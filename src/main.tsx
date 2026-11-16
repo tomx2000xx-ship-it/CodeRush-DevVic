@@ -27,8 +27,8 @@ if (tg) {
   try {
     tg.ready();
     tg.expand();
-    tg.setHeaderColor?.('#090e1b');
-    tg.setBackgroundColor?.('#090e1b');
+    tg.setHeaderColor?.('#f7fbff');
+    tg.setBackgroundColor?.('#f7fbff');
   } catch (error) {
     console.warn('Telegram WebApp presentation setup was unavailable:', error);
   }
