@@ -44,7 +44,7 @@ export function StageFourMatches(){
  const [sort,setSort]=useState<'time'|'league'>('time');
  const [slip,setSlip]=useState<Selection[]>(readSelections);
  const [expanded,setExpanded]=useState<string|null>(null);
- const [stake,setStake]=useState('10'),[walletBalance,setWalletBalance]=useState(()=>{const n=Number(localStorage.getItem('coderush-stage6-demo-balance'));return Number.isFinite(n)&&n>=0?n:125});
+ const [stake,setStake]=useState('10'),[walletBalance,setWalletBalance]=useState(()=>{const raw=localStorage.getItem('coderush-stage6-demo-balance');if(raw===null)return 125;const n=Number(raw);return Number.isFinite(n)&&n>=0?n:125});
  const [ticketOpen,setTicketOpen]=useState(false);
  const [liveMinute,setLiveMinute]=useState(28);
  const isArabic=document.documentElement.lang==='ar'||document.documentElement.dir==='rtl';
