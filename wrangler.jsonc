@@ -10,6 +10,13 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "coderush-telegram",
+      "database_id": "2c9e1bb7-6fdc-4f06-9a2c-0ed6fc323d6e"
+    }
+  ],
   "observability": {
     "enabled": true,
     "traces": {

@@ -22,28 +22,26 @@ A mobile-first sports-arena prototype designed for the Telegram Web Apps environ
 - No real wager is submitted, settled or paid.
 - No wallet is connected; no deposit address, blockchain transaction, payment or withdrawal request is created.
 - Local demo state is stored in browser localStorage. It is device/browser-specific and is not shared between users or devices.
-- The referral invite URL is a demonstration placeholder; this repo does not provision a live referral bot or track real invitees.
+- Telegram referral links now use Telegram's bot deep-link format. Only people who open the link and press Start can be registered and receive bot messages.
+- Telegram bot subscribers are stored in Cloudflare D1. This subscriber registry is separate from demo referral counts in browser localStorage.
 - Telegram `initDataUnsafe` is used only for optional display personalisation. It is **not authentication**. A production backend must validate the raw `Telegram.WebApp.initData` signature and freshness server-side.
 - No functional or end-to-end user testing is represented as completed by the build pipeline.
 
-## Telegram welcome message
+## Telegram bot, referrals and broadcasts
 
-The Worker handles Telegram `/start` webhook updates and sends an Arabic CodeRush welcome message directly into the Telegram chat. Its primary inline button opens the CodeRush Mini App. Optional channel and group buttons appear when `TELEGRAM_CHANNEL_URL` and `TELEGRAM_GROUP_URL` are configured as Worker variables.
+The Worker handles Telegram `/start` webhook updates, stores each consenting chat in D1, captures optional `ref_<code>` start payloads, and sends the Arabic welcome message with a Mini App button. `/stop` opts a subscriber out of future broadcasts.
+
+- App: `https://coderush-devvic.tomx2000xx.workers.dev`
+- Webhook: `https://coderush-devvic.tomx2000xx.workers.dev/api/telegram/webhook`
+- Bot deep link: `GET /api/telegram/link`
+- Referral deep link: `GET /api/telegram/link?ref=YOUR_CODE`
+- Subscriber counts: `GET /api/telegram/stats` (requires admin bearer secret)
+- Broadcast: `POST /api/telegram/broadcast` with JSON `{"text":"Your message","offset":0,"limit":100}` and `Authorization: Bearer <TELEGRAM_BROADCAST_SECRET>`. The endpoint sends up to 100 messages per batch and returns `nextOffset` for the next batch. Continue until it returns `nextOffset: null`.
 
 Required Worker secrets:
-- `TELEGRAM_BOT_TOKEN` — already configured in the existing Worker.
-- `TELEGRAM_WEBHOOK_SECRET` — secret header value used to authenticate Telegram webhook requests.
+- `TELEGRAM_BOT_TOKEN` — already configured.
+- `TELEGRAM_BROADCAST_SECRET` — must be added as a Worker secret before protected subscriber statistics and broadcast endpoints can be used.
 
-Webhook endpoint: `https://coderush-devvic.tomx2000xx.workers.dev/api/telegram/webhook`. The Telegram webhook must be registered with this URL and the same webhook secret. Never commit bot credentials or webhook secrets to Git.
+The Telegram bot cannot message people merely because they clicked a web link, joined a Telegram group, or saw a referral URL. Each person must open the bot and press Start at least once. The bot then stores that chat for future messages. Users can opt out with `/stop`.
 
-## Languages and direction
-
-English (LTR) and Arabic (RTL) are supported. Translation strings are centralized in `src/i18n.tsx`. New languages require a complete, reviewed translation catalogue and appropriate locale/direction configuration; the current app does not automatically translate arbitrary text.
-
-## Cloudflare runtime
-
-The existing `coderush-devvic` Worker has a Worker entry point (`worker.ts`) and serves the existing Vite build from the `dist` static-assets binding. API requests under `/api/*` execute Worker code, while normal frontend requests continue to serve the same SPA.
-
-- `GET /api/health` reports runtime readiness and whether required Telegram secrets are configured; it never returns their values.
-- Add credentials through the existing Worker’s **Settings → Variables and Secrets → Secrets**. Never commit credentials to Git.
-- The connected Cloudflare GitHub integration builds `main` using `npm run build` and deploys the existing `coderush-devvic` Worker. No new Cloudflare project is required.
+Never commit bot credentials or admin secrets to Git.
