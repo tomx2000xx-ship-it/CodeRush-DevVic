@@ -1,4 +1,4 @@
-import React, { Children, cloneElement, isValidElement, useEffect } from 'react';
+import React, { Children, cloneElement, isValidElement, useLayoutEffect } from 'react';
 
 export type Language = 'EN' | 'AR';
 
@@ -231,9 +231,18 @@ function localizeNode(node: React.ReactNode, lang: Language): React.ReactNode {
  return cloneElement(node,props);
 }
 export function Localized({lang,children}:{lang:Language;children:React.ReactNode}) {
- useEffect(()=>{
-  document.documentElement.lang=lang==='AR'?'ar':'en';
-  document.documentElement.dir=lang==='AR'?'rtl':'ltr';
- },[lang]);
- return <>{localizeNode(Children.toArray(children),lang)}</>;
+ const direction=lang==='AR'?'rtl':'ltr';
+ const locale=lang==='AR'?'ar':'en';
+ // Apply document direction before paint so child screens that inspect the document
+ // (matches, bets and wallet) render in the correct language on the first frame.
+ if(typeof document!=='undefined'){
+  document.documentElement.lang=locale;
+  document.documentElement.dir=direction;
+ }
+ useLayoutEffect(()=>{
+  document.documentElement.lang=locale;
+  document.documentElement.dir=direction;
+  document.body.dir=direction;
+ },[locale,direction]);
+ return <div className={lang==='AR'?'locale-root locale-ar':'locale-root locale-en'} lang={locale} dir={direction}>{localizeNode(Children.toArray(children),lang)}</div>;
 }
