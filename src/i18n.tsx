@@ -3,6 +3,7 @@ import React, { Children, cloneElement, isValidElement, useEffect } from 'react'
 export type Language = 'EN' | 'AR';
 
 const ar: Record<string,string> = Object.fromEntries([
+['Home win','فوز الفريق المضيف'],['Draw','تعادل'],['Away win','فوز الفريق الضيف'],['Withdrawal','سحب'],['● LIVE','● مباشر'],['1X2 · DEMO MARKET','1X2 · سوق تجريبي'],['No funds moved.','لم يتم تحويل أي أموال.'],
 ['DEMO MODE','الوضع التجريبي'],
 ['Sample data only — no real money or bets','بيانات تجريبية فقط — لا توجد أموال أو رهانات حقيقية'],
 ['DEMO EXPERIENCE','تجربة تجريبية'],
