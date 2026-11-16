@@ -249,3 +249,64 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
 @media(max-width:390px){.match-overview-stats>div{min-height:76px;padding:10px 9px}.match-overview-stats span{font-size:8px}.match-overview-stats b{font-size:21px}.match-toolbar .filter-row{max-width:calc(100vw - 120px)}.filter{padding:8px 9px;font-size:8px}.match-reference-card{padding:13px 10px}.match-reference-card .team-crest{width:65px;height:65px}.match-reference-card .team-crest img{width:53px;height:53px}.match-reference-card .versus{min-width:83px;font-size:23px}.match-reference-card .odd{min-height:74px}.match-reference-card .odd b{font-size:17px}}
 
 .match-league-heading{display:flex;align-items:center;justify-content:space-between;margin:19px 2px 10px;color:#263440}.match-league-heading b{font-size:16px;font-weight:900}.match-league-heading span{padding:6px 10px;border-radius:16px;background:#eaf5fc;color:#529dd0;font-size:8px;font-weight:900;letter-spacing:.5px}.rtl .match-league-heading{direction:rtl}
+
+
+/* Match Centre — SPORFA trophy-tab reference alignment */
+.match-arena-heading{margin-bottom:14px}
+.match-arena-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 18px}
+.match-arena-stats>div{min-height:91px;border:1px solid #dce5ec;border-radius:22px;background:#fff;box-shadow:0 7px 20px #28445d0a;padding:15px 12px;display:flex;flex-direction:column;justify-content:space-between}
+.match-arena-stats>div span{display:flex;align-items:center;gap:6px;color:#748493;font-size:11px;font-weight:800}
+.match-arena-stats>div b{font-size:27px;line-height:1;color:#202d38}
+.match-arena-search{height:62px;border-radius:24px;margin:0 0 17px;display:flex;flex-direction:row-reverse;align-items:center;padding:0 18px;gap:12px}
+.match-arena-search input{flex:1;min-width:0;text-align:right;font-size:14px}
+.match-arena-filterbar{overflow-x:auto;scrollbar-width:none;margin:0 0 14px}
+.match-arena-filterbar::-webkit-scrollbar{display:none}
+.match-arena-tabs{min-width:max-content;display:flex;gap:5px;align-items:center;justify-content:space-between;padding:6px;border:1px solid #dce5ec;background:#fff;border-radius:30px;box-shadow:0 5px 18px #28445d0a}
+.match-arena-tabs button{border:0;background:transparent;color:#73808e;font-size:12px;font-weight:850;padding:12px 15px;border-radius:24px;white-space:nowrap}
+.match-arena-tabs button.active{background:#e7f3fc;color:#4b9ed8;box-shadow:inset 0 0 0 1px #c4e0f4}
+.match-arena-tools{display:flex;align-items:center;justify-content:space-between;gap:9px;margin:0 0 17px}
+.match-arena-tools>button{min-height:42px;border:1px solid #dce5ec;border-radius:22px;background:#fff;color:#6e7e8d;padding:0 13px;display:flex;align-items:center;gap:7px;font-size:11px;font-weight:850}
+.match-arena-tools>button.active{color:#4b9ed8;background:#eaf5fc;border-color:#b9d9ef}
+.match-arena-tools .match-view-switch{display:flex;gap:3px;padding:4px;border:1px solid #dce5ec;border-radius:22px;background:#fff}
+.match-arena-tools .match-view-switch button{width:35px;height:32px;border:0;border-radius:17px;background:transparent;color:#71808e;font-size:18px}
+.match-arena-tools .match-view-switch button.active{background:#4b9fe0;color:white;box-shadow:0 4px 12px #4b9fe044}
+.match-arena-competition{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -2px 15px;padding:1px 2px 5px}
+.match-arena-competition button{min-height:42px;padding:0 15px;border:1px solid #dce5ec;border-radius:24px;background:#fff;color:#758493;white-space:nowrap;font-size:11px;font-weight:850}
+.match-arena-competition button.active,.match-arena-competition button:last-child{background:#4b9fe0;color:#fff;border-color:#4b9fe0;box-shadow:0 7px 17px #4b9fe033}
+.match-arena-competition b{margin-left:7px;padding:3px 7px;border-radius:50%;background:#ffffff35}
+.match-arena-count{text-align:right;color:#83909d;font-size:11px;font-weight:800;margin:0 4px 7px}
+.match-arena-list{gap:17px}
+.match-arena-card{padding:15px 14px 16px!important;border:1px solid #dce5ec!important;border-top:4px solid #4b9fe0!important;border-radius:25px!important;background:#fff!important;box-shadow:0 7px 22px #28445d0c!important}
+.match-arena-card .match-arena-card-head{display:flex;align-items:center;gap:9px;min-height:39px;margin-bottom:12px}
+.match-arena-card .fixture-star{position:static;float:none;flex:0 0 39px;width:39px;height:39px;border:0;border-radius:14px;background:#edf4fa;color:#778899;display:grid;place-items:center}
+.match-arena-card .fixture-star.saved{color:#4b9fe0;background:#e7f3fc}
+.match-arena-time{background:#edf4fa;color:#718091;padding:10px 12px;border-radius:20px;font-size:10px;font-weight:900;white-space:nowrap}
+.match-arena-league{margin-left:auto;color:#748493;font-size:10px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.match-arena-teams{margin:4px 0 12px!important;align-items:center}
+.match-arena-teams .team{gap:8px}
+.match-arena-teams .team b{font-size:14px!important;color:#263440}
+.match-arena-teams .team-crest{width:69px!important;height:69px!important}
+.match-arena-teams .team-crest img{width:55px!important;height:55px!important}
+.match-arena-teams .versus{min-width:90px!important;font-size:25px!important;font-weight:950;color:#263440}
+.match-arena-teams .versus small{display:block;margin-top:3px;color:#82909c;font-size:10px;font-weight:800}
+.match-arena-countdown{border-radius:18px;background:#eaf4fc;color:#438fc4;text-align:center;padding:12px 8px;margin:9px 0 13px;font-size:12px;font-weight:900}
+.match-arena-progress{display:flex!important;gap:5px!important;height:8px!important;background:transparent!important;margin:0 0 13px!important}
+.match-arena-progress span{display:block!important;flex:1;border-radius:9px;background:#d6dce1!important}
+.match-arena-progress span:first-child{background:#efc54c!important}
+.match-arena-progress span:last-child{background:#4b9fe0!important}
+.match-arena-market-head{display:none}
+.match-arena-odds{gap:9px!important}
+.match-arena-odds .odd{min-height:94px!important;border-radius:18px!important;border:1px solid #dce5ec!important;background:#fff!important;padding:11px 6px!important;display:flex!important;flex-direction:column!important;justify-content:center!important;gap:8px!important}
+.match-arena-odds .odd small{display:flex!important;flex-direction:column!important;align-items:center!important;gap:4px!important;font-size:11px!important;color:#71808e!important;font-weight:850!important}
+.match-arena-odds .odd small i{font-size:9px!important;color:#a1adb7!important}
+.match-arena-odds .odd b{font-size:21px!important;color:#263440!important}
+.match-arena-odds .odd.selected{border:2px solid #4b9fe0!important;background:#eaf5fc!important;box-shadow:0 5px 15px #4b9fe022!important}
+.match-arena-odds .odd.selected b{color:#4b9fe0!important}
+.match-arena-bet{width:min(205px,80%);height:48px;margin:13px auto 0;border:0;border-radius:25px;background:#4b9fe0;color:#fff;display:flex;align-items:center;justify-content:center;gap:9px;font-size:13px;font-weight:900;box-shadow:0 7px 18px #4b9fe044}
+.match-arena-card .match-detail-inline{margin-top:13px}
+.match-arena-list.compact .match-arena-card{padding:11px!important}
+.rtl .match-arena-search{flex-direction:row-reverse}
+.rtl .match-arena-count{text-align:left}
+.rtl .match-arena-card .match-arena-card-head{direction:rtl}
+.rtl .match-arena-league{margin-left:0;margin-right:auto}
+@media(max-width:390px){.match-arena-stats{gap:7px}.match-arena-stats>div{min-height:82px;padding:12px 9px}.match-arena-stats>div span{font-size:9px}.match-arena-stats>div b{font-size:24px}.match-arena-tabs button{padding:10px 11px;font-size:11px}.match-arena-league{font-size:8px}.match-arena-teams .team-crest{width:58px!important;height:58px!important}.match-arena-teams .team-crest img{width:46px!important;height:46px!important}.match-arena-teams .versus{min-width:75px!important;font-size:22px!important}.match-arena-odds .odd{min-height:83px!important}}
