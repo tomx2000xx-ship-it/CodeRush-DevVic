@@ -1218,3 +1218,44 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
 .wallet-modal-backdrop .wallet-flow-card .wallet-stepper>div.active i{background:#287fc1!important;border-color:#287fc1!important;color:#fff!important}
 .wallet-modal-backdrop .wallet-flow-card .wallet-flow-primary{background:#287fc1!important;color:#fff!important}
 .wallet-modal-backdrop .wallet-flow-card .wallet-flow-back{background:transparent!important;color:#5780a3!important}
+
+
+/* Wallet modal: remove every dark icon/number tile and keep the CodeRush pale-blue palette */
+.wallet-modal-backdrop .wallet-flow-card .wallet-method-mark,
+.wallet-modal-backdrop .wallet-flow-card .wallet-method-mark.tether,
+.wallet-modal-backdrop .wallet-flow-card .wallet-processing-orbit,
+.wallet-modal-backdrop .wallet-flow-card .wallet-stepper i,
+.wallet-modal-backdrop .wallet-flow-card .wallet-method-option>i>span,
+.wallet-modal-backdrop .wallet-flow-card .wallet-selected-method .wallet-method-mark,
+.wallet-modal-backdrop .wallet-flow-card .wallet-review-banner>svg,
+.wallet-modal-backdrop .wallet-flow-card .wallet-sample-address>div>svg{
+ background:#eaf4ff!important;
+ border-color:#cfe2f4!important;
+ color:#287fc1!important;
+ box-shadow:none!important;
+}
+.wallet-modal-backdrop .wallet-flow-card .wallet-method-mark img{background:#eaf4ff!important;border-radius:50%}
+.wallet-modal-backdrop .wallet-flow-card .wallet-method-option strong,
+.wallet-modal-backdrop .wallet-flow-card .wallet-quick-amounts button,
+.wallet-modal-backdrop .wallet-flow-card .stage6-amount,
+.wallet-modal-backdrop .wallet-flow-card .stage6-amount span,
+.wallet-modal-backdrop .wallet-flow-card .wallet-fee-preview b,
+.wallet-modal-backdrop .wallet-flow-card .wallet-review-list .total b{
+ background:#f1f7fd!important;color:#2878b6!important;border-color:#d7e6f3!important;
+}
+.wallet-modal-backdrop .wallet-flow-card .stage6-amount input{background:transparent!important;color:#244969!important}
+.wallet-modal-backdrop .wallet-flow-card .wallet-stepper>div.active i{background:#287fc1!important;color:#fff!important;border-color:#287fc1!important}
+.wallet-modal-backdrop .wallet-flow-card :is(.wallet-method-option,.wallet-selected-method,.wallet-review-list,.wallet-review-banner,.wallet-sample-address,.wallet-processing-orbit,.wallet-processing-track,.wallet-flow-close,.wallet-quick-amounts button,.stage6-amount) :is(svg,b,strong,span){text-shadow:none!important}
+.wallet-history-only{padding-bottom:28px}
+.wallet-history-only .wallet-history-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}
+.wallet-history-only .wallet-history-overview>div{display:flex;flex-direction:column;gap:7px;padding:12px 9px;border:1px solid #dce8f4;border-radius:12px;background:#fff;min-width:0}
+.wallet-history-only .wallet-history-overview span{font-size:8px;line-height:1.35;color:#7189a2}
+.wallet-history-only .wallet-history-overview b{font:700 13px 'Space Grotesk';color:#1c3e60;overflow-wrap:anywhere}
+.wallet-history-only .wallet-reference-history{margin-top:16px}
+.wallet-history-only .wallet-history-heading h3{color:#1e4264}
+.wallet-history-only .stage6-tx{border-color:#e0eaf3;background:#fff}
+.wallet-history-only .stage6-tx-icon{background:#eaf4ff!important;color:#287fc1!important;border:1px solid #d5e7f6}
+.wallet-history-only .stage6-tx-copy b,.wallet-history-only .stage6-tx-amount b{color:#244767}
+.wallet-history-only .stage6-tx-copy small{color:#7c91a5}
+.wallet-history-only .stage6-reset{background:#f4f9fe;border:1px solid #d8e7f4;border-radius:9px;padding:10px 14px;color:#397fb7}
+@media(max-width:370px){.wallet-history-only .wallet-history-overview{gap:5px}.wallet-history-only .wallet-history-overview>div{padding:10px 7px}.wallet-history-only .wallet-history-overview b{font-size:11px}}
