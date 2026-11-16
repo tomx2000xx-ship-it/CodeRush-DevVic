@@ -402,3 +402,5 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
  .mybets-page .mybets-tabs button{font-size:12px}
  .mybets-page .mybets-empty{padding-top:53px}
 }
+
+.mybets-page .mybets-performance-main{flex-direction:row}
