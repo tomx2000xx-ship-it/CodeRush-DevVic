@@ -948,3 +948,122 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
 .stake-row>label{width:100%}
 .stake-row>div{margin-inline-start:auto}
 @media(max-width:380px){.profile-reference-card{padding:15px;border-radius:19px}.profile-reference-user h3{font-size:14px}.profile-reference-balance strong{font-size:26px}.profile-wallet-actions button{padding:10px;column-gap:7px}.profile-wallet-actions b{font-size:12px}}
+
+
+/* CodeRush wallet refresh — guided deposit and withdrawal */
+.wallet-redesign{padding-bottom:24px}
+.wallet-redesign .wallet-page-heading{display:flex;align-items:center;justify-content:space-between;font:700 25px 'Space Grotesk';margin:22px 0 15px}
+.wallet-live-pill{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #3b5038;border-radius:30px;background:#17271f;color:#a9df9c;font:800 8px 'DM Sans';letter-spacing:.8px}
+.wallet-live-pill i{width:6px;height:6px;border-radius:50%;background:#8bd18b;box-shadow:0 0 9px #8bd18b}
+.wallet-redesign .wallet-hero-card{position:relative;min-height:158px;padding:21px;border:1px solid #33465c;border-radius:19px;background:radial-gradient(circle at 88% 10%,#315044 0,transparent 37%),linear-gradient(125deg,#172c3d,#101d2c 65%,#1b332c);overflow:hidden}
+.wallet-redesign .wallet-hero-copy{display:flex;flex-direction:column;gap:7px;position:relative;z-index:2}
+.wallet-redesign .wallet-hero-copy>span{font-size:9px;letter-spacing:1.5px;color:#aab9ca;font-weight:800}
+.wallet-redesign .wallet-hero-copy strong{font:700 32px 'Space Grotesk';color:#fff}
+.wallet-redesign .wallet-hero-copy small{font-size:9px;color:#9aabbd}
+.wallet-redesign .wallet-visibility{position:absolute;right:16px;top:18px;border:1px solid #53677b;background:#ffffff12;color:#eaf2f8;border-radius:9px;padding:8px;display:grid;place-items:center}
+.wallet-redesign .wallet-token-mark{position:absolute;right:17px;bottom:16px;display:flex;align-items:center;gap:6px;color:#e7f1eb;opacity:.92}
+.wallet-redesign .wallet-token-mark b{font:800 9px 'Space Grotesk';letter-spacing:1px}
+.wallet-redesign .wallet-token-mark>span{font:700 35px 'Space Grotesk';color:#9ed5a5}
+.wallet-redesign .wallet-token-mark strong{font:800 7px 'DM Sans';letter-spacing:1px}
+.wallet-redesign .wallet-token-mark i{font-style:normal;color:#6f8e7c}
+.wallet-redesign .wallet-hero-demo{position:absolute;left:21px;bottom:17px;color:#b4c4d2;font-size:8px;letter-spacing:1.2px}
+.wallet-redesign .wallet-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:13px 0}
+.wallet-redesign .wallet-summary-card{position:relative;min-width:0;background:#111d2b;border:1px solid #2a3b50;border-radius:13px;padding:14px}
+.wallet-redesign .wallet-summary-card span{display:block;color:#8e9eb2;font-size:8px;font-weight:800;letter-spacing:.7px}
+.wallet-redesign .wallet-summary-card b{display:block;margin-top:8px;font:700 16px 'Space Grotesk';color:#eef3fa}
+.wallet-redesign .wallet-summary-card i{position:absolute;right:12px;top:13px;color:#75c69b;font-style:normal}
+.wallet-redesign .wallet-summary-card.daily i{color:#e6a17b}
+.wallet-redesign .wallet-actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:13px 0}
+.wallet-redesign .wallet-action-card{min-width:0;border:1px solid #304258;border-radius:15px;padding:14px;background:linear-gradient(145deg,#152a29,#111c2b)}
+.wallet-redesign .wallet-action-card.withdraw{background:linear-gradient(145deg,#282337,#121d2c)}
+.wallet-redesign .wallet-action-symbol{width:39px;height:39px;border-radius:12px;background:#21443a;color:#8de0b4;display:grid;place-items:center}
+.wallet-redesign .wallet-action-card.withdraw .wallet-action-symbol{background:#423044;color:#e9a8c1}
+.wallet-redesign .wallet-action-card h3{font:700 14px 'Space Grotesk';margin:12px 0 4px}
+.wallet-redesign .wallet-action-card p{min-height:29px;margin:0;color:#91a1b6;font-size:9px;line-height:1.5}
+.wallet-redesign .wallet-action-card button{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:13px;padding:10px 11px;border:1px solid #3b6252;border-radius:9px;background:#1a3a30;color:#b7f1d0;font-size:10px;font-weight:800}
+.wallet-redesign .wallet-action-card.withdraw button{border-color:#57415a;background:#30253a;color:#f0c1d6}
+.wallet-security-line{display:flex;align-items:center;gap:8px;margin:13px 0 18px;padding:11px 12px;border:1px solid #293e3a;border-radius:10px;background:#10231f;color:#9cc7b1;font-size:9px;line-height:1.5}
+.wallet-security-line svg{flex:none}
+.wallet-flow-card{margin:17px 0;padding:16px 14px;border:1px solid #34485e;border-radius:17px;background:linear-gradient(160deg,#152438,#101a29 70%);box-shadow:0 16px 40px #0003}
+.wallet-flow-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.wallet-flow-heading span{color:#e9a77c;font-size:8px;font-weight:800;letter-spacing:1.4px}
+.wallet-flow-heading h3{margin:6px 0 0;font:700 19px 'Space Grotesk'}
+.wallet-flow-close{display:grid;place-items:center;padding:7px;border:1px solid #35465b;border-radius:9px;background:#1b293a;color:#cbd7e6}
+.wallet-stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:19px 0 18px}
+.wallet-stepper>div{display:flex;align-items:center;gap:5px;min-width:0;color:#6e8198}
+.wallet-stepper i{width:22px;height:22px;flex:none;border:1px solid #41536a;border-radius:50%;display:grid;place-items:center;font:700 9px 'DM Sans';font-style:normal}
+.wallet-stepper span{font-size:8px;white-space:nowrap}
+.wallet-stepper>div.active{color:#f0b28b}
+.wallet-stepper>div.active i{background:#ef9568;border-color:#ef9568;color:#142018}
+.wallet-flow-intro b{font:700 13px 'Space Grotesk'}
+.wallet-flow-intro p{margin:5px 0 12px;color:#91a1b6;font-size:9px}
+.wallet-method-list{display:grid;gap:8px;margin:12px 0 14px}
+.wallet-method-option{width:100%;display:flex;align-items:center;gap:10px;padding:10px;border:1px solid #2e4056;border-radius:12px;background:#111e2e;color:#eaf0f7;text-align:left}
+.wallet-method-option.selected{border-color:#e99a70;background:linear-gradient(100deg,#352c2a,#172638);box-shadow:0 0 0 1px #e99a7040}
+.wallet-method-mark{width:37px;height:37px;flex:none;display:grid;place-items:center;border-radius:50%;overflow:hidden;background:#263548}
+.wallet-method-mark svg{width:37px;height:37px}
+.wallet-method-mark b{font:700 23px 'Space Grotesk';color:#f5a64b}
+.wallet-method-mark.ethereum b{color:#aeb8ca}
+.wallet-method-option>span:nth-child(2),.wallet-selected-method>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}
+.wallet-method-option>span:nth-child(2) b,.wallet-selected-method b{font-size:10px}
+.wallet-method-option small,.wallet-selected-method small{font-size:8px;color:#8fa0b5}
+.wallet-method-option strong{font-size:9px;color:#d9e2ec}
+.wallet-method-option>i{display:grid;place-items:center;width:20px;color:#efaa7f}
+.wallet-method-option>i>span{width:15px;height:15px;border:1px solid #596b80;border-radius:50%}
+.wallet-flow-primary{width:100%;min-height:44px;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:13px;border:0;border-radius:10px;background:linear-gradient(100deg,#f0a174,#e8885e);color:#172016;font-size:11px;font-weight:800}
+.wallet-flow-back{display:flex;align-items:center;justify-content:center;gap:5px;width:100%;margin-top:9px;padding:9px;border:0;background:transparent;color:#9eafc2;font-size:10px}
+.wallet-selected-method{display:flex;align-items:center;gap:9px;padding:10px;margin-bottom:16px;border:1px solid #2c4055;border-radius:11px;background:#101e2d}
+.wallet-selected-method button{border:1px solid #43566d;border-radius:7px;padding:6px 9px;background:#1d2c3e;color:#efb18b;font-size:9px}
+.wallet-field-label{display:block;margin:14px 0 7px;color:#9eafc2;font-size:8px;font-weight:800;letter-spacing:1px}
+.wallet-amount-input{border-color:#52677d!important;background:#0c1725!important}
+.wallet-quick-amounts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:9px 0 14px}
+.wallet-quick-amounts button{padding:8px 3px;border:1px solid #34475e;border-radius:8px;background:#172639;color:#b9c8d9;font-size:9px}
+.wallet-quick-amounts button.active{border-color:#e99a70;background:#352a27;color:#ffc49f}
+.wallet-destination-input{width:100%;height:43px;padding:0 11px;border:1px solid #3a4d63;border-radius:9px;outline:none;background:#0c1725;color:#edf3fa;font:10px 'DM Sans'}
+.wallet-destination-input:focus{border-color:#e99a70}
+.wallet-fee-preview{display:flex;justify-content:space-between;gap:8px;padding:12px 0;border-top:1px solid #2a3b50;color:#8fa0b5;font-size:9px}
+.wallet-fee-preview b{color:#e5edf5}
+.wallet-inline-message{display:flex;gap:6px;align-items:center;color:#ffb6a7;font-size:9px}
+.wallet-review-banner{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid #3a5848;border-radius:10px;background:#142a23;color:#a8e0bd}
+.wallet-review-banner span{display:flex;flex-direction:column;gap:4px}
+.wallet-review-banner b{font-size:10px}
+.wallet-review-banner small{font-size:8px;color:#8eae9d}
+.wallet-review-list{margin:12px 0;padding:0 11px;border:1px solid #2c4055;border-radius:11px;background:#101d2b}
+.wallet-review-list>div{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #26374a;font-size:9px}
+.wallet-review-list>div:last-child{border:0}
+.wallet-review-list span{color:#8fa0b5}
+.wallet-review-list b{text-align:right;color:#e7edf5}
+.wallet-review-list .total b{color:#a9e5bd;font-size:12px}
+.wallet-sample-address{margin:12px 0;padding:12px;border:1px dashed #9b7452;border-radius:11px;background:#2b241d}
+.wallet-sample-address>div{display:flex;align-items:center;gap:7px;color:#ffbf88}
+.wallet-sample-address>div b{font-size:8px;letter-spacing:.4px}
+.wallet-sample-address code{display:block;margin:10px 0;overflow-wrap:anywhere;color:#ffe0c4;font:700 10px 'DM Sans'}
+.wallet-sample-address button{display:flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid #806447;border-radius:7px;background:#443326;color:#ffcfaa;font-size:9px}
+.wallet-demo-warning{color:#e5b89b;font-size:8px;line-height:1.5}
+.wallet-processing-state,.wallet-success-state{text-align:center;padding:23px 4px 5px}
+.wallet-processing-orbit{width:70px;height:70px;margin:0 auto 14px;display:grid;place-items:center;border:1px solid #476078;border-radius:50%;background:#1a2b40;color:#f1a477;animation:walletPulse 1.3s ease-in-out infinite}
+.wallet-processing-orbit svg{animation:walletSpin 1.5s linear infinite}
+.wallet-processing-state h3,.wallet-success-state h3{font:700 17px 'Space Grotesk';margin:8px 0}
+.wallet-processing-state p,.wallet-success-state p{max-width:260px;margin:0 auto 14px;color:#94a5ba;font-size:9px;line-height:1.6}
+.wallet-processing-track{height:5px;overflow:hidden;margin:18px 0 10px;border-radius:10px;background:#26374a}
+.wallet-processing-track i{display:block;width:40%;height:100%;border-radius:10px;background:#ef9568;animation:walletProgress 1.3s ease-in-out infinite}
+.wallet-processing-state>small{font-size:8px;letter-spacing:1.3px;color:#e9a77c}
+.wallet-success-state>span{width:70px;height:70px;margin:0 auto 12px;display:grid;place-items:center;border-radius:50%;background:#183a2c;color:#8fe0ae}
+.wallet-success-amount{margin:16px 0;font:700 29px 'Space Grotesk';color:#9de0b6}
+.wallet-success-amount small{font-size:10px;color:#91a1b6}
+.wallet-success-reference,.wallet-success-balance{display:flex;flex-direction:column;gap:6px;margin:8px 0;padding:11px;border:1px solid #30445a;border-radius:9px;background:#101d2c}
+.wallet-success-reference span,.wallet-success-balance span{font-size:8px;color:#8fa0b5;letter-spacing:.8px}
+.wallet-success-reference b{font-size:10px;overflow-wrap:anywhere}
+.wallet-success-balance b{font:700 16px 'Space Grotesk';color:#f3f6fb}
+.wallet-redesign .wallet-reference-note{padding:10px 11px;border-left:2px solid #d28b64;background:#151f2b;color:#9cabbc;font-size:8px;line-height:1.6}
+.wallet-redesign .wallet-reference-history{margin-top:17px}
+@keyframes walletSpin{to{transform:rotate(360deg)}}@keyframes walletPulse{50%{box-shadow:0 0 0 8px #ef95681a}}@keyframes walletProgress{0%{transform:translateX(-110%)}100%{transform:translateX(280%)}}
+.rtl .wallet-redesign,.rtl .wallet-flow-card{direction:rtl;text-align:right}
+.rtl .wallet-redesign .wallet-visibility{right:auto;left:16px}
+.rtl .wallet-redesign .wallet-token-mark{right:auto;left:17px}
+.rtl .wallet-redesign .wallet-hero-demo{left:auto;right:21px}
+.rtl .wallet-stepper>div{flex-direction:row-reverse}
+.rtl .wallet-method-option,.rtl .wallet-selected-method,.rtl .wallet-review-banner,.rtl .wallet-security-line{direction:rtl}
+.rtl .wallet-sample-address code{text-align:left;direction:ltr}
+.rtl .wallet-review-list b{text-align:left}
+@media(max-width:370px){.wallet-stepper span{font-size:7px}.wallet-redesign .wallet-summary-card b{font-size:14px}.wallet-redesign .wallet-action-card{padding:11px}}
