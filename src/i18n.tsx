@@ -465,8 +465,7 @@ const ar: Record<string,string> = Object.fromEntries([
 ['View more bets','عرض المزيد من الرهانات'],
 ['No open bets','لا توجد رهانات مفتوحة'],
 ['Browse matches','تصفح المباريات'],
-['Open this screen inside the deployed CodeRush app to generate your Telegram link','افتح هذه الشاشة داخل تطبيق CodeRush المنشور لإنشاء رابط تيليجرام الخاص بك']
-
+['Open this screen inside the deployed CodeRush app to generate your Telegram link','افتح هذه الشاشة داخل تطبيق CodeRush المنشور لإنشاء رابط تيليجرام الخاص بك'],
 ['LIVE MATCH SIMULATION','محاكاة مباراة مباشرة'],
 ['Goal! Germany take the lead.','هدف! ألمانيا تتقدم في النتيجة.'],
 ['Netherlands chance — saved by the keeper.','فرصة لهولندا — يتصدى لها حارس المرمى.'],
@@ -762,8 +761,7 @@ const ar: Record<string,string> = Object.fromEntries([
 ['Support centre is coming soon in this demo','سيتم توفير مركز الدعم قريباً في هذه النسخة التجريبية'],
 ['Close welcome message','إغلاق رسالة الترحيب'],
 ['Previous banner','الشريحة السابقة'],
-['Next banner','الشريحة التالية']
-
+['Next banner','الشريحة التالية'],
 ['Demo experience · no real money or bets','تجربة تجريبية · لا توجد أموال أو رهانات حقيقية'],
 ['Your demo arena is ready. Explore matches and rewards.','ساحتك التجريبية جاهزة. استكشف المباريات والمكافآت.'],
 ['CodeRush featured banners','اللافتات المميزة في CodeRush'],
