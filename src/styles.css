@@ -164,3 +164,46 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
 .iconbtn,.quick-actions button,.arena-features button,.odd,.nav-item{transition:filter .18s ease,transform .18s ease,border-color .18s ease}
 .iconbtn:active,.quick-actions button:active,.arena-features button:active,.odd:active,.nav-item:active{transform:translateY(1px)}
 .club-crest{display:grid;place-items:center;overflow:hidden}.club-crest img{width:34px;height:34px;object-fit:contain;display:block}.team-crest{background:#fff;border:1px solid #e2e7ee;border-radius:50%;box-shadow:0 3px 9px #203a4e20}
+
+/* CodeRush home: compact reference-led sports dashboard */
+.home-topbar{height:84px;margin:0 -18px;padding:8px 18px;background:#fff;border-bottom:1px solid #e8eff5;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.home-head-left{display:flex;align-items:center;gap:7px;min-width:0}
+.home-round-avatar{position:relative;width:47px;height:47px;flex:none;border:2px solid #36a9a0;border-radius:50%;background:linear-gradient(145deg,#56b7e8,#317fc5);color:#fff;display:grid;place-items:center;box-shadow:0 3px 10px #2e9fc333}
+.home-round-avatar i,.home-support-fab i{position:absolute;width:13px;height:13px;left:-2px;bottom:-1px;border:3px solid #102a2a;border-radius:50%;background:#18b58b}
+.home-head-icon{position:relative;width:43px;height:43px;flex:none;border:1px solid #c9e1f0;border-radius:14px;background:#edf7fc;color:#4c9bc8;display:grid;place-items:center}
+.home-head-icon:nth-child(3){border-radius:50%;background:#fff;border-color:#e3eaf0;color:#283d4d}
+.notification-count{position:absolute;right:-4px;top:-5px;width:21px;height:21px;border:2px solid white;border-radius:50%;background:#e85e69;color:#fff;font:700 10px 'DM Sans';display:grid;place-items:center}
+.home-wallet-shortcut{height:43px;flex:none;display:flex;align-items:center;gap:7px;padding:0 10px;border:1px solid #cfe3f1;border-radius:24px;background:#eff8fd;color:#4b9dd0;font-size:13px}
+.home-brand{display:flex;align-items:center;gap:7px;border:0;background:transparent;color:#263a4b;padding:0;min-width:0}
+.home-brand span{display:grid;text-align:right}.home-brand b{font:800 12px 'Space Grotesk';letter-spacing:.4px}.home-brand small{font-size:7px;color:#4b9bd0;font-weight:800}
+.home-brand i{width:40px;height:40px;flex:none;border:2px solid #c5a65d;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#245b83,#071b36 70%);color:#f5d889;font:800 12px 'Space Grotesk';font-style:normal;box-shadow:0 3px 12px #183e6330}
+.home-demo-strip{margin:8px 0 10px;border-radius:8px;background:#f2f8fc;border-color:#e1edf5;color:#718392;font-size:8px}
+.home-promo-carousel{height:clamp(245px,84vw,355px);position:relative;margin:0 0 10px;border-radius:24px;overflow:hidden;background:#071a36;box-shadow:0 10px 25px #1c5c8825}
+.home-promo-carousel>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
+.home-promo-shade{position:absolute;inset:0;background:linear-gradient(90deg,#06172acb 0%,#071a3677 57%,#071a3610 100%),linear-gradient(0deg,#06172a55,transparent 45%)}
+.home-promo-copy{position:absolute;left:19px;top:50%;transform:translateY(-50%);width:68%;color:white}
+.home-promo-copy>span{font-size:9px;font-weight:800;letter-spacing:1.4px;color:#9bd5ff}
+.home-promo-copy h2{font:800 clamp(20px,5.8vw,30px)/1.12 'Space Grotesk';letter-spacing:-.5px;margin:9px 0 8px;text-shadow:0 2px 12px #001}
+.home-promo-copy p{font-size:8px;letter-spacing:.6px;color:#e3f2ff;margin:0 0 13px}
+.home-promo-copy button{display:inline-flex;align-items:center;gap:6px;padding:9px 11px;border:1px solid #ffffff75;border-radius:20px;background:#ffffff20;color:#fff;font-size:8px;font-weight:800}
+.home-promo-dots{position:absolute;bottom:13px;left:50%;transform:translateX(-50%);display:flex;gap:7px}.home-promo-dots i{width:8px;height:8px;border-radius:10px;background:#ffffff75}.home-promo-dots i.active{width:26px;background:#55a6df}
+.home-promo-brand{position:absolute;right:14px;top:13px;width:38px;height:38px;border:1px solid #ffffff85;border-radius:50%;display:grid;place-items:center;color:#fff;font:800 12px 'Space Grotesk';background:#071a3670}
+.announcement-ticker{min-height:57px;margin:13px 0 17px;padding:9px 12px;border:1px solid #e1eaf1;border-radius:22px;background:#fff;display:flex;align-items:center;gap:10px;color:#758491;box-shadow:0 4px 13px #23435a0a}
+.ticker-speaker{width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center;background:#fff5d9;color:#d7a52a}.announcement-ticker>div{min-width:0;flex:1;font-size:9px;line-height:1.5}.announcement-ticker>div b{color:#4c6171}.ticker-new{font-size:7px;font-weight:800;color:#4b9bd0;letter-spacing:.7px}
+.home-balance-card{margin:0 0 19px;padding:17px 15px 14px;border:1px solid #4d8fdb;border-radius:26px;background:linear-gradient(118deg,#4b9bd4 0%,#397edb 56%,#5c73e7 100%);color:#fff;box-shadow:0 12px 24px #397fd22b;position:relative}
+.home-balance-top{display:flex;align-items:center;gap:10px;min-height:88px}
+.balance-avatar{width:64px;height:64px;border-color:#28c1a2;box-shadow:0 0 0 3px #ffffff25}
+.home-balance-value{margin-left:auto;min-width:0;display:grid;gap:3px;text-align:right}
+.home-balance-value>span{font-size:10px;font-weight:700;color:#e8f4ff}.home-balance-value>div{display:flex;align-items:center;gap:8px}.home-balance-value>div button{width:28px;height:28px;border:0;border-radius:50%;background:#ffffff24;color:#fff;display:grid;place-items:center}.home-balance-value strong{font:800 34px 'Space Grotesk';letter-spacing:-1px}.home-balance-value>small{font-size:7px;letter-spacing:.8px;color:#e1efff}
+.home-wallet-large{width:72px;height:72px;flex:none;border:0;border-radius:22px;background:#fff;color:#438fc7;display:grid;place-items:center;box-shadow:0 5px 15px #174d9430}
+.home-account-id{margin-top:12px;padding:9px 10px 9px 13px;border:1px solid #ffffff4d;border-radius:19px;background:#ffffff20;display:flex;align-items:center;justify-content:space-between;gap:9px}
+.home-account-id>div{min-width:0;display:grid;gap:4px}.home-account-id>div span{font-size:8px;color:#e4f1ff}.home-account-id>div b{font:700 12px 'Space Grotesk';letter-spacing:.8px;overflow:hidden;text-overflow:ellipsis}
+.home-account-id>button{height:39px;flex:none;display:flex;align-items:center;gap:7px;padding:0 11px;border:0;border-radius:14px;background:#fff;color:#438fc7;font-size:9px;font-weight:800}
+.home-match-preview{margin:19px 0 30px}.home-section-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}.home-section-title>div{display:grid;gap:4px}.home-section-title>div span{font-size:8px;letter-spacing:1.1px;font-weight:800;color:#4c9bd0}.home-section-title>div b{font:800 18px 'Space Grotesk';color:#2e3e4a}.home-section-title>button{display:flex;align-items:center;gap:4px;border:0;background:transparent;color:#4799cf;font-size:8px;font-weight:800}
+.home-support-fab{position:fixed;z-index:45;right:max(calc((100vw - 484px)/2 + 5px),16px);bottom:91px;width:64px;height:64px;border:5px solid #fff;border-radius:50%;background:linear-gradient(145deg,#64b9ed,#347ed0);color:#fff;display:grid;place-items:center;box-shadow:0 7px 18px #2675b64a}
+.home-support-fab i{left:auto;right:0;top:1px;bottom:auto;width:13px;height:13px;border-color:#fff}
+.rtl .home-promo-copy{left:auto;right:19px;text-align:right}.rtl .home-promo-shade{background:linear-gradient(270deg,#06172acb 0%,#071a3677 57%,#071a3610 100%),linear-gradient(0deg,#06172a55,transparent 45%)}
+.rtl .home-account-id{flex-direction:row-reverse}.rtl .home-section-title{flex-direction:row-reverse}
+.bottom-nav{height:78px;background:#ffffffed;border:1px solid #dce7ef;border-radius:25px 25px 0 0;box-shadow:0 -5px 20px #23435a12;padding:6px 8px env(safe-area-inset-bottom)}
+.nav-item{min-width:57px;gap:5px;color:#8493a0;font-size:9px;font-weight:700}.nav-item.active{min-width:72px;height:58px;border-radius:19px;background:#eaf5fc;color:#4a9bd0}
+@media(max-width:390px){.home-topbar{gap:5px;padding-left:11px;padding-right:11px}.home-head-left{gap:5px}.home-round-avatar{width:41px;height:41px}.home-head-icon{width:38px;height:38px}.home-wallet-shortcut{height:39px;padding:0 7px;font-size:11px}.home-brand i{width:35px;height:35px}.home-brand b{font-size:10px}.home-brand small{font-size:6px}.home-promo-carousel{height:clamp(230px,82vw,305px)}.home-balance-card{padding:14px 11px}.home-wallet-large{width:62px;height:62px}.home-balance-value strong{font-size:29px}.home-support-fab{right:13px;width:59px;height:59px}}
