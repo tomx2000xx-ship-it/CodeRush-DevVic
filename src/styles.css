@@ -1319,12 +1319,11 @@ html[dir="rtl"] .app{
  text-align:start;
 }
 html[dir="rtl"] .app{
- font-weight:600;
+ font-weight:500;
 }
 html[dir="rtl"] .app :where(p,small,label){
- font-size:calc(1em + 1px);
- font-weight:600;
- line-height:1.75;
+ font-weight:500;
+ line-height:1.5;
 }
 html[dir="rtl"] .app :where(button,input,textarea,select){
  font-weight:600;
@@ -1342,4 +1341,60 @@ html[dir="rtl"] .app :where(input[type="number"],input[inputmode="decimal"]){
 html[dir="rtl"] .app :where(code,kbd){
  direction:ltr;
  unicode-bidi:embed;
+}
+
+
+/* Arabic layout adaptation — preserve component dimensions and original type scale. */
+html[dir="rtl"] .app :where(p,small,label,span,a,h1,h2,h3,h4,b,strong){
+  min-width:0;
+  max-width:100%;
+  overflow-wrap:break-word;
+  word-break:normal;
+  unicode-bidi:plaintext;
+}
+html[dir="rtl"] .app :where(p,small,label){
+  text-wrap:pretty;
+  line-height:1.5;
+}
+html[dir="rtl"] .app :where(button){
+  min-width:0;
+  max-width:100%;
+  white-space:normal;
+  line-height:1.35;
+  text-align:center;
+}
+html[dir="rtl"] .app :where(button > span,button > b,button > strong){
+  min-width:0;
+  max-width:100%;
+}
+html[dir="rtl"] .app :where(.section-head,.home-section-title,.home-ref-section-title,.match-meta,.match-league-heading,.profile-menu-row,.profile-reference-user,.home-balance-top,.home-account-id,.home-daily-head,.home-live-meta,.home-live-score-row,.daily-reward,.arena-heading,.slip-title,.demo-bet-top,.history-bottom,.wallet-form-heading,.wallet-history-heading,.stage6-tx,.stage6-tx-copy,.stage6-tx-amount,.sb-ticket-heading,.sb-controls,.sb-match-main,.sb-match-card,.sb-market-row,.sb-ticket-row){
+  min-width:0;
+}
+html[dir="rtl"] .app :where(.section-head > *, .home-section-title > *, .home-ref-section-title > *, .profile-menu-row > *, .profile-reference-user > *, .home-balance-top > *, .home-account-id > *, .home-daily-head > *, .home-live-meta > *, .daily-reward > *, .arena-heading > *, .slip-title > *, .demo-bet-top > *, .history-bottom > *, .wallet-form-heading > *, .wallet-history-heading > *, .stage6-tx > *, .stage6-tx-copy > *, .stage6-tx-amount > *, .sb-ticket-heading > *, .sb-controls > *, .sb-match-main > *, .sb-market-row > *, .sb-ticket-row > *){
+  min-width:0;
+}
+html[dir="rtl"] .app :where(.quick-actions b,.quick-actions small,.nav-item span,.profile-menu-row span,.home-feature-card b,.home-feature-card small,.home-more-card b,.home-more-card small,.arena-features b,.arena-features small,.summary-grid span,.summary-grid small,.wallet-history-overview span){
+  white-space:normal;
+  overflow-wrap:break-word;
+  line-height:1.4;
+}
+html[dir="rtl"] .app :where(.home-promo-copy h2,.welcome-modal h2,.profile-reference-heading h1,.page-title h1,.trophy-match-page h1){
+  line-height:1.25;
+  text-wrap:balance;
+}
+html[dir="rtl"] .app :where(.teams,.trophy-teams,.trophy-fixture-head,.trophy-odds,.odds,.detail-odds,.home-promo-track,.home-promo-controls,.home-head-left,.home-brand,.home-balance-value strong,.sb-match-state,.account-id,.referral-url,.wallet-reference,code,kbd){
+  unicode-bidi:isolate;
+}
+html[dir="rtl"] .app :where(input[type="number"],input[type="email"],input[type="url"],input[inputmode="decimal"],.account-id,.referral-url,.wallet-reference,code,kbd){
+  overflow-wrap:normal;
+  word-break:normal;
+}
+html[dir="rtl"] .app :where(.nav-item,.quick-actions button,.daily-reward>button,.filter,.odd,.home-promo-copy button){
+  flex-shrink:0;
+}
+@media(max-width:380px){
+  html[dir="rtl"] .app{padding-inline:13px}
+  html[dir="rtl"] .app :where(.quick-actions){gap:5px}
+  html[dir="rtl"] .app :where(.quick-actions b){font-size:8px}
+  html[dir="rtl"] .app :where(.nav-item){min-width:0;flex:1}
 }
