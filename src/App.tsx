@@ -18,7 +18,7 @@ export default function App(){
  const rtl=lang==='AR',name=profile?.name||telegramUser?.first_name||'Guest';
  const choose=(v:string)=>setSelected(s=>s.includes(v)?s.filter(x=>x!==v):[...s,v]);
  const completeRegistration=()=>{const clean=displayName.trim();if(!clean){setNotice('Please enter a display name');return}if(!accepted){setNotice('Please acknowledge the demo notice');return}const p:Profile={name:clean,telegramId:String(telegramUser?.id||''),username:String(telegramUser?.username||''),joinedAt:new Date().toISOString()};localStorage.setItem('coderush-demo-profile',JSON.stringify(p));setProfile(p);setNotice('Welcome to CodeRush');};
- const nav:[Tab,any][]=[['Home',Home],['Matches',Trophy],['My Bets',Ticket],['Friends',Users],['Account',UserRound]];
+ const nav:[Tab,any][]=[['Home',Home],['Matches',Trophy],['My Bets',TicketPercent],['Friends',Users],['Account',UserRound]];
  return <Localized lang={lang}><main className={rtl?'app rtl':'app'}>
  <header className="topbar"><div className="brand"><div className="brandmark">CR</div><div><b>CODERUSH</b><small>SPORTS ARENA</small></div></div><div className="head-actions"><button className="iconbtn" aria-label={rtl?'Switch language to English':'تغيير اللغة إلى العربية'} onClick={()=>setLang(rtl?'EN':'AR')}><Globe2 size={17}/><span>{rtl?'عربي':'EN'}</span></button><button className="iconbtn" aria-label="Notifications" onClick={()=>setTab('Notifications')}><Bell size={18}/><i/></button><div className="avatar">{name.slice(0,1).toUpperCase()}</div></div></header>
  <div className="demo-strip"><span className="pulse"/> DEMO MODE <span>•</span> Sample data only — no real money or bets</div>
