@@ -776,3 +776,127 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
 .sb-ticket-sheet .place-demo{width:100%;margin-top:3px}
 .sb-ticket-clear{width:100%;margin-top:9px;padding:9px;border:1px solid #405168;border-radius:9px;background:transparent;color:#c4d0df;font-size:10px}
 .sb-ticket-sheet .detail-disclaimer{text-align:center;font-size:9px;color:#8798ad;margin:10px 0 0}
+
+
+/* CodeRush Matches — align fixture sizing and colours with the current SPORFA blue/white UI */
+.sporty-matches{color:#263440;padding:8px 0 112px}
+.sb-page-heading{margin:7px 2px 12px}
+.sb-page-heading>div>span{color:#82909d;font-size:9px;letter-spacing:1.35px}
+.sb-page-heading h2{color:#202c37;font-size:25px;font-weight:900}
+.sb-demo-tag{border:1px solid #b9d9ee;background:#eaf5fc;color:#438fc5;padding:6px 10px}
+.sb-summary-strip{gap:8px;margin-bottom:12px}
+.sb-summary-strip>div{min-height:75px;padding:11px 12px;border:1px solid #dce5ec;border-radius:17px;background:#fff;box-shadow:0 5px 16px #28445d0a}
+.sb-summary-strip small{font-size:9px;color:#82909d}
+.sb-summary-strip b{font-size:22px;color:#263440}
+.sb-summary-strip .sb-summary-live{color:#df6973}
+.sb-search{height:47px;margin-bottom:12px;padding:0 13px;border:1px solid #dce5ec;border-radius:16px;background:#fff;color:#82909d;box-shadow:0 4px 13px #28445d08}
+.sb-search input{color:#263440;font-size:12px}
+.sb-search input::placeholder{color:#9aa6b1}
+.sb-search kbd{color:#82909d}
+.sb-category-scroll{gap:7px;padding:2px 0 9px}
+.sb-category-scroll button{padding:8px 11px;border:1px solid #dce5ec;border-radius:18px;background:#fff;color:#718090;font-size:10px;font-weight:800}
+.sb-category-scroll button.active{border-color:#4b9fe0;background:#4b9fe0;color:#fff;box-shadow:0 4px 12px #4b9fe033}
+.sb-controls{gap:6px;margin:1px 0 13px}
+.sb-day-tabs{gap:2px;padding:3px;border:1px solid #dce5ec;border-radius:19px;background:#fff}
+.sb-day-tabs button{padding:8px 6px;border-radius:15px;color:#718090;font-size:10px}
+.sb-day-tabs button.active{background:#e8f4fc;color:#438fc5;box-shadow:inset 0 0 0 1px #c3dfef}
+.sb-controls>button{height:34px;padding:0 8px;border:1px solid #dce5ec;border-radius:17px;background:#fff;color:#718090;font-size:9px}
+.sb-controls>button.active{border-color:#b9d9ef;background:#eaf5fc;color:#438fc5}
+.sb-live-feature{margin-bottom:13px;padding:12px;border:1px solid #b9d9ef;border-top:3px solid #4b9fe0;border-radius:18px;background:linear-gradient(145deg,#fff,#f3f9fd);box-shadow:0 6px 18px #28445d0d}
+.sb-live-feature-top{color:#d65e69;font-size:9px}
+.sb-live-feature-top>small{border:1px solid #dce5ec;background:#edf4fa;color:#718090}
+.sb-live-feature-teams{grid-template-columns:minmax(0,1fr) 64px minmax(0,1fr);padding:12px 0 10px}
+.sb-live-feature-teams>div{gap:6px}
+.sb-live-feature-teams>div b{color:#263440;font-size:10px}
+.sb-live-feature-teams>strong{color:#263440;font-size:21px}
+.sb-live-feature-teams>strong small{color:#d65e69}
+.sporty-matches .team-crest{width:27px!important;height:27px!important;min-width:27px!important;border-radius:50%!important;background:#fff!important;border:1px solid #dce5ec!important;padding:2px!important}
+.sporty-matches .team-crest img{width:100%!important;height:100%!important;object-fit:contain!important}
+.sb-live-feature .team-crest{width:34px!important;height:34px!important;min-width:34px!important}
+.sb-live-feature-markets{gap:6px;margin-top:2px}
+.sb-live-feature-markets button,.sb-market-row button{height:39px;border:1px solid #dce5ec;border-radius:10px;background:#f7fafc;color:#263440}
+.sb-live-feature-markets button small,.sb-market-row button small{color:#82909d;font-size:10px}
+.sb-live-feature-markets button b,.sb-market-row button b{font-size:12px;color:#263440}
+.sb-live-feature-markets button.selected,.sb-market-row button.selected{border:1.5px solid #4b9fe0;background:#eaf5fc;color:#438fc5}
+.sb-live-feature-markets button.selected b,.sb-market-row button.selected b{color:#438fc5}
+.sb-league-group{margin-bottom:11px;border:1px solid #dce5ec;border-radius:16px;background:#fff;box-shadow:0 5px 16px #28445d09}
+.sb-league-heading{height:43px;padding:0 12px;border-bottom:1px solid #e6edf2;background:#f2f8fc;color:#263440}
+.sb-league-heading>b{font-size:10px;color:#334454}
+.sb-league-heading>small{background:#e4f1fa;color:#438fc5}
+.sb-league-heading>svg{color:#82909d}
+.sb-match-row{padding:9px 10px 9px;border-bottom:1px solid #edf1f4}
+.sb-match-row.is-live{background:#fff8f8}
+.sb-match-main{grid-template-columns:22px minmax(0,1fr) 58px;gap:7px;min-height:50px}
+.sb-fav{color:#a0acb7}
+.sb-fav.saved{color:#e4ae3f}
+.sb-team-stack{gap:6px}
+.sb-team-stack>div{gap:7px}
+.sb-team-stack>div>b{color:#2d3b47;font-size:10px;font-weight:750}
+.sb-match-state{min-height:40px;border-inline-start:1px solid #e6edf2}
+.sb-match-state>b{color:#263440;font-size:11px}
+.sb-match-state>small{color:#82909d;font-size:8px}
+.sb-match-state>strong{color:#d65e69}
+.sb-match-state .sb-live-dot{background:#df6973}
+.sb-market-row{grid-template-columns:repeat(3,minmax(0,1fr)) 32px;gap:5px;margin-top:7px}
+.sb-market-row button{height:36px;gap:5px}
+.sb-market-row .sb-more-market{font-size:10px;color:#438fc5;background:#f1f7fc}
+.sb-expanded-market{margin-top:7px;padding:10px;border:1px solid #dceaf4;border-radius:10px;background:#f5f9fc;color:#526575}
+.sb-expanded-market span,.sb-expanded-market small{color:#82909d}
+.sb-ticket-launcher{left:50%;right:auto;transform:translateX(-50%);width:min(490px,calc(100% - 24px));min-height:56px;bottom:calc(76px + env(safe-area-inset-bottom));border:1px solid #398dce;border-radius:17px;background:#4b9fe0;color:#fff;box-shadow:0 8px 22px #368bd044}
+.sb-ticket-icon{background:#fff;color:#438fc5}
+.sb-ticket-icon i{background:#df6973}
+.sb-ticket-launcher>span:nth-child(2)>small{color:#e8f5ff}
+.sb-ticket-launcher>strong{color:#fff}
+.sb-ticket-backdrop{background:#15283b88}
+.sb-ticket-sheet{background:#fff;border:1px solid #dce5ec;color:#263440;box-shadow:0 -12px 36px #18344c22}
+.sb-ticket-grabber{background:#c4d2de}
+.sb-ticket-heading .eyebrow{color:#82909d}
+.sb-ticket-heading h3{color:#263440}
+.sb-ticket-heading h3 em{background:#eaf5fc;color:#438fc5}
+.sb-ticket-heading>button{background:#edf4fa;color:#526575}
+.sb-ticket-mode{background:#f1f7fc;border:1px solid #e0ebf3}
+.sb-ticket-mode b{color:#263440}
+.sb-ticket-mode small{color:#82909d}
+.sb-ticket-sheet .slip-pick{border-bottom-color:#e8eef3}
+.sb-ticket-sheet .slip-pick>div b{color:#263440}
+.sb-ticket-sheet .slip-pick>div small{color:#82909d}
+.sb-ticket-sheet .slip-pick>strong{color:#438fc5}
+.sb-ticket-sheet .slip-pick>button{color:#82909d}
+.sb-ticket-sheet .stake-row{border-top-color:#e4ebf1;color:#526575}
+.sb-ticket-sheet .stake-row button{border-color:#cbdde9;background:#f1f7fc;color:#438fc5}
+.sb-ticket-sheet .stake-row input{border-color:#cbdde9;background:#fff;color:#263440}
+.sb-ticket-sheet .slip-totals{background:#f1f7fc;border:1px solid #e0ebf3}
+.sb-ticket-sheet .slip-totals>span{color:#718090}
+.sb-ticket-sheet .slip-totals b,.sb-ticket-sheet .slip-totals strong{color:#263440}
+.sb-ticket-sheet .place-demo{background:#4b9fe0;color:#fff}
+.sb-ticket-clear{border-color:#dce5ec;color:#718090}
+.sb-ticket-sheet .detail-disclaimer{color:#82909d}
+.sporty-matches .empty{background:#fff;border-color:#dce5ec;color:#718090}
+.sporty-matches .empty h3{color:#263440}
+.sporty-matches .empty p{color:#82909d}
+.sporty-matches .empty svg{color:#4b9fe0}
+.sporty-matches[dir="rtl"] .sb-match-main{direction:rtl}
+.sporty-matches[dir="rtl"] .sb-match-state{border-inline-start:0;border-inline-end:1px solid #e6edf2}
+.sporty-matches[dir="rtl"] .sb-live-feature-teams{direction:rtl}
+.sporty-matches[dir="rtl"] .sb-ticket-launcher{direction:rtl}
+@media(max-width:390px){
+ .sb-summary-strip{gap:6px}
+ .sb-summary-strip>div{min-height:69px;padding:9px 8px;border-radius:14px}
+ .sb-summary-strip small{font-size:8px}
+ .sb-summary-strip b{font-size:20px}
+ .sb-search{height:44px}
+ .sb-category-scroll button{padding:8px 10px;font-size:9px}
+ .sb-controls{gap:4px}
+ .sb-controls>button{padding:0 6px;font-size:8px}
+ .sb-day-tabs button{padding:8px 5px;font-size:9px}
+ .sb-match-main{grid-template-columns:20px minmax(0,1fr) 53px;gap:5px}
+ .sb-team-stack>div>b{font-size:9px}
+ .sporty-matches .team-crest{width:24px!important;height:24px!important;min-width:24px!important}
+ .sb-market-row,.sb-live-feature-markets{gap:4px}
+ .sb-market-row button{height:34px}
+ .sb-market-row button b,.sb-live-feature-markets button b{font-size:11px}
+ .sb-live-feature-teams{grid-template-columns:minmax(0,1fr) 57px minmax(0,1fr)}
+ .sb-live-feature-teams>div b{font-size:9px}
+ .sb-ticket-launcher{width:calc(100% - 18px);padding:8px 10px}
+ .sb-ticket-launcher>strong{font-size:8px}
+}
