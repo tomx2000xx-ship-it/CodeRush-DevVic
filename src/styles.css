@@ -505,3 +505,79 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
 .trophy-summary-card{direction:ltr}
 .trophy-match-page[dir="rtl"] .trophy-summary-card{direction:rtl}
 .trophy-match-page[dir="rtl"] .trophy-summary-card span{direction:rtl}
+
+
+/* Matches / Trophy tab: precise responsive layout and RTL-safe structure */
+.trophy-match-page{box-sizing:border-box;padding:10px 0 30px;min-width:0}
+.trophy-match-page *{box-sizing:border-box}
+.trophy-summary{direction:ltr;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:8px 0 15px}
+.trophy-summary-card{direction:ltr;min-height:108px;padding:14px 11px;border-radius:22px;overflow:hidden}
+.trophy-summary-card span{font-size:clamp(9px,2.8vw,12px);line-height:1.35}
+.trophy-summary-card b,.trophy-summary-card.total b{font-size:clamp(21px,6vw,29px);letter-spacing:-.7px}
+.trophy-summary-card small{font-size:8px;color:#8a98a5;font-weight:800;letter-spacing:.4px}
+.trophy-search{height:54px;border-radius:18px;margin-bottom:14px;gap:10px}
+.trophy-filter-scroll{margin:0 -2px 13px}
+.trophy-filter-tabs{justify-content:space-between;gap:2px;min-width:0;padding:4px;border-radius:22px}
+.trophy-filter-tabs button{min-height:44px;flex:1 0 auto;padding:0 10px;font-size:12px}
+.trophy-filter-tabs button .filter-live-dot{display:inline-block;width:6px;height:6px;margin-inline-start:5px;border-radius:50%;background:#e46b72}
+.trophy-tools{gap:7px;margin-bottom:14px}
+.trophy-tools>button{height:40px;padding:0 10px;font-size:10px}
+.trophy-view-switch{padding:3px}
+.trophy-view-switch button{width:32px;height:31px}
+.trophy-competition-row{gap:7px;margin-bottom:13px}
+.trophy-competition-row button{min-height:42px;padding:0 11px;font-size:10px}
+.trophy-competition-row .competition-chip{justify-content:flex-start;white-space:normal;line-height:1.25;text-align:start}
+.trophy-result-count{margin-bottom:8px}
+.trophy-league-heading{margin-bottom:11px}
+.trophy-fixture-list{gap:13px}
+.trophy-fixture-card{padding:14px 12px 15px;border-radius:22px;border-top-width:3px}
+.trophy-fixture-card.is-live{border-top-color:#e56c72;background:linear-gradient(180deg,#fff 0%,#fff 82%,#fff9f9 100%)}
+.trophy-fixture-head{direction:ltr;gap:7px;min-height:36px;margin-bottom:10px}
+.trophy-fixture-head>button{flex-basis:34px;width:34px;height:34px;border-radius:12px}
+.trophy-time-pill{padding:8px 9px;font-size:9px}
+.trophy-time-pill.live-pill{background:#fff0f0;color:#d65d65}
+.trophy-fixture-head>b{flex:1;min-width:0;margin:0;text-align:end;font-size:9px}
+.trophy-teams{direction:ltr;grid-template-columns:minmax(0,1fr) minmax(75px,.7fr) minmax(0,1fr);gap:3px;margin:5px 0 11px}
+.trophy-team{gap:6px}
+.trophy-team .team-crest{width:64px!important;height:64px!important;box-shadow:0 3px 10px #1d34431c!important}
+.trophy-team .team-crest img{width:52px!important;height:52px!important}
+.trophy-team>b{font-size:12px;max-width:100%;overflow-wrap:anywhere}
+.trophy-kickoff{min-width:0;width:100%}
+.trophy-kickoff strong{font-size:clamp(19px,5vw,25px)}
+.trophy-kickoff small{font-size:9px;white-space:nowrap}
+.trophy-countdown{min-height:37px;margin:8px 0 11px;padding:8px 6px;border-radius:13px;font-size:10px}
+.trophy-countdown.live-countdown{background:#fff0f0;color:#d65d65;gap:7px}
+.trophy-countdown.live-countdown i{width:7px;height:7px;border-radius:50%;background:#e05d67;box-shadow:0 0 0 4px #e05d671b}
+.trophy-odds-track{height:6px;margin:0 3px 10px;gap:4px}
+.trophy-odds-track.live-track i{background:#e7c5c7}
+.trophy-odds-track.live-track i:first-child{background:#e66b72}
+.trophy-odds-track.live-track i:last-child{background:#e6a3a7}
+.trophy-odds{gap:7px}
+.trophy-odds button{min-height:72px;border-radius:14px;gap:6px;padding:8px 3px}
+.trophy-odds button small{font-size:9px}
+.trophy-odds button b{font-size:18px}
+.trophy-bet-button{height:42px;margin-top:11px;border-radius:14px;width:100%;font-size:11px;box-shadow:none}
+.trophy-fixture-list.compact .trophy-fixture-card{padding:11px}
+.trophy-fixture-list.compact .trophy-team .team-crest{width:48px!important;height:48px!important}
+.trophy-fixture-list.compact .trophy-team .team-crest img{width:39px!important;height:39px!important}
+.trophy-fixture-list.compact .trophy-odds button{min-height:58px}
+.trophy-match-page[dir=rtl] .trophy-summary-card{direction:rtl}
+.trophy-match-page[dir=rtl] .trophy-fixture-head{direction:ltr}
+.trophy-match-page[dir=rtl] .trophy-teams{direction:ltr}
+.trophy-match-page[dir=rtl] .trophy-odds{direction:ltr}
+.trophy-match-page[dir=rtl] .trophy-tools{direction:rtl}
+.trophy-match-page[dir=rtl] .trophy-result-count{text-align:right}
+.trophy-match-page[dir=rtl] .trophy-league-heading{direction:rtl}
+@media(max-width:370px){
+ .trophy-summary{gap:5px}
+ .trophy-summary-card{min-height:98px;padding:11px 7px;border-radius:18px}
+ .trophy-summary-card span{font-size:8px}
+ .trophy-summary-card b,.trophy-summary-card.total b{font-size:20px}
+ .trophy-filter-tabs button{padding:0 7px;font-size:10px}
+ .trophy-competition-row .competition-chip{font-size:9px}
+ .trophy-fixture-card{padding:12px 9px}
+ .trophy-team .team-crest{width:54px!important;height:54px!important}
+ .trophy-team .team-crest img{width:45px!important;height:45px!important}
+ .trophy-kickoff strong{font-size:19px}
+ .trophy-odds button{min-height:65px}
+}
