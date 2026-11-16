@@ -81,7 +81,7 @@ function HomeReferenceSections({rtl,selected,choose,setTab,dailyClaimed,claimDai
   </section>
 
  <section className="home-match-preview"><div className="home-section-title"><div><span>{rtl?'لا تفوّت المواجهة':'MATCH CENTRE'}</span><b>{rtl?'أبرز المباريات':'Featured matches'}</b></div><button onClick={()=>setTab('Matches')}>{rtl?'عرض الكل':'VIEW ALL'} <ChevronRight size={14}/></button></div><div className="match-list">{games.slice(0,2).map(g=><Match key={g.h} g={g} choose={choose} selected={selected}/>)}</div></section>
-  <section className="home-world-arena"><div className="home-ref-section-title"><div><span>{words('EXPLORE MORE','اكتشف المزيد')}</span><h3>{words('World Arena','عالم الأرينا')} <Zap size={18}/></h3></div></div><div className="home-feature-grid">{featureCards.map(({icon:Icon,...x})=><button className="home-feature-card" key={x.title} onClick={x.action}><i className={'home-feature-icon '+x.tone}><Icon size={25}/></i><b>{words(x.title,x.ar)}</b><span>{words(x.desc,x.arDesc)}</span></button>)}</div><button className="home-more-card" onClick={()=>setTab('Account')}><i><LayoutGrid size={26}/></i><span><b>{words('More features','المزيد')}</b><small>{words('Responsible play, help and settings','حدود اللعب المسؤول والإعدادات')}</small></span><ChevronRight size={19}/></button><p className="home-responsible-note">🔒 {words('Play responsibly. Set your demo limits in Account. All activity is simulated.','العب بمسؤولية. ضع حدوداً من صفحة حسابي. جميع الأنشطة تجريبية.')}</p></section></>}
+</>}
  {tab==='Matches'&&<StageFourMatches/>}
  {tab==='My Bets'&&<StageFourBets onBrowse={()=>setTab('Matches')}/>}
  {tab==='Friends'&&<StageFiveFriends/>}
