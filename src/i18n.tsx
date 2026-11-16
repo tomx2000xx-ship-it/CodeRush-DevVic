@@ -449,7 +449,23 @@ const ar: Record<string,string> = Object.fromEntries([
 ['Open CodeRush inside Telegram to enable bot messages','افتح CodeRush داخل تيليجرام لتفعيل رسائل البوت'],
 ['Telegram permission prompt is unavailable in this preview','طلب إذن تيليجرام غير متاح في هذه المعاينة'],
 ['Please enter a display name','يرجى إدخال اسم العرض'],
-['Please acknowledge the demo notice','يرجى تأكيد فهم إشعار النسخة التجريبية']
+['Please acknowledge the demo notice','يرجى تأكيد فهم إشعار النسخة التجريبية'],
+['UEFA NATIONS LEAGUE','دوري الأمم الأوروبية'],
+['TODAY · 20:45 WAT','اليوم · 20:45 بتوقيت غرب أفريقيا'],
+['FT · 15 NOV','انتهت · 15 نوفمبر'],
+['DEMO','تجريبي'],
+['DEMO MODE','الوضع التجريبي'],
+['DEMO EXPERIENCE','تجربة تجريبية'],
+['Help & support is a demo screen','شاشة المساعدة والدعم تجريبية'],
+['DEMO WALLET · SIMULATED','محفظة تجريبية · محاكاة'],
+['FULL TIME','انتهت المباراة'],
+['TODAY · 20:45','اليوم · 20:45'],
+['FT · 15 NOV','انتهت · 15 نوفمبر'],
+['Show fewer bets','عرض رهانات أقل'],
+['View more bets','عرض المزيد من الرهانات'],
+['No open bets','لا توجد رهانات مفتوحة'],
+['Browse matches','تصفح المباريات'],
+['Open this screen inside the deployed CodeRush app to generate your Telegram link','افتح هذه الشاشة داخل تطبيق CodeRush المنشور لإنشاء رابط تيليجرام الخاص بك']
 ]);
 
 function translate(value: string, lang: Language) {
