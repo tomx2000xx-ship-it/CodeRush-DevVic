@@ -1306,3 +1306,40 @@ html[dir="rtl"] body{direction:rtl}
 [dir="rtl"] .app :where(input,textarea,select){direction:rtl}
 [dir="rtl"] .app :where(input[type="number"],input[type="email"],input[type="url"],input[inputmode="decimal"]){direction:ltr;text-align:right}
 [dir="rtl"] .app :where(code,kbd,.account-id,.referral-url,.wallet-reference){direction:ltr;unicode-bidi:embed;text-align:left}
+
+/* Arabic-first readability and complete RTL text flow */
+html[dir="rtl"] body,
+html[dir="rtl"] .app,
+html[dir="rtl"] .app :where(button,input,textarea,select){
+ font-family:'Noto Sans Arabic','DM Sans',Tahoma,Arial,sans-serif;
+}
+html[dir="rtl"] .locale-root,
+html[dir="rtl"] .app{
+ direction:rtl;
+ text-align:start;
+}
+html[dir="rtl"] .app{
+ font-weight:600;
+}
+html[dir="rtl"] .app :where(p,small,label){
+ font-size:calc(1em + 1px);
+ font-weight:600;
+ line-height:1.75;
+}
+html[dir="rtl"] .app :where(button,input,textarea,select){
+ font-weight:600;
+}
+html[dir="rtl"] .app :where(h1,h2,h3,h4,strong,b){
+ font-weight:700;
+}
+html[dir="rtl"] .app :where(input[type="number"],input[type="email"],input[type="url"],input[inputmode="decimal"],code,kbd){
+ font-family:'DM Sans',Arial,sans-serif;
+}
+html[dir="rtl"] .app :where(input[type="number"],input[inputmode="decimal"]){
+ direction:ltr;
+ text-align:center;
+}
+html[dir="rtl"] .app :where(code,kbd){
+ direction:ltr;
+ unicode-bidi:embed;
+}
