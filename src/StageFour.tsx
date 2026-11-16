@@ -65,7 +65,7 @@ export function StageFourMatches(){
  const tabs:[typeof filter,string,string][]=[['Live','Live','مباشر'],['Today','Today','اليوم'],['Tomorrow','Tomorrow','الغد'],['All','All','الكل'],['Finished','Finished','انتهت']];
  const count=(key:string)=>fixtures.filter(f=>key==='All'||status(f)===key).length;
  const arabicTeams:Record<string,string>={Senegal:'السنغال',Sudan:'السودان',Ghana:'غانا',Somalia:'الصومال',Turkey:'تركيا',France:'فرنسا'};
- const leagueName=(league:string)=>league==='AFRICA CUP OF NATIONS 2027 QUALIFIERS'?words('Africa Cup of Nations 2027 Qualifiers','تصفيات كأس أمم أفريقيا 2027'):league;
+ const leagueName=(league:string)=>league==='AFRICA CUP OF NATIONS 2027 QUALIFIERS'?words('Africa Cup of Nations 2027 Qualifiers','تصفيات كأس أمم أفريقيا 2027'):league==='UEFA NATIONS LEAGUE'?words('UEFA Nations League','دوري الأمم الأوروبية'):league;
  return <div className="trophy-match-page" dir={isArabic?'rtl':'ltr'}>
   <section className="trophy-summary" aria-label={words('Match overview','ملخص المباريات')}>
    <div className="trophy-summary-card total"><span>{words('Total accumulated','إجمالي المبلغ المجمع')}<i>↗</i></span><b>$3,888</b><small>{words('DEMO TOTAL','إجمالي تجريبي')}</small></div>
@@ -81,7 +81,7 @@ export function StageFourMatches(){
   </div>
   <div className="trophy-competition-row"><button className="all-leagues" onClick={()=>{setFilter('All');setShowAll(false)}}>{words('All leagues','كل الدوريات')}</button><button className="competition-chip" onClick={()=>{setQuery('Africa Cup of Nations');setFilter('All')}}><span>🏆</span>{words('Africa Cup of Nations 2027 Qualifiers','تصفيات كأس أمم أفريقيا 2027')}<b>2</b></button></div>
   <div className="trophy-result-count">{visible.length} {words('matches','مباريات')}</div>
-  {visible.length>0&&<div className="trophy-league-heading"><span>🏆</span><b>{leagueName(visible[0].league)}</b><small>{visible.length}</small><i>⌄</i></div>}
+  {visible.length>0&&<div className="trophy-league-heading"><i>⌄</i><small>{visible.length}</small><b>{leagueName(visible[0].league)}</b></div>}
   <div className={'trophy-fixture-list '+(viewMode==='compact'?'compact':'')}>{displayed.map(f=><article className={'trophy-fixture-card '+(f.live?'is-live':'')+(f.completed?' is-finished':'')} key={f.id}>
    <div className="trophy-fixture-head"><button className={favorites.includes(f.id)?'saved':''} aria-label={words('Toggle favourite','تبديل المفضلة')} onClick={()=>setFavorites(old=>{const next=old.includes(f.id)?old.filter(x=>x!==f.id):[...old,f.id];localStorage.setItem('coderush-stage4-favorites',JSON.stringify(next));return next})}><Star size={17} fill={favorites.includes(f.id)?'currentColor':'none'}/></button><span className={'trophy-time-pill '+(f.live?'live-pill':'')}>{f.live?words('LIVE · 89′','مباشر · 89′'):f.completed?words('FINISHED','انتهت'):f.time.split(' · ')[0]}</span><b>🏆 {leagueName(f.league)}</b></div>
    <div className="trophy-teams"><div className="trophy-team"><TeamBadge name={f.home} code={f.homeCode}/><b>{isArabic?arabicTeams[f.home]||f.home:f.home}</b></div><div className="trophy-kickoff"><strong>{f.live?(f.score||'1 : 0'):f.completed?(f.score||'FT'):f.time.split(' · ')[0]}</strong><small>{f.live?liveMinute+'′':f.completed?'FT':words('KICK-OFF','موعد البداية')}</small></div><div className="trophy-team"><TeamBadge name={f.away} code={f.awayCode}/><b>{isArabic?arabicTeams[f.away]||f.away:f.away}</b></div></div>
