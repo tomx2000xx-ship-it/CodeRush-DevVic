@@ -741,3 +741,38 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
  .sb-market-row,.sb-live-feature-markets{gap:4px}
  .sb-market-row button b,.sb-live-feature-markets button b{font-size:11px}
 }
+
+
+/* Persistent betting ticket launcher and mobile ticket sheet */
+.sporty-matches{padding-bottom:112px}
+.sb-ticket-launcher{position:fixed;z-index:60;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));min-height:58px;display:flex;align-items:center;gap:11px;padding:9px 13px;border:1px solid #e6a45f;border-radius:13px;background:#172638;color:#f5f7fa;box-shadow:0 8px 26px #0008;text-align:start}
+.sb-ticket-icon{position:relative;width:34px;height:34px;border-radius:9px;background:#e6a45f;color:#182332;display:grid;place-items:center;flex:0 0 auto}
+.sb-ticket-icon i{position:absolute;right:-5px;top:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:20px;background:#f16e70;color:#fff;font-size:10px;font-style:normal;font-weight:800;display:grid;place-items:center}
+.sb-ticket-launcher>span:nth-child(2){display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.sb-ticket-launcher>span:nth-child(2)>b{font-size:11px;letter-spacing:.5px}
+.sb-ticket-launcher>span:nth-child(2)>small{font-size:9px;color:#aebdd0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-ticket-launcher>strong{display:flex;align-items:center;gap:3px;font-size:9px;color:#f2bd73;white-space:nowrap}
+.sb-ticket-backdrop{position:fixed;z-index:100;inset:0;background:#050a11b8;display:flex;align-items:flex-end;justify-content:center;padding:0 9px calc(0px + env(safe-area-inset-bottom))}
+.sb-ticket-sheet{width:min(100%,520px);max-height:82dvh;overflow-y:auto;background:#101b2a;border:1px solid #35475d;border-bottom:0;border-radius:19px 19px 0 0;padding:9px 14px 20px;color:#f2f5fa;box-shadow:0 -12px 36px #0008}
+.sb-ticket-grabber{width:38px;height:4px;border-radius:4px;background:#52647a;margin:0 auto 13px}
+.sb-ticket-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.sb-ticket-heading .eyebrow{font-size:8px;letter-spacing:1px;color:#9aaac0}
+.sb-ticket-heading h3{display:flex;align-items:center;gap:7px;margin:4px 0 0;font-size:17px}
+.sb-ticket-heading h3 em{font-style:normal;background:#e6a45f;color:#1c2938;border-radius:20px;padding:2px 7px;font-size:10px}
+.sb-ticket-heading>button{border:0;background:#26374b;color:#d8e1eb;width:34px;height:34px;border-radius:9px;display:grid;place-items:center}
+.sb-ticket-mode{display:flex;flex-direction:column;gap:4px;padding:10px;border-radius:9px;background:#1b2a3d;margin-bottom:8px}
+.sb-ticket-mode b{font-size:11px}
+.sb-ticket-mode small{font-size:9px;color:#9eafc4}
+.sb-ticket-sheet .slip-pick{display:flex;align-items:center;gap:9px;padding:11px 2px;border-bottom:1px solid #2a3b50}
+.sb-ticket-sheet .slip-pick>div{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.sb-ticket-sheet .slip-pick>div b{font-size:11px}
+.sb-ticket-sheet .slip-pick>div small{font-size:9px;color:#9aabc0}
+.sb-ticket-sheet .slip-pick>strong{font-size:13px;color:#f1bd78}
+.sb-ticket-sheet .slip-pick>button{border:0;background:transparent;color:#9aabc0;padding:5px}
+.sb-ticket-sheet .stake-row{margin-top:12px}
+.sb-ticket-sheet .slip-totals{display:flex;flex-direction:column;gap:8px;margin:12px 0;padding:11px;border-radius:10px;background:#1a293b}
+.sb-ticket-sheet .slip-totals>span{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:#aebdd0}
+.sb-ticket-sheet .slip-totals b,.sb-ticket-sheet .slip-totals strong{color:#fff;font-size:12px}
+.sb-ticket-sheet .place-demo{width:100%;margin-top:3px}
+.sb-ticket-clear{width:100%;margin-top:9px;padding:9px;border:1px solid #405168;border-radius:9px;background:transparent;color:#c4d0df;font-size:10px}
+.sb-ticket-sheet .detail-disclaimer{text-align:center;font-size:9px;color:#8798ad;margin:10px 0 0}
