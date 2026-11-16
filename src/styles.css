@@ -1284,12 +1284,8 @@ html[dir="rtl"],html[dir="rtl"] body,.locale-ar{font-family:'Noto Sans Arabic','
 html[dir="rtl"] body{direction:rtl}
 .app.rtl,.locale-ar{direction:rtl;text-align:start}
 .app.rtl button,.app.rtl input,.app.rtl textarea,.app.rtl select{font-family:'Noto Sans Arabic','DM Sans',sans-serif}
-.global-language-switch{flex:none;min-width:66px;height:34px;padding:0 10px;border:1px solid #78404a;border-radius:9px;background:#2a171b;color:#fff1f3;font-size:11px;font-weight:700;cursor:pointer}
-.home-topbar{gap:8px}
-.home-brand{margin-inline-start:auto}
 .home-head-left{direction:ltr}
 .app.rtl .home-head-left{direction:rtl}
-.app.rtl .home-brand{margin-inline-start:0;margin-inline-end:auto}
 .app.rtl .home-head-left,.app.rtl .home-brand{unicode-bidi:plaintext}
 .app.rtl .bottom-nav{direction:rtl}
 .app.rtl .slip-fab{direction:rtl}
@@ -1303,7 +1299,6 @@ html[dir="rtl"] body{direction:rtl}
 [dir="rtl"] .sb-match-main,[dir="rtl"] .sb-controls,[dir="rtl"] .sb-ticket-heading{direction:rtl}
 [dir="rtl"] .sb-match-state{direction:ltr}
 [dir="rtl"] .sb-ticket-launcher{direction:rtl}
-@media(max-width:380px){.global-language-switch{min-width:58px;padding:0 7px;font-size:10px}.home-topbar{gap:5px}}
 
 
 /* Logical-side normalization: existing LTR spacing remains identical while RTL mirrors it naturally. */
