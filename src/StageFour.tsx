@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, ChevronRight, Minus, Plus, TicketPercent, X, Activity, Clock3, Search, Star, CalendarDays, ListFilter, Trophy } from 'lucide-react';
+import { ClubBadge } from './ClubBadge';
 type Fixture={id:string;league:string;time:string;home:string;away:string;homeCode:string;awayCode:string;odds:[number,number,number];live?:boolean};
 type Selection={id:string;fixtureId:string;fixture:string;league:string;outcome:string;odd:number};
 type Bet={id:string;selections:Selection[];stake:number;potential:number;createdAt:string};
@@ -23,7 +24,6 @@ const fixtures:Fixture[]=[
 const readJson=<T,>(key:string,fallback:T):T=>{try{return JSON.parse(localStorage.getItem(key)||'') as T}catch{return fallback}};
 const readSelections=()=>readJson<Selection[]>('coderush-stage4-slip',[]);
 const outcomes=['Home win','Draw','Away win'];
-function ClubBadge({name,code}:{name:string;code:string}){const [src,setSrc]=useState('');useEffect(()=>{let active=true;const query=encodeURIComponent(name);fetch('https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t='+query).then(r=>r.json()).then(d=>{const badge=d?.teams?.find((t:any)=>t.strBadge)?.strBadge;if(active&&badge)setSrc(badge)}).catch(()=>{});return()=>{active=false}},[name]);return <div className="crest club-crest">{src?<img src={src} alt={name+' badge'} onError={()=>setSrc('')}/>:<span>{code}</span>}</div>}
 function LiveSimulation(){const [minute,setMinute]=useState(28);useEffect(()=>{const timer=window.setInterval(()=>setMinute(m=>m>=90?90:m+1),12000);return()=>window.clearInterval(timer)},[]);const events=[{minute:18,team:'MAS',text:'Goal! Maghreb Fes take the lead.'},{minute:44,team:'RCA',text:'Raja Casablanca chance — saved by the keeper.'},{minute:63,team:'MAS',text:'Big chance! Shot hits the post.'},{minute:76,team:'RCA',text:'Raja pressure building in the final third.'}];return <div className="live-sim-panel"><div className="live-sim-head"><span><i/> LIVE MATCH SIMULATION</span><b>{minute>=90?'90′ · FULL TIME':minute+'′'}</b></div><div className="live-sim-score"><div><ClubBadge name="Maghreb Fes" code="MAS"/><b>Maghreb Fès</b></div><strong>1 <small>:</small> 0</strong><div><ClubBadge name="Raja Casablanca" code="RCA"/><b>Raja CA</b></div></div><div className="sim-progress"><span style={{width:(minute/90*100)+'%'}}/></div><div className="sim-timeline">{events.filter(e=>e.minute<=minute).slice(-3).reverse().map(e=><div key={e.minute}><b>{e.minute}′</b><span>{e.text}</span></div>)}</div><small className="sim-disclaimer">Accelerated, scripted demo match — not a real-time sports feed.</small></div>}
 export function StageFourMatches(){
  const [filter,setFilter]=useState<'All'|'Live'|'Upcoming'|'Completed'>('All');
