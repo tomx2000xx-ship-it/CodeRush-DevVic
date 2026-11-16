@@ -40,10 +40,7 @@ const readSelections=()=>readJson<Selection[]>('coderush-stage4-slip',[]);
 const outcomes=['Home win','Draw','Away win'];
 function LiveSimulation(){const [minute,setMinute]=useState(28);useEffect(()=>{const timer=window.setInterval(()=>setMinute(m=>m>=90?90:m+1),12000);return()=>window.clearInterval(timer)},[]);const events=[{minute:18,team:'MAS',text:'Goal! Germany take the lead.'},{minute:44,team:'RCA',text:'Netherlands chance — saved by the keeper.'},{minute:63,team:'MAS',text:'Big chance! Shot hits the post.'},{minute:76,team:'RCA',text:'Raja pressure building in the final third.'}];return <div className="live-sim-panel"><div className="live-sim-head"><span><i/> LIVE MATCH SIMULATION</span><b>{minute>=90?'90′ · FULL TIME':minute+'′'}</b></div><div className="live-sim-score"><div><TeamBadge name="Germany" code="GER"/><b>Germany</b></div><strong>1 <small>:</small> 0</strong><div><TeamBadge name="Netherlands" code="NED"/><b>Netherlands</b></div></div><div className="sim-progress"><span style={{width:(minute/90*100)+'%'}}/></div><div className="sim-timeline">{events.filter(e=>e.minute<=minute).slice(-3).reverse().map(e=><div key={e.minute}><b>{e.minute}′</b><span>{e.text}</span></div>)}</div><small className="sim-disclaimer">Accelerated, scripted demo match — not a real-time sports feed.</small></div>}
 export function StageFourMatches(){
- const [filter,setFilter]=useState<'Matches'|'Today'|'Tomorrow'|'All'|'Completed'>('Today');
- const [showAllMatches,setShowAllMatches]=useState(false);
- const isArabic=document.documentElement.lang==='ar'||document.documentElement.dir==='rtl';
- const words=(en:string,ar:string)=>isArabic?ar:en;
+ const [filter,setFilter]=useState<'Live'|'Today'|'Tomorrow'|'All'|'Finished'>('Today');
  const [query,setQuery]=useState('');
  const [favorites,setFavorites]=useState<string[]>(()=>readJson<string[]>('coderush-stage4-favorites',[]));
  const [favoritesOnly,setFavoritesOnly]=useState(false);
@@ -51,49 +48,55 @@ export function StageFourMatches(){
  const [slip,setSlip]=useState<Selection[]>(readSelections);
  const [expanded,setExpanded]=useState<string|null>(null);
  const [stake,setStake]=useState('10');
- const [liveMinute,setLiveMinute]=useState(28);
+ const [liveMinute,setLiveMinute]=useState(89);
  const [viewMode,setViewMode]=useState<'cards'|'compact'>('cards');
- useEffect(()=>{const timer=window.setInterval(()=>setLiveMinute(m=>m>=90?28:m+1),45000);return()=>window.clearInterval(timer)},[]);
+ const [showAll,setShowAll]=useState(false);
+ const isArabic=document.documentElement.lang==='ar'||document.documentElement.dir==='rtl';
+ const words=(en:string,ar:string)=>isArabic?ar:en;
+ useEffect(()=>{const timer=window.setInterval(()=>setLiveMinute(m=>m>=90?90:m+1),45000);return()=>window.clearInterval(timer)},[]);
  useEffect(()=>{localStorage.setItem('coderush-stage4-slip',JSON.stringify(slip))},[slip]);
- const visible=fixtures.filter(f=>(filter==='All'||(filter==='Matches'?!f.completed:filter==='Today'?!f.live&&!f.completed&&f.time.includes('TODAY'):filter==='Tomorrow'?!f.live&&!f.completed&&f.time.includes('17 NOV'):filter==='Completed'?!!f.completed:false))&&(!favoritesOnly||favorites.includes(f.id))&&(!query||(f.home+' '+f.away+' '+f.league).toLowerCase().includes(query.toLowerCase()))).sort((a,b)=>sort==='league'?a.league.localeCompare(b.league):a.time.localeCompare(b.time));
- const displayed=showAllMatches?visible:visible.slice(0,2);
+ const status=(f:Fixture)=>f.live?'Live':f.completed?'Finished':f.time.includes('17 NOV')?'Tomorrow':'Today';
+ const filtered=fixtures.filter(f=>(filter==='All'||status(f)===filter)&&(!favoritesOnly||favorites.includes(f.id))&&(!query||(f.home+' '+f.away+' '+f.league).toLowerCase().includes(query.toLowerCase())));
+ const visible=[...filtered].sort((a,b)=>sort==='league'?a.league.localeCompare(b.league):Number(b.live)-Number(a.live)||a.time.localeCompare(b.time));
+ const displayed=showAll?visible:visible.slice(0,4);
  const add=(f:Fixture,index:number)=>{const pick:Selection={id:f.id+'-'+index,fixtureId:f.id,fixture:f.home+' vs '+f.away,league:f.league,outcome:outcomes[index],odd:f.odds[index]};setSlip(old=>old.some(p=>p.id===pick.id)?old.filter(x=>x.id!==pick.id):[...old.filter(x=>x.fixtureId!==f.id),pick]);};
  const combined=slip.reduce((n,p)=>n*p.odd,1),amount=Number(stake),valid=Number.isFinite(amount)&&amount>=1&&amount<=5000;
  const record=()=>{if(!slip.length||!valid)return;const bets=readJson<Bet[]>('coderush-stage4-bets',[]);bets.unshift({id:'DEMO-'+Date.now(),selections:slip,stake:amount,potential:amount*combined,createdAt:new Date().toISOString()});localStorage.setItem('coderush-stage4-bets',JSON.stringify(bets));setSlip([]);setStake('10');};
- const setTab=(f:typeof filter)=>{setFilter(f);setShowAllMatches(false)};
- const clubArabic:Record<string,string>={Senegal:'السنغال',Sudan:'السودان',Ghana:'غانا',Somalia:'الصومال'};
+ const tabs:[typeof filter,string,string][]=[['Live','Live','مباشر'],['Today','Today','اليوم'],['Tomorrow','Tomorrow','الغد'],['All','All','الكل'],['Finished','Finished','انتهت']];
+ const count=(key:string)=>fixtures.filter(f=>key==='All'||status(f)===key).length;
+ const arabicTeams:Record<string,string>={Senegal:'السنغال',Sudan:'السودان',Ghana:'غانا',Somalia:'الصومال',Turkey:'تركيا',France:'فرنسا'};
+ const leagueName=(league:string)=>league==='AFRICA CUP OF NATIONS 2027 QUALIFIERS'?words('Africa Cup of Nations 2027 Qualifiers','تصفيات كأس أمم أفريقيا 2027'):league;
  return <div className="trophy-match-page" dir={isArabic?'rtl':'ltr'}>
-  <section className="trophy-summary">
-   <div className="trophy-summary-card total"><span>{words('Total accumulated','إجمالي المبلغ المجمع')} <i>↗</i></span><b>$1,944</b></div>
-   <div className="trophy-summary-card today"><span>{words("Today's matches",'مباريات اليوم')} <CalendarDays size={17}/></span><b>2</b></div>
-   <div className="trophy-summary-card live"><span>{words('Live now','مباشر الآن')} <i className="stat-live-dot"/></span><b>0</b></div>
+  <section className="trophy-summary" aria-label={words('Match overview','ملخص المباريات')}>
+   <div className="trophy-summary-card total"><span>{words('Total accumulated','إجمالي المبلغ المجمع')}<i>↗</i></span><b>$1,944</b><small>{words('DEMO TOTAL','إجمالي تجريبي')}</small></div>
+   <div className="trophy-summary-card today"><span>{words("Today's matches",'مباريات اليوم')}<CalendarDays size={17}/></span><b>{count('Today')}</b></div>
+   <div className="trophy-summary-card live"><span>{words('Live now','مباشر الآن')}<i className="stat-live-dot"/></span><b>{count('Live')}</b></div>
   </section>
-  <label className="trophy-search"><input value={query} onChange={e=>setQuery(e.target.value)} placeholder={words('Search for a team or league…','ابحث عن فريق أو دوري...')}/><Search size={20}/></label>
-  <div className="trophy-filter-scroll"><div className="trophy-filter-tabs">
-   {(['Matches','Today','Tomorrow','All','Completed'] as const).map(f=><button key={f} className={filter===f?'active':''} onClick={()=>setTab(f)}>{f==='Matches'?words('Matches','مباريات'):f==='Today'?words('Today','اليوم'):f==='Tomorrow'?words('Tomorrow','الغد'):f==='Completed'?words('Finished','انتهت'):words('All','الكل')}{f==='Today'&&<small>2</small>}</button>)}
-  </div></div>
+  <label className="trophy-search"><Search size={19}/><input value={query} onChange={e=>{setQuery(e.target.value);setShowAll(false)}} placeholder={words('Search for a team or league…','ابحث عن فريق أو دوري...')}/></label>
+  <div className="trophy-filter-scroll"><div className="trophy-filter-tabs">{tabs.map(([key,en,ar])=><button key={key} className={filter===key?'active':''} onClick={()=>{setFilter(key);setShowAll(false)}}>{words(en,ar)}{key==='Live'&&<i className="filter-live-dot"/>}{key==='Today'&&<small>{count('Today')}</small>}</button>)}</div></div>
   <div className="trophy-tools">
-   <button className={favoritesOnly?'active':''} onClick={()=>setFavoritesOnly(v=>!v)}>{words('Favourites','المفضلة')} <Star size={17}/></button>
-   <div className="trophy-view-switch"><button className={viewMode==='compact'?'active':''} onClick={()=>setViewMode('compact')} aria-label="List view">☷</button><button className={viewMode==='cards'?'active':''} onClick={()=>setViewMode('cards')} aria-label="Card view">▱</button></div>
+   <button className={favoritesOnly?'active':''} onClick={()=>setFavoritesOnly(v=>!v)}><Star size={16}/>{words('Favourites','المفضلة')}</button>
+   <div className="trophy-view-switch"><button className={viewMode==='compact'?'active':''} onClick={()=>setViewMode('compact')} aria-label={words('List view','عرض القائمة')}>☷</button><button className={viewMode==='cards'?'active':''} onClick={()=>setViewMode('cards')} aria-label={words('Card view','عرض البطاقات')}>▱</button></div>
    <button onClick={()=>setSort(v=>v==='time'?'league':'time')}>{sort==='time'?words('Nearest','الأقرب'):words('Competition','الدوري')} <span>↕</span></button>
   </div>
-  <div className="trophy-competition-row"><button className="all-leagues" onClick={()=>setTab('All')}>{words('All leagues','كل الدوريات')}</button><button className="competition-chip" onClick={()=>setTab('Today')}><span>🏆</span>{words('Africa Cup of Nations 2027 Qualifiers','تصفيات كأس أمم أفريقيا 2027')}<b>2</b></button></div>
+  <div className="trophy-competition-row"><button className="all-leagues" onClick={()=>{setFilter('All');setShowAll(false)}}>{words('All leagues','كل الدوريات')}</button><button className="competition-chip" onClick={()=>{setQuery('Africa Cup of Nations');setFilter('All')}}><span>🏆</span>{words('Africa Cup of Nations 2027 Qualifiers','تصفيات كأس أمم أفريقيا 2027')}<b>2</b></button></div>
   <div className="trophy-result-count">{visible.length} {words('matches','مباريات')}</div>
-  <div className="trophy-league-heading"><span>🏆</span><b>{visible[0]?.league==='AFRICA CUP OF NATIONS 2027 QUALIFIERS'?words('Africa Cup of Nations 2027 Qualifiers','تصفيات كأس أمم أفريقيا 2027'):visible[0]?.league||words('Available matches','المباريات المتاحة')}</b><small>{visible.length}</small><i>⌄</i></div>
-  <div className={'trophy-fixture-list '+(viewMode==='compact'?'compact':'')}>{displayed.map(f=><article className="trophy-fixture-card" key={f.id}>
-   <div className="trophy-fixture-head"><button className={favorites.includes(f.id)?'saved':''} aria-label="Toggle favourite" onClick={()=>setFavorites(old=>{const next=old.includes(f.id)?old.filter(x=>x!==f.id):[...old,f.id];localStorage.setItem('coderush-stage4-favorites',JSON.stringify(next));return next})}><Star size={17} fill={favorites.includes(f.id)?'currentColor':'none'}/></button><span className="trophy-time-pill">{f.live?words('LIVE','مباشر'):f.completed?words('FINISHED','انتهت'):words('TODAY','اليوم')+' · '+f.time.split(' · ')[0]}</span><b>🏆 {words('Africa Cup of Nations 2027 Qualifiers','تصفيات كأس أمم أفريقيا 2027')}...</b></div>
-   <div className="trophy-teams"><div className="trophy-team"><TeamBadge name={f.home} code={f.homeCode}/><b>{isArabic?clubArabic[f.home]||f.home:f.home}</b></div><div className="trophy-kickoff"><strong>{f.live?(f.score||'1 : 0'):f.completed?'FT':f.time.split(' · ')[0]}</strong><small>{f.live?liveMinute+'′':words('Today','اليوم')}</small></div><div className="trophy-team"><TeamBadge name={f.away} code={f.awayCode}/><b>{isArabic?clubArabic[f.away]||f.away:f.away}</b></div></div>
-   <div className="trophy-countdown">{f.live?words('● LIVE MATCH','● مباراة مباشرة'):f.completed?words('Match completed','انتهت المباراة'):words('◷ Starts in 3 hours 53 minutes 00 seconds','◷ تبدأ بعد 3 ساعات و53 دقيقة و00 ثانية')}</div>
-   <div className="trophy-odds-track"><i/><i/><i/></div>
-   <div className="trophy-odds">{[0,1,2].map(i=><button key={i} className={slip.some(p=>p.id===f.id+'-'+i)?'selected':''} onClick={()=>add(f,i)}><small>{i===0?(isArabic?clubArabic[f.home]:f.home):i===1?words('Draw','تعادل'):(isArabic?clubArabic[f.away]:f.away)}</small><b>{f.odds[i].toFixed(1)}%</b></button>)}</div>
-   <button className="trophy-bet-button" onClick={()=>setExpanded(expanded===f.id?null:f.id)}>{words('Bet now','ارهن الآن')} <ChevronRight size={17}/></button>
-   {expanded===f.id&&<div className="trophy-match-details"><b>{words('Match details','تفاصيل المباراة')}</b><p>{f.home} vs {f.away} · {words('Illustrative demo market only','سوق تجريبي توضيحي فقط')}</p></div>}
+  {visible.length>0&&<div className="trophy-league-heading"><span>🏆</span><b>{leagueName(visible[0].league)}</b><small>{visible.length}</small><i>⌄</i></div>}
+  <div className={'trophy-fixture-list '+(viewMode==='compact'?'compact':'')}>{displayed.map(f=><article className={'trophy-fixture-card '+(f.live?'is-live':'')+(f.completed?' is-finished':'')} key={f.id}>
+   <div className="trophy-fixture-head"><button className={favorites.includes(f.id)?'saved':''} aria-label={words('Toggle favourite','تبديل المفضلة')} onClick={()=>setFavorites(old=>{const next=old.includes(f.id)?old.filter(x=>x!==f.id):[...old,f.id];localStorage.setItem('coderush-stage4-favorites',JSON.stringify(next));return next})}><Star size={17} fill={favorites.includes(f.id)?'currentColor':'none'}/></button><span className={'trophy-time-pill '+(f.live?'live-pill':'')}>{f.live?words('LIVE NOW','مباشر الآن'):f.completed?words('FINISHED','انتهت'):f.time.split(' · ')[0]}</span><b>🏆 {leagueName(f.league)}</b></div>
+   <div className="trophy-teams"><div className="trophy-team"><TeamBadge name={f.home} code={f.homeCode}/><b>{isArabic?arabicTeams[f.home]||f.home:f.home}</b></div><div className="trophy-kickoff"><strong>{f.live?(f.score||'1 : 0'):f.completed?(f.score||'FT'):f.time.split(' · ')[0]}</strong><small>{f.live?liveMinute+'′':f.completed?'FT':words('KICK-OFF','موعد البداية')}</small></div><div className="trophy-team"><TeamBadge name={f.away} code={f.awayCode}/><b>{isArabic?arabicTeams[f.away]||f.away:f.away}</b></div></div>
+   <div className={'trophy-countdown '+(f.live?'live-countdown':'')}>{f.live?<><i/> {words('LIVE MATCH · '+liveMinute+' MIN','مباراة مباشرة · '+liveMinute+' دقيقة')}</>:f.completed?words('Match completed','انتهت المباراة'):words('◷ Scheduled fixture','◷ مباراة مجدولة')}</div>
+   <div className={'trophy-odds-track '+(f.live?'live-track':'')}><i/><i/><i/></div>
+   <div className="trophy-odds">{[0,1,2].map(i=><button key={i} className={slip.some(p=>p.id===f.id+'-'+i)?'selected':''} onClick={()=>add(f,i)}><small>{i===0?(isArabic?arabicTeams[f.home]||f.home:f.home):i===1?words('Draw','تعادل'):(isArabic?arabicTeams[f.away]||f.away:f.away)}</small><b>{f.odds[i].toFixed(1)}%</b></button>)}</div>
+   <button className="trophy-bet-button" onClick={()=>setExpanded(expanded===f.id?null:f.id)}>{words('Bet now','رهان تجريبي')} <ChevronRight size={17}/></button>
+   {expanded===f.id&&<div className="trophy-match-details"><b>{words('Match details','تفاصيل المباراة')}</b><p>{f.home} vs {f.away} · {words('Illustrative demo market only — not live odds.','سوق تجريبي توضيحي — ليست احتمالات مباشرة.')}</p></div>}
   </article>)}</div>
-  {visible.length>2&&<button className="match-view-more trophy-view-more" onClick={()=>setShowAllMatches(v=>!v)}>{showAllMatches?words('Show fewer matches','عرض مباريات أقل'):words('View more matches','عرض المزيد من المباريات')} <ChevronRight size={17}/><span>{showAllMatches?words('Show less','عرض أقل'):(visible.length-2)+' +'}</span></button>}
+  {visible.length>4&&<button className="match-view-more trophy-view-more" onClick={()=>setShowAll(v=>!v)}>{showAll?words('Show fewer matches','عرض مباريات أقل'):words('View more matches','عرض المزيد من المباريات')} <ChevronRight size={17}/><span>{showAll?words('Show less','عرض أقل'):(visible.length-4)+' +'}</span></button>}
   {visible.length===0&&<div className="empty"><Trophy size={28}/><h3>{words('No matches found','لم يتم العثور على مباريات')}</h3><p>{words('Try another filter or search term.','جرّب مرشحاً أو كلمة بحث أخرى.')}</p></div>}
   {slip.length>0&&<section className="bet-slip"><div className="slip-title"><div><span className="eyebrow">CURRENT SELECTIONS · DEMO</span><h3><TicketPercent size={18}/> {words('Demo bet slip','قسيمة تجريبية')} <span>{slip.length}</span></h3></div><button className="clear-slip" onClick={()=>setSlip([])}>{words('Clear all','مسح الكل')}</button></div>{slip.map(p=><div className="slip-pick" key={p.id}><div><b>{p.fixture}</b><small>{p.league} · {p.outcome}</small></div><strong>{p.odd.toFixed(1)}%</strong><button onClick={()=>setSlip(old=>old.filter(x=>x.id!==p.id))} aria-label="Remove selection"><X size={15}/></button></div>)}<div className="stake-row"><label htmlFor="stage4-stake">{words('Demo stake','قيمة تجريبية')}</label><div><button onClick={()=>setStake(String(Math.max(1,(Number(stake)||1)-5)))} aria-label="Decrease stake"><Minus size={14}/></button><input id="stage4-stake" type="number" min="1" max="5000" step="1" value={stake} onChange={e=>setStake(e.target.value)}/><button onClick={()=>setStake(String(Math.min(5000,(Number(stake)||0)+5)))} aria-label="Increase stake"><Plus size={14}/></button></div></div><div className="slip-totals"><span>{words('Combined demo odds','إجمالي النسب التجريبية')} <b>{combined.toFixed(2)}</b></span><span>{words('Potential demo return','العائد التجريبي المحتمل')} <strong>{valid?(amount*combined).toFixed(2):'—'} credits</strong></span></div><button className="place-demo" onClick={record} disabled={!valid}>{words('Record demo selection','تسجيل الاختيار التجريبي')} <ArrowRight size={16}/></button><p className="detail-disclaimer">{words('No funds are deducted. This is a visual demo only.','لا يتم خصم أي أموال. هذا عرض تجريبي فقط.')}</p></section>}
  </div>;
 }
+
 export function StageFourBets({onBrowse}:{onBrowse:()=>void}){
  const [bets,setBets]=useState<Bet[]>(()=>readJson<Bet[]>('coderush-stage4-bets',[]));
  const [slip,setSlip]=useState<Selection[]>(readSelections);
