@@ -1334,3 +1334,42 @@ body{background:radial-gradient(ellipse at 80% 0%,#e5efff 0,transparent 38%),var
 .rtl .home-promo-controls span{margin-left:0;margin-right:4px}
 @media(max-width:380px){.home-promo-slider{height:224px}.home-promo-copy h2{font-size:22px}.home-promo-copy p{font-size:8px}.home-promo-copy{max-width:85%}.home-promo-arrow{width:25px;height:25px}}
 @media(prefers-reduced-motion:reduce){.home-promo-track{transition:none}.home-promo-controls button{transition:none}}
+
+
+/* Shared page-component alignment: consistent surfaces, type and tap targets */
+.telegram-profile-card,.referral-hero-card,.referral-metrics>div,.team-detail-card,.referral-how,.referral-level-list,.referral-example,.faq-item,.stage5-notice-toolbar,.stage5-notice-list,.stage5-notice-list>article,.stage5-notice-item{
+ background:#fff!important;border:1px solid var(--cr-line)!important;color:var(--cr-ink)!important;box-shadow:0 5px 18px #284a7209
+}
+.referral-hero-card :is(h1,h2,h3,b,strong),.telegram-profile-card :is(h1,h2,h3,b,strong),.team-detail-card :is(h1,h2,h3,b,strong),.referral-how :is(h1,h2,h3,b,strong),.referral-level-list :is(h1,h2,h3,b,strong),.referral-example :is(h1,h2,h3,b,strong),.faq-item :is(h1,h2,h3,b,strong){color:var(--cr-ink)!important}
+.referral-hero-card :is(p,small,span),.telegram-profile-card :is(p,small,span),.team-detail-card :is(p,small,span),.referral-how :is(p,small,span),.referral-level-list :is(p,small,span),.referral-example :is(p,small,span),.faq-item :is(p,small,span){color:var(--cr-muted)!important}
+.referral-actions button,.team-level-tabs button,.stage5-notice-toolbar button,.filter-row .filter{border-color:var(--cr-line)!important}
+.referral-actions button,.team-level-tabs button,.stage5-notice-toolbar button{background:#f3f7fc!important;color:var(--cr-blue)!important}
+.referral-actions button.primary,.team-level-tabs button.active,.filter-row .filter.active{background:var(--cr-blue)!important;border-color:var(--cr-blue)!important;color:#fff!important}
+.stage5-notice-icon{background:#eaf2ff!important;color:var(--cr-blue)!important}
+.stage5-notice-copy :is(b,strong){color:var(--cr-ink)!important}
+.stage5-notice-copy :is(p,small,span){color:var(--cr-muted)!important}
+.sb-summary-strip,.sb-search,.sb-controls,.sb-day-tabs,.sb-live-feature,.sb-league-group,.sb-market-row,.sb-expanded-market,.sb-ticket-sheet{
+ background:#fff!important;border-color:var(--cr-line)!important;color:var(--cr-ink)!important;box-shadow:0 5px 18px #284a7209
+}
+.sb-page-heading :is(h1,h2,h3,b),.sb-league-heading,.sb-market-row :is(b,strong),.sb-ticket-heading :is(h1,h2,h3,b){color:var(--cr-ink)!important}
+.sb-demo-tag,.sb-summary-live,.sb-live-dot{background:#eaf7f5!important;color:#218c81!important}
+.sb-category-scroll button,.sb-day-tabs button,.sb-controls button{background:#f3f7fc!important;border-color:var(--cr-line)!important;color:var(--cr-muted)!important}
+.sb-category-scroll button.active,.sb-day-tabs button.active,.sb-controls button.active{background:var(--cr-blue)!important;border-color:var(--cr-blue)!important;color:#fff!important}
+.sb-ticket-backdrop{background:rgba(24,48,79,.48)!important}
+.sb-ticket-sheet{border:1px solid var(--cr-line)!important;border-radius:24px 24px 0 0!important}
+.sb-ticket-grabber{background:#c5d2df!important}
+.sb-ticket-mode,.sb-ticket-clear{color:var(--cr-blue)!important}
+.sb-ticket-sheet .slip-pick,.sb-ticket-sheet .stake-row{border-color:#e7edf4!important;color:var(--cr-ink)!important}
+.sb-ticket-sheet .stake-row input{background:#f3f7fc!important;border-color:var(--cr-line)!important;color:var(--cr-ink)!important}
+.sb-ticket-sheet .slip-totals{background:#f3f7fc!important;border:1px solid var(--cr-line)!important}
+.sb-ticket-sheet .slip-totals :is(span,b){color:var(--cr-muted)!important}
+.sb-ticket-sheet .slip-totals strong{color:var(--cr-blue)!important}
+.live-sim-panel{background:#edf7ff!important;border-color:#d3e5f5!important;color:var(--cr-ink)!important}
+.live-sim-panel :is(h1,h2,h3,b,strong){color:var(--cr-ink)!important}
+.match-view-more,.mybets-view-more{border-color:#cdddf5!important;background:#eaf2ff!important;color:var(--cr-blue)!important}
+@media(max-width:520px){
+ .app{padding-bottom:calc(100px + env(safe-area-inset-bottom))}
+ .bottom-nav{padding-bottom:max(5px,env(safe-area-inset-bottom));height:calc(68px + env(safe-area-inset-bottom))}
+ .app :is(.home-promo-slider,.home-balance-card,.profile-reference-card,.trophy-fixture-card,.referral-hero-card,.sb-live-feature,.sb-ticket-sheet){min-width:0;max-width:100%}
+ .app button{touch-action:manipulation}
+}
