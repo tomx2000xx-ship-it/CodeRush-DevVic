@@ -30,6 +30,12 @@ A mobile-first sports-arena prototype designed for the Telegram Web Apps environ
 
 English (LTR) and Arabic (RTL) are supported. Translation strings are centralized in `src/i18n.tsx`. New languages require a complete, reviewed translation catalogue and appropriate locale/direction configuration; the current app does not automatically translate arbitrary text.
 
-## Deployment
+## Cloudflare runtime
 
-The connected Cloudflare GitHub integration builds the `main` branch using `npm run build` and deploys the existing `coderush-devvic` Worker. Do not add credentials or bot tokens to source files.
+The existing `coderush-devvic` Worker now has a Worker entry point (`worker.ts`) and serves the existing Vite build from the `dist` static-assets binding. This is **not** an assets-only deployment: API requests under `/api/*` execute Worker code, while normal frontend requests continue to serve the same SPA.
+
+- `GET /api/health` reports runtime readiness and whether `TELEGRAM_BOT_TOKEN` is configured; it never returns the token.
+- Add bot credentials through the existing Worker’s **Settings → Variables and Secrets → Secrets**. Never commit credentials to Git.
+- Telegram webhook handling and server-side validation are a subsequent integration step; this scaffold does not yet authenticate Telegram users or send bot messages.
+
+The connected Cloudflare GitHub integration builds `main` using `npm run build` and deploys the existing `coderush-devvic` Worker. No new Cloudflare project is required.
