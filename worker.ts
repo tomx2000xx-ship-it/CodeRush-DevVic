@@ -74,6 +74,7 @@ async function sendWelcome(chatId: number, env: Env) {
 
 type TelegramMessage = {
   text?: string;
+  write_access_allowed?: { from_request?: boolean };
   chat?: { id?: number };
   from?: { id?: number; username?: string; first_name?: string; last_name?: string };
 };
@@ -123,7 +124,7 @@ async function handleBroadcast(request: Request, env: Env): Promise<Response> {
   if (!text || text.length > 4096) return json({ ok: false, error: "Message text must contain 1–4096 characters" }, 400);
   const offset = Math.max(0, Math.floor(Number(body.offset) || 0));
   const limit = Math.min(100, Math.max(1, Math.floor(Number(body.limit) || 100)));
-  const totalRow = await env.DB.prepare("SELECT COUNT(*) AS total FROM telegram_subscribers WHERE status='active' AND opted_out=0").first<{ total: number }>();
+  const totalRow = await env.DB.prepare("SELECT COUNT(*) AS total FROM telegram_subscribers WHERE status='active' AND opted_out=0 AND write_access_allowed=1").first<{ total: number }>();
   const total = Number(totalRow?.total || 0);
   const recipients = await env.DB.prepare("SELECT chat_id FROM telegram_subscribers WHERE status='active' AND opted_out=0 ORDER BY first_seen_at, chat_id LIMIT ? OFFSET ?").bind(limit, offset).all<{ chat_id: string }>();
   let sent = 0, failed = 0, blocked = 0;
@@ -173,7 +174,7 @@ export default {
 
     if (url.pathname === "/api/telegram/stats" && request.method === "GET") {
       if (!(await requireAdmin(request, env))) return json({ ok: false, error: "Unauthorized" }, 401);
-      const stats = await env.DB.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status='active' AND opted_out=0 THEN 1 ELSE 0 END) AS reachable, SUM(CASE WHEN opted_out=1 THEN 1 ELSE 0 END) AS optedOut, SUM(CASE WHEN status='blocked' THEN 1 ELSE 0 END) AS blocked FROM telegram_subscribers").first();
+      const stats = await env.DB.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status='active' AND opted_out=0 THEN 1 ELSE 0 END) AS reachable, SUM(CASE WHEN opted_out=1 THEN 1 ELSE 0 END) AS optedOut, SUM(CASE WHEN status='blocked' THEN 1 ELSE 0 END) AS blocked, SUM(CASE WHEN write_access_allowed=1 AND status='active' AND opted_out=0 THEN 1 ELSE 0 END) AS messageOptIns FROM telegram_subscribers").first();
       return json({ ok: true, subscribers: stats });
     }
 
