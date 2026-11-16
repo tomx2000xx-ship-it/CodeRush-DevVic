@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Clock3, ShieldCheck, Info, Pencil, CircleDollarSign, X, Eye, EyeOff } from 'lucide-react';
 type Tx={id:string;type:'Deposit'|'Withdrawal';amount:number;createdAt:string;status:'Recorded'|'Declined'};
 const KEY_BALANCE='coderush-stage6-demo-balance',KEY_TX='coderush-stage6-demo-transactions';
-const getBalance=()=>{const n=Number(localStorage.getItem(KEY_BALANCE));return Number.isFinite(n)&&n>=0?n:125};
+const getBalance=()=>{const raw=localStorage.getItem(KEY_BALANCE);if(raw===null)return 125;const n=Number(raw);return Number.isFinite(n)&&n>=0?n:125};
 const getTransactions=():Tx[]=>{try{return JSON.parse(localStorage.getItem(KEY_TX)||'[]')}catch{return []}};
 export function StageSixWallet({initialMode}:{initialMode?:'Deposit'|'Withdrawal'|null}){
  const [balance,setBalance]=useState(getBalance),[transactions,setTransactions]=useState<Tx[]>(getTransactions);
