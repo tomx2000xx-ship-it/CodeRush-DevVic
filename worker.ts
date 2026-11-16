@@ -21,7 +21,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function webhookSecret(token: string): Promise<string> {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(token), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode("CodeRush Telegram webhook authentication v1"));
-  return btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 function constantTimeEqual(a: string, b: string): boolean {
@@ -100,11 +100,11 @@ async function processUpdate(update: { message?: TelegramMessage }, env: Env) {
   const chatId = message?.chat?.id;
   const text = message?.text || "";
   if (!message || !chatId) return;
-  if (/^\\/start(?:@\\w+)?(?:\\s+(.+))?$/.test(text)) {
-    const payload = text.match(/^\\/start(?:@\\w+)?(?:\\s+(.+))?$/)?.[1] || "";
+  if (/^\/start(?:@\w+)?(?:\s+(.+))?$/.test(text)) {
+    const payload = text.match(/^\/start(?:@\w+)?(?:\s+(.+))?$/)?.[1] || "";
     await saveSubscriber(message, payload, env);
     await sendWelcome(chatId, env);
-  } else if (/^\\/(stop|unsubscribe)(?:@\\w+)?$/.test(text)) {
+  } else if (/^\/(stop|unsubscribe)(?:@\w+)?$/.test(text)) {
     await env.DB.prepare("UPDATE telegram_subscribers SET opted_out=1, last_seen_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE chat_id=?").bind(String(chatId)).run();
     await telegram(env, "sendMessage", { chat_id: chatId, text: "تم إيقاف رسائل CodeRush. أرسل /start للاشتراك مجدداً." });
   }
