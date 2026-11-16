@@ -1067,3 +1067,18 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
 .rtl .wallet-sample-address code{text-align:left;direction:ltr}
 .rtl .wallet-review-list b{text-align:left}
 @media(max-width:370px){.wallet-stepper span{font-size:7px}.wallet-redesign .wallet-summary-card b{font-size:14px}.wallet-redesign .wallet-action-card{padding:11px}}
+
+
+/* Profile wallet shortcuts — refreshed action panels */
+.profile-wallet-actions{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin:15px 0 20px}
+.profile-wallet-actions>button{position:relative;min-width:0;min-height:126px;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:5px;padding:14px;border:1px solid #385345;border-radius:15px;background:radial-gradient(circle at 88% 8%,#2b5945 0,transparent 44%),linear-gradient(145deg,#19382e,#111e2c);color:#f1f6f4;text-align:left;overflow:hidden}
+.profile-wallet-actions>button.profile-withdraw-action{border-color:#57445c;background:radial-gradient(circle at 88% 8%,#593b58 0,transparent 44%),linear-gradient(145deg,#30253a,#111e2c)}
+.profile-wallet-actions>button>span{position:absolute;top:13px;left:13px;width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:#28533f;color:#a8efc1}
+.profile-wallet-actions>button.profile-withdraw-action>span{background:#54364f;color:#f0bad4}
+.profile-wallet-actions>button>b{font:700 15px 'Space Grotesk';margin-top:8px}
+.profile-wallet-actions>button>small{color:#a2b3c1;font-size:9px}
+.profile-wallet-actions>button:after{content:'↗';position:absolute;right:13px;bottom:13px;color:#9edab5;font-size:17px}
+.profile-wallet-actions>button.profile-withdraw-action:after{color:#e6a8c5}
+.rtl .profile-wallet-actions>button{text-align:right;align-items:flex-start}
+.rtl .profile-wallet-actions>button>span{left:auto;right:13px}
+.rtl .profile-wallet-actions>button:after{right:auto;left:13px}
