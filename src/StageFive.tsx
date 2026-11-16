@@ -27,13 +27,13 @@ export function StageFiveFriends(){
 }
 export function StageFiveNotifications(){
  const [items,setItems]=useState<Notice[]>(safeRead);
- const [filter,setFilter]=useState<'All'|'Unread'>('All');
+ const [filter,setFilter]=useState<'All'|'Unread'|'Bets'|'Wallet'>('All');
  const unread=useMemo(()=>items.filter(n=>!n.read).length,[items]);
  const save=(next:Notice[])=>{setItems(next);localStorage.setItem('coderush-stage5-notifications',JSON.stringify(next))};
  const markAll=()=>save(items.map(n=>({...n,read:true})));
- const visible=items.filter(n=>filter==='All'||!n.read);
+ const visible=items.filter(n=>filter==='All'||(filter==='Unread'&&!n.read)||(filter==='Bets'&&n.category==='Activity')||(filter==='Wallet'&&n.category==='Updates'));
  return <><section className="page-title notifications-title"><span className="eyebrow">YOUR UPDATES</span><h1>Notifications</h1><p>You have {unread} unread notifications out of {items.length}.</p></section>
- <div className="stage5-notice-toolbar"><div className="filter-row">{(['All','Unread'] as const).map(f=><button key={f} className={filter===f?'filter active':'filter'} onClick={()=>setFilter(f)}>{f}{f==='Unread'?' ('+unread+')':''}</button>)}</div><button className="stage5-markall" onClick={markAll} disabled={!unread}><CheckCheck size={14}/> Mark all read</button></div>
+ <div className="stage5-notice-toolbar"><div className="filter-row">{(['All','Unread','Bets','Wallet'] as const).map(f=><button key={f} className={filter===f?'filter active':'filter'} onClick={()=>setFilter(f)}>{f}{f==='Unread'?' ('+unread+')':''}</button>)}</div><button className="stage5-markall" onClick={markAll} disabled={!unread}><CheckCheck size={14}/> Mark all read</button></div>
  {visible.length? <div className="stage5-notice-list">{visible.map(n=><article className={n.read?'stage5-notice read':'stage5-notice'} key={n.id} role="button" tabIndex={0} aria-label={'Mark notification as read: '+n.title} onClick={()=>save(items.map(x=>x.id===n.id?{...x,read:true}:x))} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();save(items.map(x=>x.id===n.id?{...x,read:true}:x))}}}><span className="stage5-notice-icon"><Bell size={17}/></span><div className="stage5-notice-copy"><div><b>{n.title}</b>{!n.read&&<i/>}</div><p>{n.body}</p><small>{n.category} · {n.date}</small></div><ChevronRight size={16}/></article>)}</div>:<div className="empty"><Bell size={27}/><h3>{filter==='Unread'?'You’re all caught up':'No notifications'}</h3><p>New demo updates will appear here.</p></div>}
  <p className="detail-disclaimer stage5-disclaimer">These are local sample notifications stored on this device, not messages sent by a live service.</p></>;
 }
