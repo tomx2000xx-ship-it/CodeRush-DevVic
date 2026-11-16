@@ -55,3 +55,29 @@ html[dir="rtl"] .stage5-notice,html[dir="rtl"] .stage6-notice{direction:rtl}
 html[dir="rtl"] .stage6-tx{direction:rtl}
 html[dir="rtl"] .onboard-submit,html[dir="rtl"] .primary,html[dir="rtl"] .place-demo{direction:rtl}
 html[dir="rtl"] .toast{direction:rtl}
+
+/* Stage 8 — demo readiness, accessibility and device-safe polish */
+:root{color-scheme:dark;scrollbar-gutter:stable}
+html{min-height:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth}
+body{min-height:100dvh;overscroll-behavior-y:contain}
+button,input,textarea{font:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:disabled{cursor:not-allowed}
+button:focus-visible,input:focus-visible,[tabindex="0"]:focus-visible{outline:2px solid #c4fa58;outline-offset:3px}
+.app{min-height:100vh;min-height:100dvh;padding-bottom:calc(100px + env(safe-area-inset-bottom))}
+.bottom-nav{height:calc(68px + env(safe-area-inset-bottom));padding:5px 7px env(safe-area-inset-bottom);bottom:0}
+.nav-item{min-height:48px;justify-content:center}
+.slip-fab{bottom:calc(80px + env(safe-area-inset-bottom));min-height:44px}
+.toast{bottom:calc(145px + env(safe-area-inset-bottom));max-width:calc(100vw - 32px);white-space:normal;text-align:center;z-index:30}
+.name-field input,.stage6-amount input{font-size:16px}
+.match-card,.demo-bet-card,.stage5-notice,.stage6-tx,.menu-row{overflow-wrap:anywhere}
+.match-details-link,.filter,.iconbtn,.balance-card button,.quick-actions button,.stage5-markall,.stage6-mode button,.stage6-submit,.stage6-reset{min-height:40px}
+.stage5-notice[role="button"]{cursor:pointer}
+.fatal-screen{min-height:100dvh;max-width:520px;margin:auto;padding:32px 22px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:#080d19;color:#f4f6fc}
+.fatal-mark{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;background:#c4fa58;color:#111a0b;font:800 20px 'Space Grotesk'}
+.fatal-screen h1{font:700 25px 'Space Grotesk';margin:22px 0 8px}
+.fatal-screen p{max-width:330px;color:#9aa8bc;font-size:13px;line-height:1.65}
+.fatal-screen button{margin-top:12px;padding:13px 20px;border:0;border-radius:10px;background:#c4fa58;color:#111a0b;font-weight:800}
+@media(max-width:360px){.app{padding-left:13px;padding-right:13px}.nav-item{min-width:0;font-size:8px}.nav-item svg{width:17px;height:17px}.hero{padding:21px 16px}.hero h1{font-size:37px}.quick-actions{gap:5px}.quick-actions b{font-size:8px}.quick-actions small{font-size:6px}}
+@media(min-width:600px){.app{min-height:100dvh}.bottom-nav{width:min(520px,100%)}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}

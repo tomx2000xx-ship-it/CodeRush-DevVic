@@ -1,3 +1,37 @@
-import React from 'react'; import { createRoot } from 'react-dom/client'; import App from './App'; import './styles.css';
-const tg = (window as any).Telegram?.WebApp; if (tg) { tg.ready(); tg.expand(); }
-createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App';
+import './styles.css';
+
+declare global {
+  interface Window { Telegram?: { WebApp?: any } }
+}
+
+class AppErrorBoundary extends React.Component<React.PropsWithChildren, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error: Error) { console.error('CodeRush render error:', error); }
+  render() {
+    if (this.state.failed) return <main className="fatal-screen" role="alert">
+      <div className="fatal-mark">CR</div>
+      <h1>Something went wrong</h1>
+      <p>The demo could not display this screen. Your locally saved demo data has not intentionally been cleared.</p>
+      <button onClick={() => window.location.reload()}>Reload CodeRush</button>
+    </main>;
+    return this.props.children;
+  }
+}
+
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  try {
+    tg.ready();
+    tg.expand();
+    tg.setHeaderColor?.('#090e1b');
+    tg.setBackgroundColor?.('#090e1b');
+  } catch (error) {
+    console.warn('Telegram WebApp presentation setup was unavailable:', error);
+  }
+}
+const root = document.getElementById('root');
+if (root) createRoot(root).render(<React.StrictMode><AppErrorBoundary><App /></AppErrorBoundary></React.StrictMode>);
