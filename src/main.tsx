@@ -14,9 +14,9 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, { failed
   render() {
     if (this.state.failed) return <main className="fatal-screen" role="alert">
       <div className="fatal-mark">CR</div>
-      <h1>Something went wrong</h1>
-      <p>The demo could not display this screen. Your locally saved demo data has not intentionally been cleared.</p>
-      <button onClick={() => window.location.reload()}>Reload CodeRush</button>
+      <h1>{document.documentElement.lang==='ar'?'حدث خطأ غير متوقع':'Something went wrong'}</h1>
+      <p>{document.documentElement.lang==='ar'?'تعذّر عرض هذه الشاشة. لم يتم حذف بياناتك التجريبية المحفوظة محلياً.':'The demo could not display this screen. Your locally saved demo data has not intentionally been cleared.'}</p>
+      <button onClick={() => window.location.reload()}>{document.documentElement.lang==='ar'?'إعادة تحميل CodeRush':'Reload CodeRush'}</button>
     </main>;
     return this.props.children;
   }
