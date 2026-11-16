@@ -5,7 +5,7 @@ import adBanner from './assets/coderush-ad-banner.svg';
 import { StageFourMatches, StageFourBets } from './StageFour';
 import { StageFiveFriends, StageFiveNotifications } from './StageFive';
 import { StageSixWallet } from './StageSix';
-import { Home, Trophy, TicketPercent, Users, UserRound, Wallet, Bell, ChevronRight, Flame, CircleHelp, Globe2, CheckCircle2, ShieldCheck, User, ArrowRight, Gift, Zap, CalendarDays, TrendingUp, Star, Target, Radio, Crown, Copy, Headphones, Eye, EyeOff, WalletCards, Medal, Handshake, ClipboardList, LayoutGrid, Coins, Timer, Flame as FlameIcon } from 'lucide-react';
+import { Home, Trophy, TicketPercent, Users, UserRound, Wallet, Bell, ChevronRight, Flame, CircleHelp, Globe2, CheckCircle2, ShieldCheck, User, ArrowRight, ArrowDownLeft, ArrowUpRight, Gift, Zap, CalendarDays, TrendingUp, Star, Target, Radio, Crown, Copy, Headphones, Eye, EyeOff, WalletCards, Medal, Handshake, ClipboardList, LayoutGrid, Coins, Timer, Flame as FlameIcon } from 'lucide-react';
 type Tab='Home'|'Matches'|'My Bets'|'Friends'|'Account'|'Notifications'|'Wallet';
 type Profile={name:string;telegramId:string;username:string;joinedAt:string};
 declare global { interface Window { Telegram?: { WebApp?: any } } }
