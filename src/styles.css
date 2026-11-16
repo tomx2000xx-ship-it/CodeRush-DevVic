@@ -655,3 +655,10 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
  .trophy-kickoff strong{font-size:22px}
  .trophy-odds button{min-height:56px}
 }
+
+.trophy-league-heading{direction:rtl}
+.trophy-league-heading>i{order:0;margin-inline-start:0;margin-inline-end:3px;font-size:21px}
+.trophy-league-heading>small{order:1}
+.trophy-league-heading>b{order:2;text-align:start}
+.trophy-live-progress span{position:relative}
+.trophy-live-progress span:before{content:"";position:absolute;left:0;top:50%;width:10px;height:10px;border:3px solid #e45d65;border-radius:50%;background:#fff;transform:translate(-1px,-50%)}
