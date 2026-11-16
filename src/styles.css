@@ -353,3 +353,12 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
 .mybets-selection-note .mybets-browse{background:#4b9fe0;color:#fff}
 .mybets-page .detail-disclaimer{color:#84929e}
 @media(max-width:390px){.mybets-page .mybets-performance{min-height:365px;padding:27px 18px 17px;border-radius:26px}.mybets-performance-main{min-height:220px}.mybets-profit-copy>b{font-size:49px}.mybets-profit-copy small{font-size:13px}.mybets-profit-copy em{font-size:10px;padding:8px 10px}.mybets-accuracy{width:96px;height:96px;border-width:8px}.mybets-stats{gap:7px}.mybets-stats>div{min-height:103px;padding:13px 3px;border-radius:20px}.mybets-stats small{font-size:10px}.mybets-stats b{font-size:21px}.mybets-tabs button{min-height:62px;font-size:12px;gap:6px}.mybets-empty{padding-top:56px}.mybets-ticket-art{width:160px;height:160px;margin-bottom:27px}.mybets-empty h2{font-size:25px}.mybets-empty p{font-size:13px}.mybets-browse{min-height:57px;font-size:14px}}
+
+
+/* Compact match catalogue and progressive disclosure */
+.match-view-more{width:min(270px,90%);min-height:49px;margin:20px auto 24px;padding:0 18px;border:1px solid #b9d9ee;border-radius:25px;background:#eaf5fc;color:#3e8fc5;display:flex;align-items:center;justify-content:center;gap:9px;font-size:13px;font-weight:900;box-shadow:0 6px 18px #4b9fe018}
+.match-view-more span{padding:3px 8px;border-radius:15px;background:#fff;color:#438fc4;font-size:10px}
+.mybets-view-more{margin-top:12px}
+.match-arena-count{display:flex;align-items:center;justify-content:flex-end;gap:5px}
+.match-arena-count:before{content:"";width:6px;height:6px;border-radius:50%;background:#4b9fe0}
+@media(max-width:390px){.match-view-more{min-height:45px;font-size:12px;margin:16px auto 20px}}
