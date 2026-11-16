@@ -54,7 +54,7 @@ export function StageFourMatches(){
  const catLabel=(v:string)=>({ 'TOP LEAGUES':words('Top leagues','أهم الدوريات'),'INTERNATIONAL':words('International','المنتخبات'),'INTERNATIONAL CLUBS':words('International clubs','الأندية الدولية'),'ENGLISH PREMIER LEAGUE':'Premier League','LA LIGA':'La Liga','SERIE A':'Serie A','BUNDESLIGA':'Bundesliga','LIGUE 1':'Ligue 1','UEFA CHAMPIONS LEAGUE':'Champions League','UEFA EUROPA LEAGUE':'Europa League'} as Record<string,string>)[v]||v;
  const status=(f:Fixture)=>f.live?'Live':f.completed?'Finished':f.time.includes('TOMORROW')?'Tomorrow':'Today';
  const topLeagues=['ENGLISH PREMIER LEAGUE','LA LIGA','SERIE A','BUNDESLIGA','LIGUE 1'];
- const filtered=fixtures.filter(f=>(filter==='All'||status(f)===filter)&&(!favoritesOnly||favorites.includes(f.id))&&(!query||(f.home+' '+f.away+' '+f.league).toLowerCase().includes(query.toLowerCase()))&&(competition==='TOP LEAGUES'?topLeagues.includes(f.league):competition==='INTERNATIONAL'||competition==='INTERNATIONAL CLUBS'?f.league===competition:f.league===competition));
+ const filtered=fixtures.filter(f=>(filter==='All'||status(f)===filter||(filter==='Today'&&f.live))&&(!favoritesOnly||favorites.includes(f.id))&&(!query||(f.home+' '+f.away+' '+f.league).toLowerCase().includes(query.toLowerCase()))&&(competition==='TOP LEAGUES'?topLeagues.includes(f.league):competition==='INTERNATIONAL'||competition==='INTERNATIONAL CLUBS'?f.league===competition:f.league===competition));
  const visible=[...filtered].sort((a,b)=>sort==='league'?a.league.localeCompare(b.league):Number(b.live)-Number(a.live)||a.time.localeCompare(b.time));
  const live=visible.find(f=>f.live);
  const list=visible.filter(f=>!f.live);
