@@ -466,14 +466,319 @@ const ar: Record<string,string> = Object.fromEntries([
 ['No open bets','لا توجد رهانات مفتوحة'],
 ['Browse matches','تصفح المباريات'],
 ['Open this screen inside the deployed CodeRush app to generate your Telegram link','افتح هذه الشاشة داخل تطبيق CodeRush المنشور لإنشاء رابط تيليجرام الخاص بك']
+
+['LIVE MATCH SIMULATION','محاكاة مباراة مباشرة'],
+['Goal! Germany take the lead.','هدف! ألمانيا تتقدم في النتيجة.'],
+['Netherlands chance — saved by the keeper.','فرصة لهولندا — يتصدى لها حارس المرمى.'],
+['Big chance! Shot hits the post.','فرصة خطيرة! الكرة تصطدم بالقائم.'],
+['Raja pressure building in the final third.','الرجاء يكثف الضغط في الثلث الهجومي.'],
+['Accelerated, scripted demo match — not a real-time sports feed.','مباراة تجريبية سريعة ومبرمجة — وليست بثاً رياضياً مباشراً.'],
+['RECORDED · DEMO','مسجلة · تجريبية'],
+['NET PROFIT','صافي الربح'],
+['POTENTIAL RETURN','العائد المحتمل'],
+['Win streak','سلسلة الانتصارات'],
+['Best return','أفضل عائد'],
+['accuracy','الدقة'],
+['No settled bets','لا توجد رهانات مُسوّاة'],
+['Your settled bets will appear here when completed.','ستظهر رهاناتك المُسوّاة هنا بعد اكتمالها.'],
+['Choose a match and predict its result before it starts.','اختر مباراة وتوقّع نتيجتها قبل انطلاقها.'],
+['Recorded demo bets','رهانات تجريبية مسجلة'],
+['Stake (USD)','قيمة الرهان (دولار أمريكي)'],
+['Demo only · Stakes are deducted from the sample USD balance; potential returns are illustrative and are not paid.','للعرض التجريبي فقط · تُخصم قيمة الرهان من الرصيد الافتراضي بالدولار؛ والعوائد المحتملة توضيحية ولا يتم دفعها.'],
+['LIVE MATCH SIMULATION','محاكاة مباراة مباشرة'],
+['FULL TIME','انتهت المباراة'],
+['YOUR UPDATES','تحديثاتك'],
+['Notifications','الإشعارات'],
+['You’re all caught up','لا توجد إشعارات جديدة'],
+['No notifications','لا توجد إشعارات'],
+['New demo updates will appear here.','ستظهر تحديثات النسخة التجريبية هنا.'],
+['These are local sample notifications stored on this device, not messages sent by a live service.','هذه إشعارات تجريبية محفوظة على هذا الجهاز، وليست رسائل مرسلة من خدمة مباشرة.'],
+['Mark all read','تحديد الكل كمقروء'],
+['All','الكل'],
+['Unread','غير مقروء'],
+['Bets','الرهانات'],
+['Wallet','المحفظة'],
+['Rewards','المكافآت'],
+['Activity','النشاط'],
+['Updates','التحديثات'],
+['Welcome to CodeRush','مرحباً بك في CodeRush'],
+['Your demo profile is ready. Explore matches, sample selections and your personal arena.','ملفك التجريبي جاهز. استكشف المباريات والاختيارات التوضيحية وساحتك الشخصية.'],
+['Your referral rewards','مكافآت الإحالة الخاصة بك'],
+['Your invite dashboard shows how the three-level demo commission structure works.','تعرض لوحة الدعوات كيفية عمل هيكل العمولات التجريبي ذي المستويات الثلاثة.'],
+['Match centre is ready','مركز المباريات جاهز'],
+['Browse sample fixtures and add an outcome to your demo slip. No real bets are placed.','تصفح المباريات التوضيحية وأضف نتيجة إلى قسيمتك التجريبية. لا يتم وضع رهانات حقيقية.'],
+['Demo wallet reminder','تذكير بالمحفظة التجريبية'],
+['All displayed balances and wallet activity are simulated and have no cash value.','جميع الأرصدة والأنشطة المعروضة في المحفظة افتراضية وليس لها قيمة نقدية.'],
+['Just now','الآن'],
+['Today','اليوم'],
+['Yesterday','أمس'],
+['INVITE · CONNECT · EXPLORE','ادعُ · تواصل · اكتشف'],
+['Friends & referrals','الأصدقاء والإحالات'],
+['Build your demo network across three levels.','أنشئ شبكتك التجريبية عبر ثلاثة مستويات.'],
+['CodeRushDev','CodeRushDev'],
+['@coderushdev · Telegram bot','@coderushdev · بوت تيليجرام'],
+['PERSONAL REFERRAL LINK','رابط الإحالة الشخصي'],
+['Preparing your Telegram invite link…','جارٍ تجهيز رابط دعوتك عبر تيليجرام…'],
+['Share on Telegram','مشاركة عبر تيليجرام'],
+['Copy link','نسخ الرابط'],
+['Copied','تم النسخ'],
+['LEVEL 1','المستوى الأول'],
+['LEVEL 2','المستوى الثاني'],
+['LEVEL 3','المستوى الثالث'],
+['Illustrative referral programme · no real commissions or payouts','برنامج إحالة توضيحي · لا توجد عمولات أو مدفوعات حقيقية'],
+['TEAM SIZE','حجم الفريق'],
+['Invited users','المستخدمون المدعوون'],
+['TOTAL REWARDS','إجمالي المكافآت'],
+['Demo earnings','مكافآت تجريبية'],
+['AVAILABLE','المتاح'],
+['Not withdrawable','غير قابل للسحب'],
+['YOUR NETWORK','شبكتك'],
+['Your teams','فرقك'],
+['DEMO VIEW','عرض تجريبي'],
+['Level 1 team','فريق المستوى الأول'],
+['Level 2 team','فريق المستوى الثاني'],
+['Level 3 team','فريق المستوى الثالث'],
+['Your direct friends','أصدقاؤك المباشرون'],
+['Friends of your friends','أصدقاء أصدقائك'],
+['Third-level network','شبكة المستوى الثالث'],
+['0 members','0 أعضاء'],
+['Team commission','عمولة الفريق'],
+['Join rewards','مكافآت الانضمام'],
+['No referrals yet — share your link to preview how the network is organised.','لا توجد إحالات بعد — شارك رابطك لمعاينة طريقة تنظيم الشبكة.'],
+['HOW IT WORKS','كيف يعمل'],
+['Three simple levels','ثلاثة مستويات بسيطة'],
+['Level 1 · Direct friends','المستوى الأول · الأصدقاء المباشرون'],
+['Invite friends using your personal Telegram link.','ادعُ أصدقاءك باستخدام رابطك الشخصي على تيليجرام.'],
+['Level 2 · Second level','المستوى الثاني · المستوى التالي'],
+['Your friends’ invited friends.','الأصدقاء الذين يدعوهم أصدقاؤك.'],
+['Level 3 · Third level','المستوى الثالث · المستوى الثالث'],
+['The next level in your demo network.','المستوى التالي في شبكتك التجريبية.'],
+['EXAMPLE','مثال'],
+['For illustration only: the three levels show how a referral network could be displayed. No real commission is calculated, credited or paid.','للتوضيح فقط: تعرض المستويات الثلاثة كيفية تنظيم شبكة الإحالات. لا يتم احتساب أي عمولة حقيقية أو إضافتها أو دفعها.'],
+['NEED TO KNOW','معلومات مهمة'],
+['Frequently asked questions','الأسئلة الشائعة'],
+['Does my friend’s activity reduce my reward?','هل يؤثر نشاط صديقي على مكافأتي؟'],
+['No. The displayed levels are a demo explanation. No real commission is calculated or transferred.','لا. المستويات المعروضة شرح تجريبي فقط. لا يتم احتساب أي عمولة حقيقية أو تحويلها.'],
+['When does commission begin?','متى تبدأ العمولة؟'],
+['This demo illustrates the referral journey only. No real earnings or payouts are generated.','توضح هذه النسخة التجريبية رحلة الإحالة فقط. لا يتم إنشاء أرباح أو مدفوعات حقيقية.'],
+['What do the three levels mean?','ماذا تعني المستويات الثلاثة؟'],
+['Level 1 represents direct invites, Level 2 represents your invitees’ invites, and Level 3 represents the next network level.','يمثل المستوى الأول الدعوات المباشرة، والثاني دعوات الأشخاص الذين دعوتهم، والثالث المستوى التالي في الشبكة.'],
+['Are rewards withdrawable?','هل يمكن سحب المكافآت؟'],
+['No. All referral amounts and balances in CodeRush are simulated and have no cash value.','لا. جميع مبالغ الإحالات والأرصدة في CodeRush افتراضية وليس لها قيمة نقدية.'],
+['Telegram invite link unavailable','رابط الدعوة عبر تيليجرام غير متاح'],
+['Your Telegram invite link is still being prepared','لا يزال رابط دعوتك عبر تيليجرام قيد التجهيز'],
+['Clipboard unavailable','الحافظة غير متاحة'],
+['Join me on CodeRush','انضم إليّ على CodeRush'],
+['Help & support is a demo screen','شاشة المساعدة والدعم تجريبية'],
+['Open this screen inside the deployed CodeRush app to generate your Telegram link','افتح هذه الشاشة داخل تطبيق CodeRush المنشور لإنشاء رابط تيليجرام الخاص بك'],
+['Could not copy link','تعذّر نسخ الرابط'],
+['Favourite','إضافة إلى المفضلة'],
+['Favourite team','إضافة الفريق إلى المفضلة'],
+['Top leagues','أهم الدوريات'],
+['International','المنتخبات الدولية'],
+['International clubs','الأندية الدولية'],
+['Premier League','الدوري الإنجليزي الممتاز'],
+['La Liga','الدوري الإسباني'],
+['Serie A','الدوري الإيطالي'],
+['Bundesliga','الدوري الألماني'],
+['Ligue 1','الدوري الفرنسي'],
+['Champions League','دوري أبطال أوروبا'],
+['Europa League','الدوري الأوروبي'],
+['Live','مباشر'],
+['Finished','انتهت'],
+['Time','الوقت'],
+['League','الدوري'],
+['Search teams or competitions','ابحث عن فريق أو بطولة'],
+['Matches shown','المباريات المعروضة'],
+['Competitions','البطولات'],
+['No matches found','لا توجد مباريات'],
+['Try another competition or date filter.','جرّب بطولة أخرى أو غيّر مرشح التاريخ.'],
+['BET SLIP','قسيمة الرهان'],
+['VIEW TICKET','عرض القسيمة'],
+['YOUR SELECTIONS','اختياراتك'],
+['Single / Accumulator','مفرد / تراكمي'],
+['Demo ticket · selections are grouped here','قسيمة تجريبية · تظهر اختياراتك هنا'],
+['Combined odds','إجمالي الاحتمالات'],
+['selection(s)','اختيار'],
+['Confirm demo ticket','تأكيد القسيمة التجريبية'],
+['Clear ticket','مسح القسيمة'],
+['Available demo balance: ','الرصيد التجريبي المتاح: '],
+['Open profile','فتح الملف الشخصي'],
+['Open demo wallet','فتح المحفظة التجريبية'],
+['Toggle balance visibility','تبديل إظهار الرصيد'],
+['Close ticket','إغلاق القسيمة'],
+['Remove selection','إزالة الاختيار'],
+['Customer support','دعم العملاء'],
+['Reset demo profile','إعادة تعيين الملف التجريبي'],
+['Reset demo wallet','إعادة تعيين المحفظة التجريبية'],
+['USD · SIMULATED BALANCE','دولار أمريكي · رصيد افتراضي'],
+['DEMO WALLET · SIMULATED','محفظة تجريبية · محاكاة'],
+['DEMO MODE','الوضع التجريبي'],
+['DEMO EXPERIENCE','التجربة التجريبية'],
+['THE FOOTBALL ARENA','ساحة كرة القدم'],
+['FEEL THE MATCH.','عِش أجواء المباراة.'],
+['EXPLORE CODERUSH.','اكتشف CodeRush.'],
+['MATCHES · DEMO ODDS · REWARDS','المباريات · احتمالات تجريبية · مكافآت'],
+['YOUR NEXT MATCH STARTS HERE','مباراتك القادمة تبدأ هنا'],
+['FIND YOUR GAME.','اعثر على مباراتك.'],
+['MAKE EVERY MOMENT COUNT.','اجعل لكل لحظة قيمة.'],
+['FIXTURES · LIVE ACTION · MATCH CENTRE','جدول المباريات · أحداث مباشرة · مركز المباريات'],
+['THE ENERGY IS YOURS','الحماس بين يديك'],
+['JOIN THE RUSH.','انضم إلى الحماس.'],
+['EXPLORE THE ARENA.','اكتشف الساحة.'],
+['REWARDS · COMMUNITY · DEMO PLAY','المكافآت · المجتمع · تجربة تجريبية'],
+['MATCH CENTRE','مركز المباريات'],
+['Featured matches','المباريات المميزة'],
+['VIEW ALL','عرض الكل'],
+['Explore matches','استكشف المباريات'],
+['tap to dismiss','اضغط للإغلاق'],
+['Start exploring','ابدأ الاستكشاف'],
+['Maybe later','ربما لاحقاً'],
+['Start','ابدأ'],
+['Back','رجوع'],
+['Continue','متابعة'],
+['Change','تغيير'],
+['Close','إغلاق'],
+['Remove','إزالة'],
+['Submit','إرسال'],
+['Confirm','تأكيد'],
+['Cancel','إلغاء'],
+['vs','ضد'],
+[' vs ',' ضد '],
+['members','أعضاء'],
+['DEPOSIT CENTRE','مركز الإيداع'],
+['WITHDRAWAL CENTRE','مركز السحب'],
+['DEMO ACCOUNT','حساب تجريبي'],
+['YOUR ACTIVITY','نشاطك'],
+['Recent transactions','المعاملات الأخيرة'],
+['RECORDS','عمليات'],
+['No wallet activity recorded yet','لا توجد معاملات مسجلة بعد'],
+['DEMO DEPOSIT · NO ADDRESS REQUIRED','إيداع تجريبي · لا حاجة إلى عنوان'],
+['SAMPLE DESTINATION ONLY','وجهة تجريبية فقط'],
+['SIMULATION IN PROGRESS','المحاكاة قيد التنفيذ'],
+['Processing deposit','جارٍ معالجة الإيداع'],
+['Processing withdrawal','جارٍ معالجة السحب'],
+['Move into your wallet','أضف إلى محفظتك'],
+['Request a withdrawal','طلب سحب'],
+['Choose a transfer format','اختر طريقة التحويل'],
+['Select the asset and network for this demo.','اختر الأصل والشبكة لهذه التجربة.'],
+['AMOUNT · DEMO USD','المبلغ · دولار تجريبي'],
+['DESTINATION · SAMPLE ONLY','الوجهة · تجريبية فقط'],
+['Enter a sample destination address','أدخل عنوان وجهة تجريبي'],
+['Estimated network fee','رسوم الشبكة التقديرية'],
+['Review details','مراجعة التفاصيل'],
+['Review before confirming','راجع التفاصيل قبل التأكيد'],
+['This is a simulated transaction preview.','هذه معاينة لمعاملة تجريبية.'],
+['Transfer type','نوع العملية'],
+['Asset & network','الأصل والشبكة'],
+['Network fee','رسوم الشبكة'],
+['Wallet credit','رصيد المحفظة'],
+['Total debit','إجمالي الخصم'],
+['SAMPLE DESTINATION ONLY','وجهة تجريبية فقط'],
+['Edit details','تعديل التفاصيل'],
+['Please wait while this demo transaction is simulated.','يرجى الانتظار أثناء محاكاة هذه المعاملة التجريبية.'],
+['Enter an amount between 1 and 10,000 demo USD.','أدخل مبلغاً بين 1 و10,000 دولار تجريبي.'],
+['Enter an amount between 1 and 10,000.','أدخل مبلغاً بين 1 و10,000.'],
+['Insufficient demo balance.','الرصيد التجريبي غير كافٍ.'],
+['Enter a sample destination address.','أدخل عنوان وجهة تجريبي.'],
+['Confirm demo deposit','تأكيد الإيداع التجريبي'],
+['Submit demo withdrawal','إرسال طلب السحب التجريبي'],
+['No real USDT address is provided. Nothing is broadcast to a network and no payment is collected.','لا يتم توفير عنوان USDT حقيقي. لن يتم إرسال أي معاملة إلى الشبكة ولن يتم تحصيل أي دفعة.'],
+['Choose your USDT network and confirm the demo amount. This preview does not generate a deposit address or accept cryptocurrency.','اختر شبكة USDT وأكد المبلغ التجريبي. لا تنشئ هذه المعاينة عنوان إيداع ولا تستقبل عملات رقمية.'],
+['DEMO only. No real money moves.','للعرض التجريبي فقط. لا يتم تحويل أموال حقيقية.'],
+['Reset demo profile','إعادة تعيين الملف التجريبي'],
+['Account ID copied','تم نسخ معرّف الحساب'],
+['Today’s demo reward has already been claimed','تم استلام مكافأة اليوم التجريبية بالفعل'],
+['$0.03 demo reward recorded — no cash value','$0.03 مكافأة تجريبية مسجلة — بلا قيمة نقدية'],
+['Please enter a display name','يرجى إدخال اسم العرض'],
+['Please acknowledge the demo notice','يرجى تأكيد فهم إشعار النسخة التجريبية'],
+['Allow Telegram messages','السماح برسائل تيليجرام'],
+['Telegram updates enabled','تم تفعيل تحديثات تيليجرام'],
+['Telegram message permission was not granted','لم يتم منح إذن رسائل تيليجرام'],
+['Open CodeRush inside Telegram to enable bot messages','افتح CodeRush داخل تيليجرام لتفعيل رسائل البوت'],
+['Telegram permission prompt is unavailable in this preview','طلب إذن تيليجرام غير متاح في هذه المعاينة'],
+['You have','لديك'],
+['unread notifications out of','إشعارات غير مقروءة من أصل'],
+['Mark notification as read: ','تحديد الإشعار كمقروء: '],
+['The demo could not display this screen. Your locally saved demo data has not intentionally been cleared.','تعذّر عرض هذه الشاشة. لم يتم حذف بياناتك التجريبية المحفوظة محلياً.'],
+['Something went wrong','حدث خطأ غير متوقع'],
+['Try again','حاول مرة أخرى'],
+['Reset','إعادة تعيين'],
+['My bets','رهاناتي'],
+['Friends','الأصدقاء'],
+['Home','الرئيسية'],
+['Account','حسابي'],
+['Notifications','الإشعارات'],
+['Withdraw','سحب'],
+['Deposit','إيداع'],
+['Help','المساعدة'],
+['History','السجل'],
+['Wallet & transactions','المحفظة والمعاملات'],
+['Friends & referrals','الأصدقاء والإحالات'],
+['Switch to Arabic','التبديل إلى العربية'],
+['Switch to English','التبديل إلى الإنجليزية'],
+['More features','المزيد من الميزات'],
+['Responsible play, help and settings','اللعب المسؤول والمساعدة والإعدادات'],
+['Champions ranking','ترتيب الأبطال'],
+['Invite friends','ادعُ أصدقاءك'],
+['Offers & rewards','العروض والمكافآت'],
+['VIP club','نادي كبار الشخصيات'],
+['Results centre','مركز النتائج'],
+['Live selections','الاختيارات المباشرة'],
+['DAILY REWARDS','مكافآت يومية'],
+['Daily check-in','التسجيل اليومي'],
+['Winning streak','سلسلة الانتصارات'],
+['Collect','استلام'],
+['Collected','تم الاستلام'],
+['MATCH IN PROGRESS · DEMO','مباراة جارية · تجريبية'],
+['Live now','مباشر الآن'],
+['All','الكل'],
+['International friendly · Demo','مباراة ودية دولية · تجريبية'],
+['Turkey','تركيا'],
+['France','فرنسا'],
+['Explore match','استكشف المباراة'],
+['Illustrative score and running match clock — not a real live fixture.','نتيجة ووقت مباراة توضيحيان — ليست مباراة حقيقية مباشرة.'],
+['Illustrative daily reward · no cash value · stored on this device only','مكافأة يومية توضيحية · بلا قيمة نقدية · محفوظة على هذا الجهاز فقط'],
+['Top demo balances across the arena · updates locally','أعلى الأرصدة التجريبية في الساحة · يتم تحديثها محلياً'],
+['Explore the three-level referral programme','استكشف برنامج الإحالة ذي المستويات الثلاثة'],
+['Discover the current demo reward features','اكتشف مزايا المكافآت التجريبية الحالية'],
+['Preview the VIP area and its sample benefits','استعرض منطقة كبار الشخصيات ومزاياها التوضيحية'],
+['Review completed fixtures and demo activity','راجع المباريات المكتملة والنشاط التجريبي'],
+['Follow the live match simulation','تابع محاكاة المباراة المباشرة'],
+['Play responsibly. Set your demo limits in Account. All activity is simulated.','العب بمسؤولية. حدّد حدودك التجريبية من صفحة الحساب. جميع الأنشطة محاكاة.'],
+['Play responsibly','العب بمسؤولية'],
+['Your arena.','ساحتك.'],
+['Your experience.','تجربتك.'],
+['Open','مفتوحة'],
+['Settled','مُسوّاة'],
+['Active','نشطة'],
+['Finished','انتهت'],
+['Favourites','المفضلة'],
+['No open bets','لا توجد رهانات مفتوحة'],
+['Browse matches','تصفح المباريات'],
+['Show fewer bets','عرض رهانات أقل'],
+['View more bets','عرض المزيد من الرهانات'],
+['No referrals yet','لا توجد إحالات بعد'],
+['Support centre is coming soon in this demo','سيتم توفير مركز الدعم قريباً في هذه النسخة التجريبية'],
+['Close welcome message','إغلاق رسالة الترحيب'],
+['Previous banner','الشريحة السابقة'],
+['Next banner','الشريحة التالية']
 ]);
 
 function translate(value: string, lang: Language) {
  if (lang === 'EN') return value;
  const trimmed=value.trim();
- const translated=ar[trimmed];
- if (!translated) return value;
- return value.replace(trimmed, translated);
+ if (!trimmed) return value;
+ if (ar[trimmed]) return value.replace(trimmed,ar[trimmed]);
+ // Translate known phrases inside mixed text nodes while preserving numbers,
+ // punctuation, spacing and Latin product names that are not in the glossary.
+ let output=value;
+ const entries=Object.entries(ar).sort((a,b)=>b[0].length-a[0].length);
+ for(const [source,target] of entries){
+  if(source.length<2||!output.includes(source)) continue;
+  output=output.split(source).join(target);
+ }
+ return output;
 }
 function localizeNode(node: React.ReactNode, lang: Language): React.ReactNode {
  if (typeof node === 'string') return translate(node,lang);
@@ -484,11 +789,37 @@ function localizeNode(node: React.ReactNode, lang: Language): React.ReactNode {
  if ('children' in props) props.children=localizeNode(props.children as React.ReactNode,lang);
  return cloneElement(node,props);
 }
+const textSources=new WeakMap<Text,{source:string;rendered:string}>();
+const attributeSources=new WeakMap<Element,Map<string,{source:string;rendered:string}>>();
+function localizeDom(root:Element,lang:Language){
+ const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+ let node:Node|null;
+ while((node=walker.nextNode())){
+  const textNode=node as Text,parent=textNode.parentElement;
+  if(!parent||parent.closest('script,style,noscript,code,pre,[data-no-translate]'))continue;
+  const current=textNode.nodeValue||'',saved=textSources.get(textNode);
+  const source=saved&&current===saved.rendered?saved.source:current;
+  const rendered=translate(source,lang);
+  if(current!==rendered)textNode.nodeValue=rendered;
+  textSources.set(textNode,{source,rendered});
+ }
+ const elements=[root,...Array.from(root.querySelectorAll('[aria-label],[placeholder],[title]'))];
+ for(const element of elements){
+  const saved=attributeSources.get(element)||new Map<string,{source:string;rendered:string}>();
+  for(const name of ['aria-label','placeholder','title']){
+   const current=element.getAttribute(name);
+   if(current===null)continue;
+   const prior=saved.get(name),source=prior&&current===prior.rendered?prior.source:current;
+   const rendered=translate(source,lang);
+   if(current!==rendered)element.setAttribute(name,rendered);
+   saved.set(name,{source,rendered});
+  }
+  attributeSources.set(element,saved);
+ }
+}
 export function Localized({lang,children}:{lang:Language;children:React.ReactNode}) {
  const direction=lang==='AR'?'rtl':'ltr';
  const locale=lang==='AR'?'ar':'en';
- // Apply document direction before paint so child screens that inspect the document
- // (matches, bets and wallet) render in the correct language on the first frame.
  if(typeof document!=='undefined'){
   document.documentElement.lang=locale;
   document.documentElement.dir=direction;
@@ -497,6 +828,18 @@ export function Localized({lang,children}:{lang:Language;children:React.ReactNod
   document.documentElement.lang=locale;
   document.documentElement.dir=direction;
   document.body.dir=direction;
- },[locale,direction]);
+  const root=document.querySelector('.locale-root');
+  if(!root)return;
+  let scheduled=false;
+  const apply=()=>{scheduled=false;localizeDom(root,lang)};
+  apply();
+  const observer=new MutationObserver(()=>{
+   if(scheduled)return;
+   scheduled=true;
+   window.requestAnimationFrame(apply);
+  });
+  observer.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['aria-label','placeholder','title']});
+  return()=>observer.disconnect();
+ },[locale,direction,lang]);
  return <div className={lang==='AR'?'locale-root locale-ar':'locale-root locale-en'} lang={locale} dir={direction}>{localizeNode(Children.toArray(children),lang)}</div>;
 }
