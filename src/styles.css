@@ -310,3 +310,46 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
 .rtl .match-arena-card .match-arena-card-head{direction:rtl}
 .rtl .match-arena-league{margin-left:0;margin-right:auto}
 @media(max-width:390px){.match-arena-stats{gap:7px}.match-arena-stats>div{min-height:82px;padding:12px 9px}.match-arena-stats>div span{font-size:9px}.match-arena-stats>div b{font-size:24px}.match-arena-tabs button{padding:10px 11px;font-size:11px}.match-arena-league{font-size:8px}.match-arena-teams .team-crest{width:58px!important;height:58px!important}.match-arena-teams .team-crest img{width:46px!important;height:46px!important}.match-arena-teams .versus{min-width:75px!important;font-size:22px!important}.match-arena-odds .odd{min-height:83px!important}}
+
+
+/* My Bets — rebuilt against SPORFA reference */
+.mybets-page{padding-top:8px;color:#24313c}
+.mybets-page .mybets-performance{position:relative;overflow:hidden;min-height:405px;margin:0 0 16px;padding:35px 25px 20px;border:0;border-radius:30px;background:linear-gradient(135deg,#3184c4 0%,#4ca2e3 55%,#3989d0 100%);box-shadow:0 14px 30px #368bd044;color:#fff}
+.mybets-page .mybets-performance:before{content:"";position:absolute;width:360px;height:360px;left:-95px;bottom:-245px;border:3px solid #ffffff18;border-radius:50%;pointer-events:none}
+.mybets-performance-main{min-height:250px;display:flex;flex-direction:row-reverse;align-items:flex-start;justify-content:space-between;position:relative;z-index:1}
+.mybets-profit-copy{display:flex;flex-direction:column;align-items:flex-start;gap:7px}
+.mybets-profit-copy small{font-size:15px;font-weight:850;color:#e7f4ff}
+.mybets-profit-copy>b{font-size:57px;line-height:1.05;font-weight:950;letter-spacing:-2px;color:#fff}
+.mybets-profit-copy em{margin-top:8px;padding:10px 14px;border-radius:22px;background:#ffffff25;color:#b5f0d8;font-size:12px;font-style:normal;font-weight:850;white-space:nowrap}
+.mybets-accuracy{width:112px;height:112px;margin:3px 0 0 8px;border:10px solid #ffffff38;border-right-color:#ffffff80;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff}
+.mybets-accuracy b{font-size:26px;line-height:1;font-weight:950}
+.mybets-accuracy small{font-size:11px;font-weight:800;margin-top:4px;color:#eaf6ff}
+.mybets-progress{height:8px;position:relative;margin:0 0 27px;border-radius:10px;background:#ffffff35;box-shadow:0 5px 7px #174f7a35}
+.mybets-progress span{position:absolute;left:0;top:0;width:91%;height:5px;border-radius:8px;background:#fff}
+.mybets-progress i{position:absolute;right:-4px;top:-5px;width:19px;height:19px;border:4px solid #fff;border-radius:50%;background:#a8d4f1;box-shadow:0 2px 8px #15517b35}
+.mybets-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;position:relative;z-index:1}
+.mybets-stats>div{min-height:115px;padding:19px 5px 13px;border:1px solid #ffffff40;border-radius:24px;background:#ffffff20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;text-align:center}
+.mybets-stats small{font-size:12px;line-height:1.25;font-weight:850;color:#e8f5ff}
+.mybets-stats b{font-size:24px;line-height:1;font-weight:950;color:#fff}
+.mybets-demo-label{position:absolute;left:16px;bottom:9px;font-size:7px;letter-spacing:1.5px;color:#ffffff65;font-weight:800}
+.mybets-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:0 0 20px;padding:5px;border:2px solid #dce5ec;border-radius:28px;background:#fff}
+.mybets-tabs button{min-height:72px;display:flex;align-items:center;justify-content:center;gap:9px;padding:10px 8px;border:2px solid transparent;border-radius:24px;background:transparent;color:#273440;font-size:14px;font-weight:900}
+.mybets-tabs button.active{border-color:#b9d9ee;background:#e8f4fc;color:#3e8fc5}
+.mybets-tabs button b{min-width:31px;height:31px;display:grid;place-items:center;border-radius:50%;background:#eaf1f7;color:#273440;font-size:13px}
+.mybets-tabs button.active b{background:#fff;color:#3e8fc5}
+.mybets-empty{min-height:410px;padding:65px 16px 35px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;background:transparent}
+.mybets-ticket-art{width:180px;height:180px;margin:0 auto 31px;border-radius:50%;display:grid;place-items:center;background:#eff7fd;color:#a9d4f0}
+.mybets-ticket-art svg{transform:rotate(-8deg);filter:drop-shadow(0 3px 0 #d5eafa)}
+.mybets-empty h2{margin:0 0 13px;color:#202c37;font-size:28px;line-height:1.3;font-weight:950}
+.mybets-empty p{max-width:330px;margin:0;color:#83909d;font-size:15px;line-height:1.8;font-weight:650}
+.mybets-browse{min-height:62px;min-width:220px;margin:26px auto 0;padding:0 25px;border:0;border-radius:24px;background:#fff;color:#25313d;box-shadow:0 8px 24px #4b9edb28;display:flex;align-items:center;justify-content:center;gap:10px;font-size:16px;font-weight:950}
+.mybets-history-heading{display:flex;justify-content:space-between;align-items:center;margin:16px 4px 10px;color:#293743}
+.mybets-history-heading h3{margin:0;font-size:15px}
+.mybets-history-heading span{padding:5px 10px;border-radius:18px;background:#eaf4fc;color:#438fc4;font-weight:850}
+.mybets-recorded-card{background:#fff;border:1px solid #dce7ef;border-radius:18px;color:#263541}
+.mybets-selection-note{padding:20px;border:1px solid #dce7ef;border-radius:20px;background:#fff;text-align:center}
+.mybets-selection-note h3{color:#263541}
+.mybets-selection-note p{color:#82909d;font-size:12px}
+.mybets-selection-note .mybets-browse{background:#4b9fe0;color:#fff}
+.mybets-page .detail-disclaimer{color:#84929e}
+@media(max-width:390px){.mybets-page .mybets-performance{min-height:365px;padding:27px 18px 17px;border-radius:26px}.mybets-performance-main{min-height:220px}.mybets-profit-copy>b{font-size:49px}.mybets-profit-copy small{font-size:13px}.mybets-profit-copy em{font-size:10px;padding:8px 10px}.mybets-accuracy{width:96px;height:96px;border-width:8px}.mybets-stats{gap:7px}.mybets-stats>div{min-height:103px;padding:13px 3px;border-radius:20px}.mybets-stats small{font-size:10px}.mybets-stats b{font-size:21px}.mybets-tabs button{min-height:62px;font-size:12px;gap:6px}.mybets-empty{padding-top:56px}.mybets-ticket-art{width:160px;height:160px;margin-bottom:27px}.mybets-empty h2{font-size:25px}.mybets-empty p{font-size:13px}.mybets-browse{min-height:57px;font-size:14px}}
