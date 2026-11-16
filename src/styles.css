@@ -499,3 +499,9 @@ body{background:radial-gradient(ellipse at 15% 0%,#dceeff 0,transparent 34%),lin
  .trophy-odds button small{font-size:9px}
  .trophy-odds button b{font-size:18px}
 }
+
+/* Keep the three summary tiles in the screenshot's physical left-to-right order */
+.trophy-summary{direction:ltr}
+.trophy-summary-card{direction:ltr}
+.trophy-match-page[dir="rtl"] .trophy-summary-card{direction:rtl}
+.trophy-match-page[dir="rtl"] .trophy-summary-card span{direction:rtl}
