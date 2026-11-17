@@ -516,6 +516,73 @@ async function handleSportsSync(request: Request, env: Env): Promise<Response> {
   }
 }
 
+type BetQuoteSelectionInput = { fixtureId?: unknown; outcome?: unknown };
+const BET_OUTCOME_KEYS: Record<string,string> = {
+  "home win":"home", "home":"home",
+  "draw":"draw",
+  "away win":"away", "away":"away"
+};
+async function handleBetQuote(request: Request, env: Env): Promise<Response> {
+  const session = await currentSession(request, env);
+  if (!session) return json({ok:false,error:"Sign in through Telegram before validating a betting ticket."},401);
+  let body: { selections?: BetQuoteSelectionInput[] };
+  try { body = await request.json() as { selections?: BetQuoteSelectionInput[] }; }
+  catch { return json({ok:false,error:"Invalid ticket request."},400); }
+  const inputs = body.selections;
+  if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > 20) {
+    return json({ok:false,error:"A ticket must contain between 1 and 20 selections."},400);
+  }
+  const seenFixtures = new Set<string>();
+  const now = Date.now();
+  const normalized: Array<{fixtureId:string;outcome:string;outcomeKey:string;fixture:string;league:string;odd:number;oddsUpdatedAt:string}> = [];
+  for (const input of inputs) {
+    const fixtureId = typeof input.fixtureId === "string" ? input.fixtureId.trim() : "";
+    const outcome = typeof input.outcome === "string" ? input.outcome.trim() : "";
+    const outcomeKey = BET_OUTCOME_KEYS[outcome.toLowerCase()];
+    if (!/^\d{1,20}$/.test(fixtureId) || !outcomeKey) return json({ok:false,error:"One or more ticket selections are invalid."},400);
+    if (seenFixtures.has(fixtureId)) return json({ok:false,error:"A ticket can contain only one outcome per match."},400);
+    seenFixtures.add(fixtureId);
+    const row = await env.DB.prepare(`
+      SELECT f.id,f.home_team,f.away_team,f.league_name,f.kickoff,f.status_short,
+             o.outcome_name,o.odd,o.suspended,o.updated_at AS odds_updated_at
+      FROM sports_fixtures f
+      LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1 AND o.outcome_key=?
+      WHERE f.id=? LIMIT 1
+    `).bind(outcomeKey,fixtureId).first<{
+      id:string;home_team:string;away_team:string;league_name:string;kickoff:string;status_short:string;
+      outcome_name:string|null;odd:number|null;suspended:number|null;odds_updated_at:string|null
+    }>();
+    if (!row) return json({ok:false,error:"A selected match is no longer available. Refresh the Match Centre."},409);
+    const kickoff = Date.parse(row.kickoff);
+    if (!Number.isFinite(kickoff) || kickoff <= now || !["NS","TBD"].includes(row.status_short)) {
+      return json({ok:false,error:"A selected match has started, finished, or is not open for selections."},409);
+    }
+    if (row.odd === null || !Number.isFinite(Number(row.odd)) || Number(row.odd) <= 1 || row.suspended) {
+      return json({ok:false,error:"Odds are unavailable or suspended for one of your selections."},409);
+    }
+    const oddsUpdatedAt = row.odds_updated_at ? Date.parse(row.odds_updated_at) : NaN;
+    if (!Number.isFinite(oddsUpdatedAt) || now - oddsUpdatedAt > 45*60*1000 || oddsUpdatedAt > now + 60*1000) {
+      return json({ok:false,error:"The odds for a selected match are stale. Please wait for an updated price."},409);
+    }
+    normalized.push({
+      fixtureId:row.id,
+      outcome:row.outcome_name || (outcomeKey==="home"?"Home win":outcomeKey==="draw"?"Draw":"Away win"),
+      outcomeKey,
+      fixture:row.home_team+" vs "+row.away_team,
+      league:row.league_name,
+      odd:Number(row.odd),
+      oddsUpdatedAt:row.odds_updated_at!
+    });
+  }
+  const combinedOdds = normalized.reduce((product,pick)=>product*pick.odd,1);
+  if (!Number.isFinite(combinedOdds) || combinedOdds > 1000000) return json({ok:false,error:"The combined odds exceed the ticket limit."},422);
+  return json({
+    ok:true,
+    quote:{selections:normalized,selectionCount:normalized.length,combinedOdds,combinedOddsDisplay:combinedOdds.toFixed(2),validatedAt:new Date(now).toISOString(),expiresAt:new Date(now+30000).toISOString(),market:"1X2"},
+    notice:"This is an odds validation quote only. No bet has been placed and no balance has been changed."
+  });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -550,6 +617,7 @@ export default {
       const limiter = await env.DB.prepare("SELECT next_allowed_at,datetime(next_allowed_at,'unixepoch') AS next_allowed_utc FROM api_football_rate_limit WHERE id=1").first();
       return json({ok:true,diagnostics:diagnostics.results||[],sync:sync||null,limiter:limiter||null});
     }
+    if (url.pathname === "/api/bets/quote" && request.method === "POST") return handleBetQuote(request, env);
     if (url.pathname === "/api/profile" && request.method === "POST") return handleProfileUpdate(request, env);
     if (url.pathname === "/api/sports/fixtures" && request.method === "GET") return handleSportsFixtures(request, env);
     if (url.pathname === "/api/sports/sync" && request.method === "POST") return handleSportsSync(request, env);
