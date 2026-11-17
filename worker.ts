@@ -5,6 +5,7 @@ interface Env {
   TELEGRAM_BROADCAST_SECRET?: string;
   TELEGRAM_CHANNEL_URL?: string;
   TELEGRAM_GROUP_URL?: string;
+  CODERUSH_ADMIN_TELEGRAM_IDS?: string;
 }
 
 const APP_URL = "https://coderush-devvic.tomx2000xx.workers.dev";
@@ -151,9 +152,150 @@ async function handleBroadcast(request: Request, env: Env): Promise<Response> {
   return json({ ok: true, broadcastId, totalEligible: total, offset, processed: recipients.results?.length || 0, sent, failed, blocked, nextOffset: processed < total ? processed : null });
 }
 
+
+type AuthUser = { id: string; telegram_username: string | null; first_name: string | null; last_name: string | null; display_name: string | null; language: string; role: string; status: string; created_at: string; last_login_at: string | null };
+const SESSION_COOKIE = "cr_session";
+const SESSION_SECONDS = 60 * 60 * 24 * 7;
+
+function hex(bytes: ArrayBuffer): string {
+  return Array.from(new Uint8Array(bytes), value => value.toString(16).padStart(2, "0")).join("");
+}
+async function sha256(value: string): Promise<string> {
+  return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+}
+async function hmacSha256(keyBytes: Uint8Array, value: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)));
+}
+async function validateTelegramInitData(initData: string, botToken: string): Promise<{ user: { id: number; username?: string; first_name?: string; last_name?: string }; authDate: number } | null> {
+  if (!initData || initData.length > 8192) return null;
+  const params = new URLSearchParams(initData);
+  const suppliedHash = params.get("hash") || "";
+  const authDate = Number(params.get("auth_date"));
+  const rawUser = params.get("user");
+  if (!/^[a-f0-9]{64}$/i.test(suppliedHash) || !Number.isInteger(authDate) || !rawUser) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (authDate > now + 60 || now - authDate > 3600) return null;
+  params.delete("hash");
+  params.delete("signature");
+  const dataCheckString = Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => key + "=" + value).join("\n");
+  const secretKey = await hmacSha256(new TextEncoder().encode("WebAppData"), botToken);
+  const expected = await hmacSha256(new Uint8Array(secretKey.match(/.{2}/g)!.map(pair => parseInt(pair, 16))), dataCheckString);
+  if (!constantTimeEqual(expected.toLowerCase(), suppliedHash.toLowerCase())) return null;
+  try {
+    const user = JSON.parse(rawUser) as { id?: number; username?: string; first_name?: string; last_name?: string };
+    if (!Number.isSafeInteger(user.id) || Number(user.id) <= 0) return null;
+    return { user: { id: Number(user.id), username: user.username, first_name: user.first_name, last_name: user.last_name }, authDate };
+  } catch { return null; }
+}
+function cookieValue(request: Request, name: string): string | null {
+  const cookies = request.headers.get("cookie") || "";
+  for (const part of cookies.split(";")) {
+    const index = part.indexOf("=");
+    if (index < 0) continue;
+    if (part.slice(0, index).trim() === name) return decodeURIComponent(part.slice(index + 1).trim());
+  }
+  return null;
+}
+function sessionCookie(token: string): string {
+  return SESSION_COOKIE + "=" + token + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=" + SESSION_SECONDS;
+}
+function clearSessionCookie(): string {
+  return SESSION_COOKIE + "=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0";
+}
+async function currentSession(request: Request, env: Env): Promise<{ tokenHash: string; user: AuthUser } | null> {
+  const token = cookieValue(request, SESSION_COOKIE);
+  if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
+  const tokenHash = await sha256(token);
+  const row = await env.DB.prepare(`
+    SELECT u.id, u.telegram_username, u.first_name, u.last_name, u.display_name, u.language, u.role, u.status, u.created_at, u.last_login_at
+    FROM user_sessions s JOIN users u ON u.id=s.user_id
+    WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>? LIMIT 1
+  `).bind(tokenHash, new Date().toISOString()).first<AuthUser>();
+  if (!row || row.status !== "active") return null;
+  return { tokenHash, user: row };
+}
+async function recordAuthEvent(env: Env, userId: string | null, event: string, request: Request): Promise<void> {
+  await env.DB.prepare("INSERT INTO auth_events (id,user_id,event_type,user_agent) VALUES (?,?,?,?)")
+    .bind(crypto.randomUUID(), userId, event, (request.headers.get("user-agent") || "").slice(0, 300) || null).run();
+}
+async function handleTelegramAuth(request: Request, env: Env): Promise<Response> {
+  if (!env.TELEGRAM_BOT_TOKEN) return json({ ok: false, error: "Telegram authentication is not configured" }, 503);
+  let body: { initData?: string };
+  try { body = await request.json() as { initData?: string }; } catch { return json({ ok: false, error: "Invalid request body" }, 400); }
+  const verified = await validateTelegramInitData(body.initData || "", env.TELEGRAM_BOT_TOKEN);
+  if (!verified) {
+    await recordAuthEvent(env, null, "telegram_auth_rejected", request);
+    return json({ ok: false, error: "Telegram authentication data is invalid or expired. Reopen CodeRush from Telegram and try again." }, 401);
+  }
+  const tg = verified.user;
+  const userId = String(tg.id);
+  const adminIds = (env.CODERUSH_ADMIN_TELEGRAM_IDS || "").split(",").map(value => value.trim()).filter(Boolean);
+  const assignedRole = adminIds.includes(userId) ? "admin" : "user";
+  await env.DB.prepare(`
+    INSERT INTO users (id,telegram_username,first_name,last_name,role,last_login_at)
+    VALUES (?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    ON CONFLICT(id) DO UPDATE SET
+      telegram_username=excluded.telegram_username,
+      first_name=excluded.first_name,
+      last_name=excluded.last_name,
+      role=CASE WHEN excluded.role='admin' THEN 'admin' ELSE users.role END,
+      updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+      last_login_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+  `).bind(userId, tg.username || null, tg.first_name || null, tg.last_name || null, assignedRole).run();
+  const user = await env.DB.prepare("SELECT id,telegram_username,first_name,last_name,display_name,language,role,status,created_at,last_login_at FROM users WHERE id=?").bind(userId).first<AuthUser>();
+  if (!user || user.status !== "active") {
+    await recordAuthEvent(env, userId, "login_blocked", request);
+    return json({ ok: false, error: "This account is not active. Contact support." }, 403);
+  }
+  const tokenBytes = crypto.getRandomValues(new Uint8Array(32));
+  const token = hex(tokenBytes.buffer);
+  const tokenHash = await sha256(token);
+  const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000).toISOString();
+  await env.DB.prepare("INSERT INTO user_sessions (token_hash,user_id,expires_at,user_agent) VALUES (?,?,?,?)")
+    .bind(tokenHash, userId, expiresAt, (request.headers.get("user-agent") || "").slice(0, 300) || null).run();
+  await recordAuthEvent(env, userId, "login_success", request);
+  return new Response(JSON.stringify({ ok: true, user }), {
+    status: 200,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "set-cookie": sessionCookie(token) }
+  });
+}
+async function handleAuthSession(request: Request, env: Env): Promise<Response> {
+  const session = await currentSession(request, env);
+  if (!session) return json({ ok: false, authenticated: false }, 401);
+  await env.DB.prepare("UPDATE user_sessions SET last_seen_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE token_hash=?").bind(session.tokenHash).run();
+  return json({ ok: true, authenticated: true, user: session.user });
+}
+async function handleLogout(request: Request, env: Env): Promise<Response> {
+  const session = await currentSession(request, env);
+  if (session) {
+    await env.DB.prepare("UPDATE user_sessions SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE token_hash=?").bind(session.tokenHash).run();
+    await recordAuthEvent(env, session.user.id, "logout", request);
+  }
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "set-cookie": clearSessionCookie() } });
+}
+async function handleProfileUpdate(request: Request, env: Env): Promise<Response> {
+  const session = await currentSession(request, env);
+  if (!session) return json({ ok: false, error: "Authentication required" }, 401);
+  let body: { displayName?: string; language?: string };
+  try { body = await request.json() as { displayName?: string; language?: string }; } catch { return json({ ok: false, error: "Invalid request body" }, 400); }
+  const displayName = (body.displayName || "").trim();
+  const language = body.language === "EN" ? "EN" : body.language === "AR" ? "AR" : null;
+  if (displayName.length < 2 || displayName.length > 60 || !language) return json({ ok: false, error: "Display name must be 2–60 characters and language must be AR or EN." }, 400);
+  await env.DB.prepare("UPDATE users SET display_name=?,language=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?")
+    .bind(displayName, language, session.user.id).run();
+  const user = await env.DB.prepare("SELECT id,telegram_username,first_name,last_name,display_name,language,role,status,created_at,last_login_at FROM users WHERE id=?").bind(session.user.id).first<AuthUser>();
+  return json({ ok: true, user });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/auth/telegram" && request.method === "POST") return handleTelegramAuth(request, env);
+    if (url.pathname === "/api/auth/session" && request.method === "GET") return handleAuthSession(request, env);
+    if (url.pathname === "/api/auth/logout" && request.method === "POST") return handleLogout(request, env);
+    if (url.pathname === "/api/profile" && request.method === "POST") return handleProfileUpdate(request, env);
 
     if (url.pathname === "/api/health" && request.method === "GET") {
       if (!env.TELEGRAM_BOT_TOKEN) return json({ ok: true, service: "coderush", runtime: "cloudflare-worker", telegramTokenConfigured: false, databaseConfigured: !!env.DB });
