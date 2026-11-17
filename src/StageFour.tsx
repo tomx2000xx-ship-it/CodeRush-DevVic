@@ -72,7 +72,7 @@ export function StageFourMatches(){
    const body=await response.json();
    if(!response.ok||!body?.ok||!body?.ticket)throw new Error(body?.error||'Unable to save this ticket.');
    setSlip([]);setStake('10');setTicketOpen(false);window.dispatchEvent(new CustomEvent('coderush:bets-updated'));
-  }catch(error){const message=error instanceof Error?error.message:'Unable to save this ticket.';setSubmitTicketError(message);if(/odds have changed|price snapshot/i.test(message))setSlip(current=>[...current]);}
+  }catch(error){const message=error instanceof Error?error.message:'Unable to save this ticket.';setSubmitTicketError(message);if(/odds have changed|price snapshot|quote has expired/i.test(message))setSlip(current=>[...current]);}
   finally{setSubmittingTicket(false);}
  };
  const renderMatch=(f:Fixture)=><article className={'sb-match-row '+(f.live?'is-live':'')} key={f.id}>
