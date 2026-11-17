@@ -140,7 +140,7 @@ async function handleBroadcast(request: Request, env: Env): Promise<Response> {
   if (!text || text.length > 4096) return json({ ok: false, error: "Message text must contain 1–4096 characters" }, 400);
   const offset = Math.max(0, Math.floor(Number(body.offset) || 0));
   const limit = Math.min(100, Math.max(1, Math.floor(Number(body.limit) || 100)));
-  const totalRow = await env.DB.prepare("SELECT COUNT(*) AS total FROM telegram_subscribers WHERE status='active' AND opted_out=0 AND write_access_allowed=1").first<{ total: number }>();
+  const totalRow = await env.DB.prepare("SELECT COUNT(*) AS total FROM telegram_subscribers WHERE status='active' AND opted_out=0").first<{ total: number }>();
   const total = Number(totalRow?.total || 0);
   const recipients = await env.DB.prepare("SELECT chat_id FROM telegram_subscribers WHERE status='active' AND opted_out=0 ORDER BY first_seen_at, chat_id LIMIT ? OFFSET ?").bind(limit, offset).all<{ chat_id: string }>();
   let sent = 0, failed = 0, blocked = 0;
@@ -1144,6 +1144,7 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/admin" && request.method === "GET") return adminHtml(env);
+    if (url.pathname === "/admin/notifications" && request.method === "GET") return adminNotificationsHtml();
     if (url.pathname === "/api/auth/telegram" && request.method === "POST") return handleTelegramAuth(request, env);
     if (url.pathname === "/api/auth/session" && request.method === "GET") return handleAuthSession(request, env);
     if (url.pathname === "/api/auth/logout" && request.method === "POST") return handleLogout(request, env);
@@ -1242,6 +1243,7 @@ export default {
     return env.ASSETS.fetch(request);
   },
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    if (controller.cron === "* * * * *") { await deliverTelegramNotificationOutbox(env); await deliverTelegramBroadcastJobs(env); return; }
     if (controller.cron === "* * * * *") { await deliverTelegramNotificationOutbox(env); await deliverTelegramBroadcastJobs(env); return; }
     if (controller.cron === "*/5 * * * *") {
       await monitorPendingWalletDeposits(env);
