@@ -22,7 +22,7 @@ export function StageFourMatches(){
  const [favorites,setFavorites]=useState<string[]>(()=>readJson<string[]>('coderush-stage4-favorites',[]));
  const [favoritesOnly,setFavoritesOnly]=useState(false);
  const [sort,setSort]=useState<'time'|'league'>('time');
- const [,setSlip]=useState<Selection[]>(readSelections);
+ const [slip,setSlip]=useState<Selection[]>(readSelections);
  const [expanded,setExpanded]=useState<string|null>(null);
  const [stake,setStake]=useState('10'),[walletBalance,setWalletBalance]=useState(()=>{const raw=localStorage.getItem('coderush-stage6-demo-balance');if(raw===null)return 125;const n=Number(raw);return Number.isFinite(n)&&n>=0?n:125});
  const [ticketOpen,setTicketOpen]=useState(false);
