@@ -1064,6 +1064,7 @@ async function handleWalletWithdrawal(request:Request,env:Env):Promise<Response>
     return json({ok:false,error:"Insufficient available USDT balance."},409);
   }
   await env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) VALUES(?,?,?,'withdrawal_submitted',?)").bind(crypto.randomUUID(),id,session.user.id,JSON.stringify({networkCode,amountUnits:units})).run();
+  await createUserNotification(env,session.user.id,"withdrawal-submitted:"+id,"wallet","Withdrawal request received","Your "+(units/USDT_SCALE).toFixed(2)+" USDT withdrawal request is awaiting manual review.","تم استلام طلب السحب","طلب السحب بقيمة "+(units/USDT_SCALE).toFixed(2)+" USDT بانتظار المراجعة اليدوية.","/wallet");
   return json({ok:true,transaction:{id,type:"withdrawal",status:"pending_review",amount_units:units,asset:"USDT",network_code:networkCode,destination_address:address},notice:"Withdrawal request received. The amount is reserved while an administrator reviews it; no payout has been sent yet."},201);
 }
 async function walletAdminSession(request:Request,env:Env):Promise<{id:string}|null>{
