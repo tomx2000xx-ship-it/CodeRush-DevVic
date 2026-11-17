@@ -446,7 +446,8 @@ async function handleSportsSync(request: Request, env: Env): Promise<Response> {
   if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||to<from||(new Date(to).getTime()-new Date(from).getTime())>14*86400000) return json({ok:false,error:"Choose a valid date range of no more than 15 days."},400);
   try{
     const result=await syncFootballRange(env,from,to);
-    return json({ok:true,provider:"API-Football",range:{from,to},...result});
+    const live=await syncFootballLive(env);
+    return json({ok:true,provider:"API-Football",range:{from,to},...result,liveFixtures:live.fixtures,liveOdds:live.odds});
   }catch(error){
     const message=error instanceof Error?error.message:"Sports provider sync failed";
     await env.DB.prepare(`
