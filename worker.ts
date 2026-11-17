@@ -575,7 +575,7 @@ async function handleBetCreate(request:Request,env:Env):Promise<Response>{
   if(!session)return json({ok:false,error:"Authentication required"},401);
   if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);
   if(!(request.headers.get("content-type")||"").toLowerCase().includes("application/json"))return json({ok:false,error:"Content-Type must be application/json."},415);
-  let body:{selections?:BetQuoteSelectionInput[];stake?:unknown;idempotencyKey?:unknown};
+  let body:{selections?:BetQuoteSelectionInput[];stake?:unknown;idempotencyKey?:unknown;quoteValidatedAt?:unknown;quotedOdds?:Array<{fixtureId?:unknown;outcomeKey?:unknown;odd?:unknown}>};
   try{body=await request.json() as typeof body;}catch{return json({ok:false,error:"Invalid ticket request."},400);}
   const stake=Number(body.stake);
   if(!Number.isFinite(stake)||stake<1||stake>5000||Math.abs(Math.round(stake*100)-stake*100)>1e-8)return json({ok:false,error:"Stake must be between 1.00 and 5,000.00."},400);
@@ -588,6 +588,11 @@ async function handleBetCreate(request:Request,env:Env):Promise<Response>{
   }
   const validated=await validateBetSelections(env,body.selections||[]);
   if(!validated.ok)return json({ok:false,error:validated.error},validated.status);
+  const quoteTime=typeof body.quoteValidatedAt==="string"?Date.parse(body.quoteValidatedAt):NaN;
+  if(!Number.isFinite(quoteTime)||quoteTime>Date.now()+60000)return json({ok:false,error:"The ticket quote timestamp is invalid. Refresh the ticket prices."},400);
+  if(!Array.isArray(body.quotedOdds)||body.quotedOdds.length!==validated.selections.length)return json({ok:false,error:"The ticket price snapshot is missing. Refresh the ticket prices."},400);
+  const quoted=new Map(body.quotedOdds.map(q=>[String(q.fixtureId)+":"+String(q.outcomeKey),Number(q.odd)]));
+  if(validated.selections.some(pick=>quoted.get(pick.fixtureId+":"+pick.outcomeKey)!==pick.odd))return json({ok:false,error:"Odds have changed since this ticket was quoted. The updated prices are being loaded; review them before saving."},409);
   const id=crypto.randomUUID(),potential=Number((stake*validated.combinedOdds).toFixed(2)),createdAt=new Date().toISOString();
   const statements=[env.DB.prepare("INSERT INTO bet_tickets(id,user_id,ticket_type,status,stake,combined_odds,potential_return,currency,selection_count,idempotency_key,quoted_at,created_at,updated_at) VALUES(?,?,'demo','open',?,?,?,'USD',?,?,?, ?,?)").bind(id,session.user.id,stake,validated.combinedOdds,potential,validated.selections.length,idempotencyKey,validated.validatedAt,createdAt,createdAt)];
   validated.selections.forEach((s,index)=>statements.push(env.DB.prepare("INSERT INTO bet_ticket_selections(id,ticket_id,selection_index,fixture_id,home_team,away_team,league_name,outcome_key,outcome_name,odd,odds_updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),id,index,s.fixtureId,s.homeTeam,s.awayTeam,s.league,s.outcomeKey,s.outcome,s.odd,s.oddsUpdatedAt)));
