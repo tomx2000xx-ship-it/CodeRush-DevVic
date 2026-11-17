@@ -473,6 +473,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.pathname === "/admin" && request.method === "GET") return adminHtml(env);
     if (url.pathname === "/api/auth/telegram" && request.method === "POST") return handleTelegramAuth(request, env);
     if (url.pathname === "/api/auth/session" && request.method === "GET") return handleAuthSession(request, env);
     if (url.pathname === "/api/auth/logout" && request.method === "POST") return handleLogout(request, env);
