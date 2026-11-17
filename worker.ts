@@ -1235,11 +1235,9 @@ export default {
       if (!constantTimeEqual(supplied, expected)) return json({ ok: false, error: "Unauthorized" }, 401);
       try {
         const update=await request.json() as {update_id?:number;message?:TelegramMessage};
-        if(Number.isSafeInteger(update.update_id)){
-          const receipt=await env.DB.prepare("INSERT OR IGNORE INTO telegram_command_events(update_id,telegram_user_id,command) VALUES(?,?,?)").bind(String(update.update_id),String(update.message?.from?.id||"")||null,(update.message?.text||"").slice(0,64)||"message").run();
-          if(Number(receipt.meta?.changes||0)===0)return json({ok:true,duplicate:true});
-        }
+        if(Number.isSafeInteger(update.update_id)){const exists=await env.DB.prepare("SELECT update_id FROM telegram_command_events WHERE update_id=?").bind(String(update.update_id)).first<any>();if(exists)return json({ok:true,duplicate:true});}
         await processUpdate(update,env);
+        if(Number.isSafeInteger(update.update_id))await env.DB.prepare("INSERT OR IGNORE INTO telegram_command_events(update_id,telegram_user_id,command) VALUES(?,?,?)").bind(String(update.update_id),String(update.message?.from?.id||"")||null,(update.message?.text||"").slice(0,64)||"message").run();
         return json({ok:true});
       } catch (error) {
         console.error("Telegram webhook processing failed", error);
