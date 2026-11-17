@@ -960,6 +960,7 @@ async function awardReferralCommissions(env:Env,ticketId:string):Promise<void>{
       AND EXISTS(SELECT 1 FROM referral_program_settings WHERE id=1 AND commission_enabled=1)`)
       .bind(crypto.randomUUID(),account.id,ancestor,ticket.id,ticket.user_id,level,rate,profitUnits,amount,ticket.id).run();
     if(Number(inserted.meta?.changes||0)===1)await env.DB.prepare("INSERT INTO referral_audit_events(id,actor_user_id,event_type,subject_user_id,details_json) VALUES(?,NULL,'referral_commission_credited',?,?)").bind(crypto.randomUUID(),ancestor,JSON.stringify({ticketId:ticket.id,referredUserId:ticket.user_id,level,rateBps:rate,profitUnits,amountUnits:amount})).run();
+      await createUserNotification(env,ancestor,"referral-commission:"+ticket.id+":"+level,"referral","Referral commission credited","You received "+(amount/USDT_SCALE).toFixed(6)+" USDT from a Level "+level+" referral.","تمت إضافة عمولة إحالة","تمت إضافة "+(amount/USDT_SCALE).toFixed(6)+" USDT من إحالة المستوى "+level+".","/friends");
   }
 }
 async function handleReferralMe(request:Request,env:Env):Promise<Response>{
