@@ -66,7 +66,8 @@ const welcomeText = [
   "📊 تابع المواجهات، استكشف الاحتمالات، وجرّب أدوات CodeRush في بيئة تجريبية مصممة لتمنحك تجربة ممتعة وسهلة.", "",
   "تنبيه: CodeRush حالياً نسخة تجريبية فقط. جميع الأرصدة والاحتمالات والأنشطة افتراضية، ولا توجد أموال حقيقية أو رهانات أو مدفوعات.", "",
   "👋 أهلاً بك، ونتمنى لك تجربة ممتعة!"
-].join("\n");
+].join("
+");
 
 async function sendWelcome(chatId: number, env: Env) {
   const keyboard: Array<Array<Record<string, unknown>>> = [[{ text: "⚽ افتح CodeRush وابدأ الاستكشاف", web_app: { url: APP_URL } }]];
@@ -191,7 +192,8 @@ async function validateTelegramInitData(initData: string, botToken: string): Pro
   if (authDate > now + 60 || now - authDate > 3600) return null;
   params.delete("hash");
   params.delete("signature");
-  const dataCheckString = Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => key + "=" + value).join("\n");
+  const dataCheckString = Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => key + "=" + value).join("
+");
   const secretKey = await hmacSha256(new TextEncoder().encode(botToken), "WebAppData");
   const expected = await hmacSha256(new Uint8Array(secretKey.match(/.{2}/g)!.map(pair => parseInt(pair, 16))), dataCheckString);
   if (!constantTimeEqual(expected.toLowerCase(), suppliedHash.toLowerCase())) return null;
@@ -581,6 +583,11 @@ async function handleBetCreate(request:Request,env:Env):Promise<Response>{
   if(!Number.isFinite(stake)||stake<1||stake>5000||Math.round(stake*100)!==stake*100)return json({ok:false,error:"Stake must be between 1.00 and 5,000.00."},400);
   const idempotencyKey=typeof body.idempotencyKey==="string"?body.idempotencyKey.trim():"";
   if(!/^[A-Za-z0-9_-]{16,80}$/.test(idempotencyKey))return json({ok:false,error:"A valid ticket submission key is required."},400);
+  const prior=await env.DB.prepare("SELECT * FROM bet_tickets WHERE user_id=? AND idempotency_key=?").bind(session.user.id,idempotencyKey).first<any>();
+  if(prior){
+    const priorPicks=await env.DB.prepare("SELECT * FROM bet_ticket_selections WHERE ticket_id=? ORDER BY selection_index").bind(prior.id).all<any>();
+    return json({ok:true,duplicate:true,ticket:publicTicket(prior,priorPicks.results||[])},200);
+  }
   const validated=await validateBetSelections(env,body.selections||[]);
   if(!validated.ok)return json({ok:false,error:validated.error},validated.status);
   const id=crypto.randomUUID(),potential=Number((stake*validated.combinedOdds).toFixed(2)),createdAt=new Date().toISOString();
@@ -644,7 +651,9 @@ export default {
       const limiter = await env.DB.prepare("SELECT next_allowed_at,datetime(next_allowed_at,'unixepoch') AS next_allowed_utc FROM api_football_rate_limit WHERE id=1").first();
       return json({ok:true,diagnostics:diagnostics.results||[],sync:sync||null,limiter:limiter||null});
     }
-    if (url.pathname === "/api/bets/quote" && request.method === "POST") return handleBetQuote(request, env);\n    if (url.pathname === "/api/bets" && request.method === "POST") return handleBetCreate(request, env);\n    if (url.pathname === "/api/bets" && request.method === "GET") return handleBetList(request, env);
+    if (url.pathname === "/api/bets/quote" && request.method === "POST") return handleBetQuote(request, env);
+    if (url.pathname === "/api/bets" && request.method === "POST") return handleBetCreate(request, env);
+    if (url.pathname === "/api/bets" && request.method === "GET") return handleBetList(request, env);
     if (url.pathname === "/api/profile" && request.method === "POST") return handleProfileUpdate(request, env);
     if (url.pathname === "/api/sports/fixtures" && request.method === "GET") return handleSportsFixtures(request, env);
     if (url.pathname === "/api/sports/sync" && request.method === "POST") return handleSportsSync(request, env);
