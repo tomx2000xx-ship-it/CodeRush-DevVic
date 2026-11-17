@@ -115,6 +115,15 @@ async function processUpdate(update: { message?: TelegramMessage }, env: Env) {
     await env.DB.prepare("UPDATE telegram_subscribers SET opted_out=1, last_seen_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE chat_id=?").bind(String(chatId)).run();
     await env.DB.prepare("INSERT INTO notification_preferences(user_id,in_app_enabled,telegram_enabled,updated_at) VALUES(?,1,0,?) ON CONFLICT(user_id) DO UPDATE SET telegram_enabled=0,updated_at=excluded.updated_at").bind(String(message.from?.id||""),isoNow()).run();
     await telegram(env, "sendMessage", { chat_id: chatId, text: "تم إيقاف رسائل CodeRush. أرسل /start للاشتراك مجدداً." });
+  } else if (/^\/notifications(?:@\w+)?(?:\s+(on|off))?$/i.test(text)) {
+    const mode=text.match(/\s+(on|off)$/i)?.[1]?.toLowerCase();
+    if(mode==="on"){
+      await env.DB.prepare("UPDATE telegram_subscribers SET status='active',opted_out=0,last_seen_at=? WHERE chat_id=?").bind(isoNow(),String(chatId)).run();
+      await env.DB.prepare("INSERT INTO notification_preferences(user_id,in_app_enabled,telegram_enabled,updated_at) VALUES(?,1,1,?) ON CONFLICT(user_id) DO UPDATE SET telegram_enabled=1,updated_at=excluded.updated_at").bind(String(message.from?.id||""),isoNow()).run();
+    }else if(mode==="off")await env.DB.prepare("INSERT INTO notification_preferences(user_id,in_app_enabled,telegram_enabled,updated_at) VALUES(?,1,0,?) ON CONFLICT(user_id) DO UPDATE SET telegram_enabled=0,updated_at=excluded.updated_at").bind(String(message.from?.id||""),isoNow()).run();
+    await telegram(env,"sendMessage",{chat_id:chatId,text:mode==="off"?"Telegram notifications are paused. Send /notifications on to resume.":mode==="on"?"Telegram notifications are enabled.":"Use /notifications on or /notifications off to manage alerts."});
+  } else if (/^\/help(?:@\w+)?$/i.test(text)) {
+    await telegram(env,"sendMessage",{chat_id:chatId,text:"CodeRush commands:\n/start — Open CodeRush\n/notifications on — Enable alerts\n/notifications off — Pause alerts\n/stop — Unsubscribe from bot messages\n/help — Show this help"});
   }
 }
 
