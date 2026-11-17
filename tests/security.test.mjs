@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 
 const worker = readFileSync(new URL("../worker.ts", import.meta.url), "utf8");
 const wrangler = readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+const workerEntry = (await import("../worker.ts")).default;
+const testEnv = { DB: { prepare() { throw new Error("Database should not be touched by these boundary tests"); } }, ASSETS: { fetch: async () => new Response("asset") } };
 
 test("unsafe browser requests require an exact same-origin Origin header", () => {
   assert.match(worker, /function sameOrigin\(request:Request\):boolean\{const origin=request\.headers\.get\("origin"\);if\(!origin\)return false;/);
@@ -51,4 +53,44 @@ test("production observability is enabled and no credentials are committed in Wr
   assert.match(wrangler, /"observability":\s*\{\s*"enabled":\s*true/);
   assert.match(wrangler, /"traces":\s*\{\s*"enabled":\s*true/);
   assert.doesNotMatch(wrangler, /(TELEGRAM_BOT_TOKEN|TRONGRID_API_KEY|API_FOOTBALL_KEY)\s*[:=]\s*["'][^"']+["']/);
+});
+
+test("runtime rejects state-changing requests with no Origin header", async () => {
+  const request = new Request("https://coderush-devvic.tomx2000xx.workers.dev/api/auth/logout", {
+    method: "POST", headers: { "content-type": "application/json" }, body: "{}"
+  });
+  const response = await workerEntry.fetch(request, testEnv);
+  assert.equal(response.status, 403);
+  assert.equal(response.headers.get("x-frame-options"), "DENY");
+});
+
+test("runtime rejects cross-origin state changes and non-JSON bodies", async () => {
+  const base = "https://coderush-devvic.tomx2000xx.workers.dev";
+  const crossOrigin = await workerEntry.fetch(new Request(base + "/api/auth/logout", {
+    method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: "{}"
+  }), testEnv);
+  assert.equal(crossOrigin.status, 403);
+  const wrongType = await workerEntry.fetch(new Request(base + "/api/auth/logout", {
+    method: "POST", headers: { origin: base, "content-type": "text/plain" }, body: "x"
+  }), testEnv);
+  assert.equal(wrongType.status, 415);
+});
+
+test("runtime rejects oversized declared bodies before route processing", async () => {
+  const base = "https://coderush-devvic.tomx2000xx.workers.dev";
+  const response = await workerEntry.fetch(new Request(base + "/api/auth/logout", {
+    method: "POST", headers: { origin: base, "content-type": "application/json", "content-length": "65537" }, body: "{}"
+  }), testEnv);
+  assert.equal(response.status, 413);
+});
+
+test("runtime allows same-origin logout and attaches security headers", async () => {
+  const base = "https://coderush-devvic.tomx2000xx.workers.dev";
+  const response = await workerEntry.fetch(new Request(base + "/api/auth/logout", {
+    method: "POST", headers: { origin: base, "content-type": "application/json" }, body: "{}"
+  }), testEnv);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  assert.match(response.headers.get("content-security-policy") || "", /frame-ancestors 'none'/);
 });
