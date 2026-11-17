@@ -638,7 +638,7 @@ async function handleBetList(request:Request,env:Env):Promise<Response>{
       SUM(CASE WHEN status='lost' THEN 1 ELSE 0 END) AS losses,
       SUM(CASE WHEN status='void' THEN 1 ELSE 0 END) AS voids,
       COALESCE(SUM(CASE WHEN status IN ('won','lost','void') THEN COALESCE(settled_return,0)-stake ELSE 0 END),0) AS net_result,
-      COALESCE(MAX(CASE WHEN status IN ('won','lost','void') THEN COALESCE(settled_return,0) ELSE 0 END),0) AS best_return
+      COALESCE(MAX(CASE WHEN status='won' THEN COALESCE(settled_return,0) ELSE 0 END),0) AS best_return
       FROM bet_tickets WHERE user_id=?`).bind(session.user.id).first<any>(),
     env.DB.prepare("SELECT status FROM bet_tickets WHERE user_id=? AND status IN ('won','lost','void') ORDER BY settled_at DESC,created_at DESC LIMIT 100").bind(session.user.id).all<any>()
   ]);
