@@ -8,6 +8,9 @@ interface Env {
   CODERUSH_ADMIN_TELEGRAM_IDS?: string;
   API_FOOTBALL_KEY?: string;
   API_FOOTBALL_BOOKMAKER_ID?: string;
+  TRONGRID_API_KEY?: string;
+  ETHEREUM_RPC_URL?: string;
+  BSC_RPC_URL?: string;
 }
 
 const APP_URL = "https://coderush-devvic.tomx2000xx.workers.dev";
@@ -64,7 +67,7 @@ const welcomeText = [
   "✅ مرحباً بك في CodeRush — ساحة الرياضة الرقمية!", "",
   "⚽ اكتشف تجربة رياضية تفاعلية تجمع بين شغف كرة القدم ومتابعة المباريات واستكشاف تفاصيلها.", "",
   "📊 تابع المواجهات، استكشف الاحتمالات، وجرّب أدوات CodeRush في بيئة تجريبية مصممة لتمنحك تجربة ممتعة وسهلة.", "",
-  "تنبيه: CodeRush حالياً نسخة تجريبية فقط. جميع الأرصدة والاحتمالات والأنشطة افتراضية، ولا توجد أموال حقيقية أو رهانات أو مدفوعات.", "",
+  "استخدم CodeRush بمسؤولية، وتأكد من أهلية الاستخدام والقوانين المحلية قبل المشاركة.", "",
   "👋 أهلاً بك، ونتمنى لك تجربة ممتعة!"
 ].join("\n");
 
@@ -772,6 +775,108 @@ async function walletAccount(env:Env,userId:string):Promise<any>{
 async function walletSettings(env:Env):Promise<any>{
   return await env.DB.prepare("SELECT enabled,min_deposit_units,max_deposit_units,min_withdrawal_units,max_withdrawal_units FROM wallet_settings WHERE id=1").first<any>();
 }
+
+const USDT_TRANSFER_TOPIC="ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const USDT_CONTRACTS={USDT_TRC20:"TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",USDT_ERC20:"0xdac17f958d2ee523a2206206994597c13d831ec7",USDT_BEP20:"0x55d398326f99059ff775485246999027b3197955"} as const;
+type DepositCheck={state:"pending"|"verified"|"failed"|"mismatch";blockNumber:number|null;confirmations:number|null;amountUnits:number|null;fromAddress:string|null;error?:string};
+async function rpcJson<T>(url:string,method:string,params:unknown[]):Promise<T>{
+ const response=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method,params})});
+ if(!response.ok)throw new Error("Blockchain RPC HTTP "+response.status);
+ const body=await response.json() as {result?:T;error?:{message?:string}};
+ if(body.error)throw new Error(body.error.message||"Blockchain RPC returned an error");
+ return body.result as T;
+}
+function base58ToHexPayload(address:string):string{
+ const alphabet="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";let value=0n;
+ for(const ch of address){const n=alphabet.indexOf(ch);if(n<0)throw new Error("Invalid TRON address");value=value*58n+BigInt(n)}
+ let hex=value.toString(16);if(hex.length%2)hex="0"+hex;
+ const bytes=hex.match(/.{2}/g)?.map(x=>parseInt(x,16))||[];
+ for(const ch of address){if(ch!=="1")break;bytes.unshift(0)}
+ if(bytes.length!==25)throw new Error("Invalid TRON address length");
+ return bytes.slice(0,21).map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+async function verifyEvmDeposit(tx:any,network:any):Promise<DepositCheck>{
+ const isEth=tx.network_code==="USDT_ERC20",rpcUrl=tx.rpcUrl as string,expectedChain=isEth?"0x1":"0x38";
+ const chainId=await rpcJson<string>(rpcUrl,"eth_chainId",[]);
+ if(chainId.toLowerCase()!==expectedChain)return {state:"mismatch",blockNumber:null,confirmations:null,amountUnits:null,fromAddress:null,error:"RPC endpoint returned the wrong chain ID."};
+ const receipt=await rpcJson<any>(rpcUrl,"eth_getTransactionReceipt",["0x"+String(tx.tx_hash).replace(/^0x/i,"")]);
+ if(!receipt)return {state:"pending",blockNumber:null,confirmations:null,amountUnits:null,fromAddress:null,error:"Transaction receipt is not available yet."};
+ const blockNumber=Number(BigInt(receipt.blockNumber||"0x0"));
+ if(receipt.status!=="0x1")return {state:"failed",blockNumber,confirmations:0,amountUnits:null,fromAddress:null,error:"The blockchain transaction failed."};
+ const latest=Number(BigInt(await rpcJson<string>(rpcUrl,"eth_blockNumber",[])));
+ const confirmations=Math.max(0,latest-blockNumber+1),required=isEth?12:15;
+ const token=USDT_CONTRACTS[tx.network_code as keyof typeof USDT_CONTRACTS].toLowerCase();
+ const destination=String(network.deposit_address||"").toLowerCase().replace(/^0x/,"");
+ let total=0n,from:string|null=null;
+ for(const log of receipt.logs||[]){
+  if(String(log.address||"").toLowerCase()!==token)continue;
+  const topics=(log.topics||[]).map((x:string)=>String(x).toLowerCase());
+  if(topics[0]!==("0x"+USDT_TRANSFER_TOPIC)||topics.length<3||topics[2].slice(-40)!==destination)continue;
+  total+=BigInt(log.data||"0x0");if(!from)from="0x"+topics[1].slice(-40);
+ }
+ if(total===0n)return {state:"mismatch",blockNumber,confirmations,amountUnits:null,fromAddress:null,error:"No supported USDT transfer to the configured deposit address was found."};
+ const decimals=isEth?6:18,divisor=10n**BigInt(decimals-6);
+ if(total%divisor!==0n)return {state:"mismatch",blockNumber,confirmations,amountUnits:null,fromAddress:from,error:"Transfer precision is smaller than the wallet ledger supports."};
+ const amountUnits=Number(total/divisor);
+ if(!Number.isSafeInteger(amountUnits)||amountUnits<=0)return {state:"mismatch",blockNumber,confirmations,amountUnits:null,fromAddress:from,error:"Invalid on-chain USDT amount."};
+ if(confirmations<required)return {state:"pending",blockNumber,confirmations,amountUnits,fromAddress:from,error:"Waiting for "+required+" confirmations."};
+ return {state:"verified",blockNumber,confirmations,amountUnits,fromAddress:from};
+}
+async function verifyTronDeposit(tx:any,network:any,env:Env):Promise<DepositCheck>{
+ const response=await fetch("https://api.trongrid.io/walletsolidity/gettransactioninfobyid",{method:"POST",headers:{"content-type":"application/json",...(env.TRONGRID_API_KEY?{"TRON-PRO-API-KEY":env.TRONGRID_API_KEY}:{})},body:JSON.stringify({value:String(tx.tx_hash).replace(/^0x/i,"")})});
+ if(response.status===404)return {state:"pending",blockNumber:null,confirmations:null,amountUnits:null,fromAddress:null,error:"Waiting for the confirmed TRON transaction."};
+ if(!response.ok)throw new Error("TronGrid HTTP "+response.status);
+ const info=await response.json() as any;
+ if(!info||!info.id||!info.blockNumber)return {state:"pending",blockNumber:null,confirmations:null,amountUnits:null,fromAddress:null,error:"Transaction is not solidified on TRON yet."};
+ if(info.receipt?.result&&info.receipt.result!=="SUCCESS")return {state:"failed",blockNumber:Number(info.blockNumber),confirmations:1,amountUnits:null,fromAddress:null,error:"The TRON smart-contract transaction failed."};
+ const token=base58ToHexPayload(USDT_CONTRACTS.USDT_TRC20).slice(-40),destination=base58ToHexPayload(String(network.deposit_address)).slice(-40);
+ let total=0n,from:string|null=null;
+ for(const log of info.log||[]){
+  const contract=String(log.address||"").toLowerCase().replace(/^41/,"");
+  const topics=(log.topics||[]).map((x:string)=>String(x).toLowerCase());
+  if(contract!==token||topics[0]!==USDT_TRANSFER_TOPIC||topics.length<3||topics[2].slice(-40)!==destination)continue;
+  total+=BigInt("0x"+String(log.data||"0"));if(!from)from=topics[1].slice(-40);
+ }
+ if(total===0n)return {state:"mismatch",blockNumber:Number(info.blockNumber),confirmations:1,amountUnits:null,fromAddress:null,error:"No USDT TRC20 transfer to the configured deposit address was found."};
+ const amountUnits=Number(total);
+ if(!Number.isSafeInteger(amountUnits)||amountUnits<=0)return {state:"mismatch",blockNumber:Number(info.blockNumber),confirmations:1,amountUnits:null,fromAddress:from,error:"Invalid on-chain USDT amount."};
+ return {state:"verified",blockNumber:Number(info.blockNumber),confirmations:1,amountUnits,fromAddress:from};
+}
+async function monitorPendingWalletDeposits(env:Env):Promise<void>{
+ const rows=await env.DB.prepare("SELECT t.*,n.deposit_address,n.monitor_enabled FROM wallet_transactions t JOIN wallet_networks n ON n.network_code=t.network_code WHERE t.type='deposit' AND t.status IN ('pending_review','processing') ORDER BY t.created_at ASC LIMIT 10").all<any>();
+ for(const tx of rows.results||[]){
+  const network={deposit_address:tx.deposit_address};
+  try{
+   if(!tx.deposit_address||!tx.monitor_enabled)throw new Error("Automatic monitoring is not configured for this network.");
+   const rpcTx={...tx,rpcUrl:tx.network_code==="USDT_ERC20"?(env.ETHEREUM_RPC_URL||"https://ethereum-rpc.publicnode.com"):(env.BSC_RPC_URL||"https://bsc-rpc.publicnode.com")};
+   const check=tx.network_code==="USDT_TRC20"?await verifyTronDeposit(tx,network,env):await verifyEvmDeposit(rpcTx,network);
+   const checkedAt=isoNow();
+   if(check.state==="verified"){
+    if(check.amountUnits!==Number(tx.amount_units)){
+     const message="On-chain amount ("+check.amountUnits+") does not match submitted amount ("+tx.amount_units+"). Manual review required.";
+     await env.DB.prepare("UPDATE wallet_transactions SET chain_block_number=?,chain_confirmations=?,chain_amount_units=?,chain_from_address=?,chain_error=?,monitor_attempts=monitor_attempts+1,updated_at=? WHERE id=? AND status IN ('pending_review','processing')").bind(check.blockNumber,check.confirmations,check.amountUnits,check.fromAddress,message,checkedAt,tx.id).run();
+    }else{
+     await env.DB.batch([
+      env.DB.prepare("INSERT OR IGNORE INTO wallet_ledger_entries(id,account_id,user_id,transaction_id,entry_type,available_delta_units,reserved_delta_units) SELECT ?,?,?,?,'deposit_credit',?,0 WHERE EXISTS(SELECT 1 FROM wallet_transactions WHERE id=? AND type='deposit' AND status IN ('pending_review','processing') AND amount_units=?)").bind(crypto.randomUUID(),tx.account_id,tx.user_id,tx.id,check.amountUnits,tx.id,check.amountUnits),
+      env.DB.prepare("UPDATE wallet_transactions SET status='completed',chain_block_number=?,chain_confirmations=?,chain_amount_units=?,chain_from_address=?,chain_verified_at=?,chain_error=NULL,monitor_attempts=monitor_attempts+1,updated_at=? WHERE id=? AND status IN ('pending_review','processing') AND EXISTS(SELECT 1 FROM wallet_ledger_entries WHERE transaction_id=? AND entry_type='deposit_credit')").bind(check.blockNumber,check.confirmations,check.amountUnits,check.fromAddress,checkedAt,checkedAt,tx.id,tx.id),
+      env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) SELECT ?,?,NULL,'deposit_auto_credited',? WHERE EXISTS(SELECT 1 FROM wallet_ledger_entries WHERE transaction_id=? AND entry_type='deposit_credit') AND NOT EXISTS(SELECT 1 FROM wallet_audit_events WHERE transaction_id=? AND event_type='deposit_auto_credited')").bind(crypto.randomUUID(),tx.id,JSON.stringify({networkCode:tx.network_code,blockNumber:check.blockNumber,confirmations:check.confirmations,amountUnits:check.amountUnits,fromAddress:check.fromAddress}),tx.id,tx.id)
+     ]);
+    }
+   }else if(check.state==="failed"){
+    await env.DB.prepare("UPDATE wallet_transactions SET status='rejected',chain_block_number=?,chain_confirmations=?,chain_error=?,monitor_attempts=monitor_attempts+1,updated_at=? WHERE id=? AND status IN ('pending_review','processing')").bind(check.blockNumber,check.confirmations,check.error||"Blockchain transaction failed",checkedAt,tx.id).run();
+   }else{
+    await env.DB.prepare("UPDATE wallet_transactions SET status=CASE WHEN status='pending_review' THEN 'processing' ELSE status END,chain_block_number=COALESCE(?,chain_block_number),chain_confirmations=?,chain_amount_units=?,chain_from_address=?,chain_error=?,monitor_attempts=monitor_attempts+1,updated_at=? WHERE id=? AND status IN ('pending_review','processing')").bind(check.blockNumber,check.confirmations,check.amountUnits,check.fromAddress,check.error||null,checkedAt,tx.id).run();
+   }
+   await env.DB.prepare("INSERT INTO wallet_monitor_state(network_code,last_checked_at,last_success_at,last_error,checked_count,updated_at) VALUES(?,?,?,NULL,1,?) ON CONFLICT(network_code) DO UPDATE SET last_checked_at=excluded.last_checked_at,last_success_at=excluded.last_success_at,last_error=NULL,checked_count=wallet_monitor_state.checked_count+1,updated_at=excluded.updated_at").bind(tx.network_code,checkedAt,checkedAt,checkedAt).run();
+  }catch(error){
+   const checkedAt=isoNow(),message=(error instanceof Error?error.message:"Blockchain verification failed").slice(0,400);
+   await env.DB.prepare("UPDATE wallet_transactions SET chain_error=?,monitor_attempts=monitor_attempts+1,updated_at=? WHERE id=? AND status IN ('pending_review','processing')").bind(message,checkedAt,tx.id).run();
+   await env.DB.prepare("INSERT INTO wallet_monitor_state(network_code,last_checked_at,last_error,checked_count,updated_at) VALUES(?,?,?,1,?) ON CONFLICT(network_code) DO UPDATE SET last_checked_at=excluded.last_checked_at,last_error=excluded.last_error,checked_count=wallet_monitor_state.checked_count+1,updated_at=excluded.updated_at").bind(tx.network_code,checkedAt,message,checkedAt).run();
+   console.error("Wallet deposit monitor error",tx.network_code,tx.id,message);
+  }
+ }
+}
+
 async function handleWalletGet(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
   if(!session)return json({ok:false,error:"Sign in through Telegram to access your wallet."},401);
