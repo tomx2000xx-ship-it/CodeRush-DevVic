@@ -1,6 +1,6 @@
-# CodeRush — Telegram Mini App Demo
+# CodeRush
 
-A mobile-first sports-arena prototype designed for the Telegram Web Apps environment. This repository contains a **demonstration interface**, not a live wagering, wallet or payment product.
+CodeRush is a mobile-first sports platform built for the Telegram Web Apps environment. The current production implementation is being delivered in phases on Cloudflare Workers, D1 and Workers Assets.
 
 ## Run locally
 
@@ -8,40 +8,62 @@ A mobile-first sports-arena prototype designed for the Telegram Web Apps environ
 - Start the development server with `npm run dev`.
 - Create a production build with `npm run build`.
 
-## Demo capabilities
+## Platform architecture
 
-- Demo profile onboarding, dashboard and sample match centre.
-- Sample match outcomes, a local demo selection slip and recorded demo slips.
-- Referral programme presentation and local sample notifications.
-- Simulated wallet balance, deposits and withdrawals stored in the current browser.
-- English and Arabic language selection with LTR/RTL document direction.
+- Frontend: React, TypeScript and Vite.
+- Runtime: Cloudflare Worker.
+- Database: Cloudflare D1.
+- Telegram: Bot webhook and Telegram Mini App authentication.
+- Sports data: API-Football (API-Sports) adapter; provider credentials remain server-side.
 
-## Strict demo boundaries
+## Phase 1 — Identity and sessions
 
-- All fixtures, odds, balances, rewards, referral counts and activity are illustrative sample data.
-- No real wager is submitted, settled or paid.
-- No wallet is connected; no deposit address, blockchain transaction, payment or withdrawal request is created.
-- Local demo state is stored in browser localStorage. It is device/browser-specific and is not shared between users or devices.
-- Telegram referral links now use Telegram's bot deep-link format. Only people who open the link and press Start can be registered and receive bot messages.
-- Telegram bot subscribers are stored in Cloudflare D1. This subscriber registry is separate from demo referral counts in browser localStorage.
-- Telegram `initDataUnsafe` is used only for optional display personalisation. It is **not authentication**. A production backend must validate the raw `Telegram.WebApp.initData` signature and freshness server-side.
-- No functional or end-to-end user testing is represented as completed by the build pipeline.
+Migration: `migrations/0001_identity_and_sessions.sql`
 
-## Telegram bot, referrals and broadcasts
+- Telegram Mini App `initData` signature and freshness validation on the server.
+- Secure HttpOnly session cookie, server-side session hash, expiry and revocation.
+- User profile and language preference records.
+- User roles and protected administrator session endpoint.
+- Authentication events and administrator audit-log schema.
 
-The Worker handles Telegram `/start` webhook updates, stores each consenting chat in D1, captures optional `ref_<code>` start payloads, and sends the Arabic welcome message with a Mini App button. `/stop` opts a subscriber out of future broadcasts.
+Set `CODERUSH_ADMIN_TELEGRAM_IDS` as a comma-separated Cloudflare Worker variable containing the Telegram numeric IDs permitted to receive the admin role. Never commit credentials or secrets to Git.
+
+## Phase 2 — Football data integration
+
+Migration: `migrations/0002_sports_data.sql`
+
+- API-Football adapter for global football fixtures.
+- Fixture status, kickoff, teams, league, live score and elapsed minute storage.
+- Match-winner (1X2) bookmaker odds snapshots.
+- Separate live fixture and in-play odds synchronization.
+- Read-only match feed endpoint: `GET /api/sports/fixtures`.
+- Admin-protected synchronization endpoint: `POST /api/sports/sync` (optional `from=YYYY-MM-DD&to=YYYY-MM-DD`, maximum 15 days).
+- The Match Centre now reads fixtures and prices from the backend and does not invent sample matches or odds.
+
+### Required sports provider configuration
+
+Add the provider key as a **Cloudflare Worker secret**, never as a committed variable:
+
+- `API_FOOTBALL_KEY` — API-Football / API-Sports API key.
+- Optional `API_FOOTBALL_BOOKMAKER_ID` — bookmaker ID to use for the displayed 1X2 prices. If omitted, the first bookmaker returned for each fixture is used.
+
+The provider account must have access to the required competitions, pre-match odds and in-play odds endpoints. Coverage and request quotas vary by competition and subscription. The feed remains empty until the owner supplies a valid provider subscription/key and an authorized administrator runs the first sync.
+
+The provider adapter keeps its API key on the Worker and never exposes it to the browser. Odds shown in this phase are reference feed snapshots; bet acceptance must revalidate the current market and price in the Phase 3 betting engine.
+
+## Telegram bot
+
+The Worker handles Telegram `/start` webhook updates, stores consenting bot subscribers in D1, captures optional `ref_<code>` start payloads, and sends the welcome message with a Mini App button. `/stop` opts a subscriber out of future broadcasts.
 
 - App: `https://coderush-devvic.tomx2000xx.workers.dev`
 - Webhook: `https://coderush-devvic.tomx2000xx.workers.dev/api/telegram/webhook`
 - Bot deep link: `GET /api/telegram/link`
 - Referral deep link: `GET /api/telegram/link?ref=YOUR_CODE`
-- Subscriber counts: `GET /api/telegram/stats` (requires admin bearer secret)
-- Broadcast: `POST /api/telegram/broadcast` with JSON `{"text":"Your message","offset":0,"limit":100}` and `Authorization: Bearer <TELEGRAM_BROADCAST_SECRET>`. The endpoint sends up to 100 messages per batch and returns `nextOffset` for the next batch. Continue until it returns `nextOffset: null`.
+- Subscriber counts: `GET /api/telegram/stats` (protected by the existing broadcast admin secret).
+- Broadcast: `POST /api/telegram/broadcast` with JSON `{"text":"Your message","offset":0,"limit":100}` and `Authorization: Bearer <TELEGRAM_BROADCAST_SECRET>`.
 
-Required Worker secrets:
-- `TELEGRAM_BOT_TOKEN` — already configured.
-- `TELEGRAM_BROADCAST_SECRET` — must be added as a Worker secret before protected subscriber statistics and broadcast endpoints can be used.
+Required Worker secrets include `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BROADCAST_SECRET`. Never commit bot credentials, provider keys or admin secrets to Git.
 
-The Telegram bot cannot message people merely because they clicked a web link, joined a Telegram group, or saw a referral URL. Each person must open the bot and press Start at least once. The bot then stores that chat for future messages. Users can opt out with `/stop`.
+## Production status
 
-Never commit bot credentials or admin secrets to Git.
+A successful build/deployment confirms the Worker bundle was published; it does not by itself confirm provider credentials, bookmaker coverage, Telegram login, or end-to-end wagering readiness. Those require configured third-party accounts and live integration testing.
