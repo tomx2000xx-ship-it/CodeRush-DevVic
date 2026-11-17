@@ -54,13 +54,16 @@ async function ensureWebhook(token: string): Promise<{ configured: boolean; deta
   const infoResponse = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
   const info = await infoResponse.json() as { ok?: boolean; result?: { url?: string } };
   if (!infoResponse.ok || !info.ok) return { configured: false, detail: "Telegram getWebhookInfo request failed" };
-  if (info.result?.url === WEBHOOK_URL) return { configured: true };
+  const commands=[{command:"start",description:"Open CodeRush"},{command:"notifications",description:"Manage Telegram alerts"},{command:"help",description:"Show bot commands"},{command:"stop",description:"Unsubscribe from bot messages"}];
+  const register=async()=>{try{await fetch("https://api.telegram.org/bot"+token+"/setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands})});}catch{}};
+  if (info.result?.url === WEBHOOK_URL) { await register(); return { configured: true }; }
   const setResponse = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ url: WEBHOOK_URL, secret_token: secret, allowed_updates: ["message"], drop_pending_updates: false }),
   });
   const result = await setResponse.json() as { ok?: boolean; description?: string };
-  return setResponse.ok && result.ok ? { configured: true } : { configured: false, detail: result.description || "Telegram rejected setWebhook" };
+  if(setResponse.ok&&result.ok){await register();return {configured:true};}
+  return { configured: false, detail: result.description || "Telegram rejected setWebhook" };
 }
 
 const welcomeText = [
