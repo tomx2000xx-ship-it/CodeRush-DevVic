@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bell, CheckCheck, ChevronRight, Copy, Link2, Users } from 'lucide-react';
 
-type Notice={id:string;title:string;body:string;category:'Rewards'|'Activity'|'Updates';date:string;read:boolean};
-const initialNotices:Notice[]=[];
-const safeRead=():Notice[]=>initialNotices;
 export function StageFiveFriends(){
  const [copied,setCopied]=useState(false);const [openFaq,setOpenFaq]=useState<number|null>(null);const arabic=document.documentElement.lang==='ar';
  const [code,setCode]=useState('');const [stats,setStats]=useState({registrations:0,qualified:0});
