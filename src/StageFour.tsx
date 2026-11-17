@@ -100,7 +100,7 @@ export function StageFourMatches(){
 export function StageFourBets({onBrowse}:{onBrowse:()=>void}){
  const [bets,setBets]=useState<Bet[]>(()=>readJson<Bet[]>('coderush-stage4-bets',[]));
  const [summary,setSummary]=useState<{openCount:number;settledCount:number;wins:number;losses:number;voids:number;netResult:number;bestReturn:number;winStreak:number;accuracy:number}|null>(null);
- const [slip,setSlip]=useState<Selection[]>(readSelections);
+ const [,setSlip]=useState<Selection[]>(readSelections);
  const [view,setView]=useState<'Active'|'Settled'>('Active');
  const [showMoreBets,setShowMoreBets]=useState(false);
  const isArabic=document.documentElement.lang==='ar'||document.documentElement.dir==='rtl';
