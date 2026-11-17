@@ -516,33 +516,29 @@ async function handleSportsSync(request: Request, env: Env): Promise<Response> {
   }
 }
 
+
 type BetQuoteSelectionInput = { fixtureId?: unknown; outcome?: unknown };
-const BET_OUTCOME_KEYS: Record<string,string> = {
-  "home win":"home", "home":"home",
-  "draw":"draw",
-  "away win":"away", "away":"away"
+type ValidatedBetSelection = {
+  fixtureId:string; outcome:string; outcomeKey:string; fixture:string; league:string;
+  homeTeam:string; awayTeam:string; odd:number; oddsUpdatedAt:string;
 };
-async function handleBetQuote(request: Request, env: Env): Promise<Response> {
-  const session = await currentSession(request, env);
-  if (!session) return json({ok:false,error:"Sign in through Telegram before validating a betting ticket."},401);
-  let body: { selections?: BetQuoteSelectionInput[] };
-  try { body = await request.json() as { selections?: BetQuoteSelectionInput[] }; }
-  catch { return json({ok:false,error:"Invalid ticket request."},400); }
-  const inputs = body.selections;
-  if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > 20) {
-    return json({ok:false,error:"A ticket must contain between 1 and 20 selections."},400);
-  }
-  const seenFixtures = new Set<string>();
-  const now = Date.now();
-  const normalized: Array<{fixtureId:string;outcome:string;outcomeKey:string;fixture:string;league:string;odd:number;oddsUpdatedAt:string}> = [];
-  for (const input of inputs) {
-    const fixtureId = typeof input.fixtureId === "string" ? input.fixtureId.trim() : "";
-    const outcome = typeof input.outcome === "string" ? input.outcome.trim() : "";
-    const outcomeKey = BET_OUTCOME_KEYS[outcome.toLowerCase()];
-    if (!/^\d{1,20}$/.test(fixtureId) || !outcomeKey) return json({ok:false,error:"One or more ticket selections are invalid."},400);
-    if (seenFixtures.has(fixtureId)) return json({ok:false,error:"A ticket can contain only one outcome per match."},400);
+const BET_OUTCOME_KEYS: Record<string,string> = {
+  "home win":"home", "home":"home", "1":"home",
+  "draw":"draw", "x":"draw",
+  "away win":"away", "away":"away", "2":"away"
+};
+async function validateBetSelections(env:Env, inputs:BetQuoteSelectionInput[]):Promise<{ok:true;selections:ValidatedBetSelection[];combinedOdds:number;validatedAt:string}|{ok:false;error:string;status:number}> {
+  if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > 20) return {ok:false,error:"A ticket must contain between 1 and 20 selections.",status:400};
+  const seenFixtures=new Set<string>(), now=Date.now();
+  const normalized:ValidatedBetSelection[]=[];
+  for(const input of inputs){
+    const fixtureId=typeof input.fixtureId==="string"?input.fixtureId.trim():"";
+    const outcome=typeof input.outcome==="string"?input.outcome.trim():"";
+    const outcomeKey=BET_OUTCOME_KEYS[outcome.toLowerCase()];
+    if(!/^\d{1,20}$/.test(fixtureId)||!outcomeKey)return {ok:false,error:"One or more ticket selections are invalid.",status:400};
+    if(seenFixtures.has(fixtureId))return {ok:false,error:"A ticket can contain only one outcome per match.",status:400};
     seenFixtures.add(fixtureId);
-    const row = await env.DB.prepare(`
+    const row=await env.DB.prepare(`
       SELECT f.id,f.home_team,f.away_team,f.league_name,f.kickoff,f.status_short,
              o.outcome_name,o.odd,o.suspended,o.updated_at AS odds_updated_at
       FROM sports_fixtures f
@@ -552,35 +548,66 @@ async function handleBetQuote(request: Request, env: Env): Promise<Response> {
       id:string;home_team:string;away_team:string;league_name:string;kickoff:string;status_short:string;
       outcome_name:string|null;odd:number|null;suspended:number|null;odds_updated_at:string|null
     }>();
-    if (!row) return json({ok:false,error:"A selected match is no longer available. Refresh the Match Centre."},409);
-    const kickoff = Date.parse(row.kickoff);
-    if (!Number.isFinite(kickoff) || kickoff <= now || !["NS","TBD"].includes(row.status_short)) {
-      return json({ok:false,error:"A selected match has started, finished, or is not open for selections."},409);
-    }
-    if (row.odd === null || !Number.isFinite(Number(row.odd)) || Number(row.odd) <= 1 || row.suspended) {
-      return json({ok:false,error:"Odds are unavailable or suspended for one of your selections."},409);
-    }
-    const oddsUpdatedAt = row.odds_updated_at ? Date.parse(row.odds_updated_at) : NaN;
-    if (!Number.isFinite(oddsUpdatedAt) || now - oddsUpdatedAt > 45*60*1000 || oddsUpdatedAt > now + 60*1000) {
-      return json({ok:false,error:"The odds for a selected match are stale. Please wait for an updated price."},409);
-    }
-    normalized.push({
-      fixtureId:row.id,
-      outcome:row.outcome_name || (outcomeKey==="home"?"Home win":outcomeKey==="draw"?"Draw":"Away win"),
-      outcomeKey,
-      fixture:row.home_team+" vs "+row.away_team,
-      league:row.league_name,
-      odd:Number(row.odd),
-      oddsUpdatedAt:row.odds_updated_at!
-    });
+    if(!row)return {ok:false,error:"A selected match is no longer available. Refresh the Match Centre.",status:409};
+    const kickoff=Date.parse(row.kickoff);
+    if(!Number.isFinite(kickoff)||kickoff<=now||!["NS","TBD"].includes(row.status_short))return {ok:false,error:"A selected match has started, finished, or is not open for selections.",status:409};
+    if(row.odd===null||!Number.isFinite(Number(row.odd))||Number(row.odd)<=1||row.suspended)return {ok:false,error:"Odds are unavailable or suspended for one of your selections.",status:409};
+    const updated=row.odds_updated_at?Date.parse(row.odds_updated_at):NaN;
+    if(!Number.isFinite(updated)||now-updated>45*60*1000||updated>now+60*1000)return {ok:false,error:"The odds for a selected match are stale. Please wait for an updated price.",status:409};
+    normalized.push({fixtureId:row.id,outcome:row.outcome_name||(outcomeKey==="home"?"Home win":outcomeKey==="draw"?"Draw":"Away win"),outcomeKey,fixture:row.home_team+" vs "+row.away_team,league:row.league_name,homeTeam:row.home_team,awayTeam:row.away_team,odd:Number(row.odd),oddsUpdatedAt:row.odds_updated_at!});
   }
-  const combinedOdds = normalized.reduce((product,pick)=>product*pick.odd,1);
-  if (!Number.isFinite(combinedOdds) || combinedOdds > 1000000) return json({ok:false,error:"The combined odds exceed the ticket limit."},422);
-  return json({
-    ok:true,
-    quote:{selections:normalized,selectionCount:normalized.length,combinedOdds,combinedOddsDisplay:combinedOdds.toFixed(2),validatedAt:new Date(now).toISOString(),expiresAt:new Date(now+30000).toISOString(),market:"1X2"},
-    notice:"This is an odds validation quote only. No bet has been placed and no balance has been changed."
-  });
+  const combinedOdds=normalized.reduce((product,pick)=>product*pick.odd,1);
+  if(!Number.isFinite(combinedOdds)||combinedOdds>1000000)return {ok:false,error:"The combined odds exceed the ticket limit.",status:422};
+  return {ok:true,selections:normalized,combinedOdds,validatedAt:new Date(now).toISOString()};
+}
+function publicTicket(row:any,selections:any[]){return {id:row.id,status:row.status,ticketType:row.ticket_type,stake:Number(row.stake),combinedOdds:Number(row.combined_odds),potential:Number(row.potential_return),createdAt:row.created_at,selections:selections.map(s=>({id:s.id,fixtureId:s.fixture_id,fixture:s.home_team+" vs "+s.away_team,league:s.league_name,outcome:s.outcome_name,odd:Number(s.odd)}))};}
+async function handleBetQuote(request:Request,env:Env):Promise<Response>{
+  const session=await currentSession(request,env);
+  if(!session)return json({ok:false,error:"Sign in through Telegram before validating a betting ticket."},401);
+  let body:{selections?:BetQuoteSelectionInput[]};
+  try{body=await request.json() as {selections?:BetQuoteSelectionInput[]};}catch{return json({ok:false,error:"Invalid ticket request."},400);}
+  const result=await validateBetSelections(env,body.selections||[]);
+  if(!result.ok)return json({ok:false,error:result.error},result.status);
+  return json({ok:true,quote:{selections:result.selections.map(s=>({fixtureId:s.fixtureId,outcome:s.outcome,outcomeKey:s.outcomeKey,fixture:s.fixture,league:s.league,odd:s.odd,oddsUpdatedAt:s.oddsUpdatedAt})),selectionCount:result.selections.length,combinedOdds:result.combinedOdds,combinedOddsDisplay:result.combinedOdds.toFixed(2),validatedAt:result.validatedAt,expiresAt:new Date(Date.parse(result.validatedAt)+30000).toISOString(),market:"1X2"},notice:"This is an odds validation quote only. No bet has been placed and no balance has been changed."});
+}
+async function handleBetCreate(request:Request,env:Env):Promise<Response>{
+  const session=await currentSession(request,env);
+  if(!session)return json({ok:false,error:"Authentication required"},401);
+  if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);
+  if(!(request.headers.get("content-type")||"").toLowerCase().includes("application/json"))return json({ok:false,error:"Content-Type must be application/json."},415);
+  let body:{selections?:BetQuoteSelectionInput[];stake?:unknown;idempotencyKey?:unknown};
+  try{body=await request.json() as typeof body;}catch{return json({ok:false,error:"Invalid ticket request."},400);}
+  const stake=Number(body.stake);
+  if(!Number.isFinite(stake)||stake<1||stake>5000||Math.round(stake*100)!==stake*100)return json({ok:false,error:"Stake must be between 1.00 and 5,000.00."},400);
+  const idempotencyKey=typeof body.idempotencyKey==="string"?body.idempotencyKey.trim():"";
+  if(!/^[A-Za-z0-9_-]{16,80}$/.test(idempotencyKey))return json({ok:false,error:"A valid ticket submission key is required."},400);
+  const validated=await validateBetSelections(env,body.selections||[]);
+  if(!validated.ok)return json({ok:false,error:validated.error},validated.status);
+  const id=crypto.randomUUID(),potential=Number((stake*validated.combinedOdds).toFixed(2)),createdAt=new Date().toISOString();
+  const statements=[env.DB.prepare("INSERT INTO bet_tickets(id,user_id,ticket_type,status,stake,combined_odds,potential_return,currency,selection_count,idempotency_key,quoted_at,created_at,updated_at) VALUES(?,?,'demo','open',?,?,?,'USD',?,?,?, ?,?)").bind(id,session.user.id,stake,validated.combinedOdds,potential,validated.selections.length,idempotencyKey,validated.validatedAt,createdAt,createdAt)];
+  validated.selections.forEach((s,index)=>statements.push(env.DB.prepare("INSERT INTO bet_ticket_selections(id,ticket_id,selection_index,fixture_id,home_team,away_team,league_name,outcome_key,outcome_name,odd,odds_updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),id,index,s.fixtureId,s.homeTeam,s.awayTeam,s.league,s.outcomeKey,s.outcome,s.odd,s.oddsUpdatedAt)));
+  try{await env.DB.batch(statements);}catch(error){
+    const existing=await env.DB.prepare("SELECT * FROM bet_tickets WHERE user_id=? AND idempotency_key=?").bind(session.user.id,idempotencyKey).first<any>();
+    if(!existing)throw error;
+    const picks=await env.DB.prepare("SELECT * FROM bet_ticket_selections WHERE ticket_id=? ORDER BY selection_index").bind(existing.id).all<any>();
+    return json({ok:true,duplicate:true,ticket:publicTicket(existing,picks.results||[])},200);
+  }
+  const ticket=await env.DB.prepare("SELECT * FROM bet_tickets WHERE id=? AND user_id=?").bind(id,session.user.id).first<any>();
+  const picks=await env.DB.prepare("SELECT * FROM bet_ticket_selections WHERE ticket_id=? ORDER BY selection_index").bind(id).all<any>();
+  return json({ok:true,ticket:publicTicket(ticket,picks.results||[]),notice:"Demo ticket stored securely. No real-money wager or wallet debit has occurred."},201);
+}
+async function handleBetList(request:Request,env:Env):Promise<Response>{
+  const session=await currentSession(request,env);
+  if(!session)return json({ok:false,error:"Authentication required"},401);
+  const limit=Math.min(50,Math.max(1,Number(new URL(request.url).searchParams.get("limit"))||25));
+  const rows=await env.DB.prepare("SELECT * FROM bet_tickets WHERE user_id=? ORDER BY created_at DESC LIMIT ?").bind(session.user.id,limit).all<any>();
+  const tickets=rows.results||[];
+  if(!tickets.length)return json({ok:true,bets:[]});
+  const placeholders=tickets.map(()=>"?").join(",");
+  const picks=await env.DB.prepare("SELECT * FROM bet_ticket_selections WHERE ticket_id IN ("+placeholders+") ORDER BY ticket_id,selection_index").bind(...tickets.map(t=>t.id)).all<any>();
+  const grouped=new Map<string,any[]>();
+  for(const pick of picks.results||[]){const list=grouped.get(pick.ticket_id)||[];list.push(pick);grouped.set(pick.ticket_id,list);}
+  return json({ok:true,bets:tickets.map(ticket=>publicTicket(ticket,grouped.get(ticket.id)||[]))});
 }
 
 export default {
@@ -617,7 +644,7 @@ export default {
       const limiter = await env.DB.prepare("SELECT next_allowed_at,datetime(next_allowed_at,'unixepoch') AS next_allowed_utc FROM api_football_rate_limit WHERE id=1").first();
       return json({ok:true,diagnostics:diagnostics.results||[],sync:sync||null,limiter:limiter||null});
     }
-    if (url.pathname === "/api/bets/quote" && request.method === "POST") return handleBetQuote(request, env);
+    if (url.pathname === "/api/bets/quote" && request.method === "POST") return handleBetQuote(request, env);\n    if (url.pathname === "/api/bets" && request.method === "POST") return handleBetCreate(request, env);\n    if (url.pathname === "/api/bets" && request.method === "GET") return handleBetList(request, env);
     if (url.pathname === "/api/profile" && request.method === "POST") return handleProfileUpdate(request, env);
     if (url.pathname === "/api/sports/fixtures" && request.method === "GET") return handleSportsFixtures(request, env);
     if (url.pathname === "/api/sports/sync" && request.method === "POST") return handleSportsSync(request, env);
