@@ -83,7 +83,7 @@ A successful build/deployment confirms the Worker bundle was published; it does 
 
 Migrations: `migrations/0008_wallet_ledger.sql`, `migrations/0009_wallet_audit_hardening.sql`, `migrations/0010_wallet_automatic_deposits.sql`, `migrations/0011_wallet_deposit_address_snapshot.sql`
 
-- Introduces a separate server-authoritative USDT wallet account for each authenticated user. The betting engine does not use a simulated reference balance. Real-money ticket placement remains disabled until the wallet-backed staking and settlement integration is completed.
+- Introduces a separate server-authoritative USDT wallet account for each authenticated user. The betting engine does not expose a placeholder balance. Real-money ticket placement remains disabled until the wallet-backed staking and settlement integration is completed.
 - Stores balances as integer micro-USDT units (six decimal places), deriving available and reserved balances from an append-only D1 ledger. Ledger and wallet audit rows are protected against update and deletion; payout transaction hashes are unique per network.
 - Supports automatic USDT verification on TRON/TRC20 and Ethereum/ERC20. BNB Smart Chain/BEP20 remains locked until its exact USD₮ contract is confirmed. Each supported network has independent deposit-address and deposit/withdrawal enablement.
 - User endpoints: `GET /api/wallet`, `POST /api/wallet/deposits`, and `POST /api/wallet/withdrawals`.
