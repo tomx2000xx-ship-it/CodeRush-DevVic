@@ -18,7 +18,7 @@ export function StageSixWallet({initialMode,showHistory=false,onClose}:Props){
  const [loading,setLoading]=useState(true),[error,setError]=useState('');
  const [mode,setMode]=useState<Mode>('Deposit'),[flowOpen,setFlowOpen]=useState(false);
  const [networkCode,setNetworkCode]=useState('USDT_TRC20'),[amount,setAmount]=useState('25'),[txHash,setTxHash]=useState(''),[destination,setDestination]=useState('');
- const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
+ const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[requestKey,setRequestKey]=useState(()=>crypto.randomUUID());
  const load=useCallback(async()=>{
   setLoading(true);setError('');
   try{
@@ -32,7 +32,7 @@ export function StageSixWallet({initialMode,showHistory=false,onClose}:Props){
  useEffect(()=>{void load();window.addEventListener('focus',load);return()=>window.removeEventListener('focus',load)},[load]);
  useEffect(()=>{if(initialMode){setMode(initialMode);setFlowOpen(true);setMessage('')}},[initialMode]);
  const close=()=>{setFlowOpen(false);setMessage('');setTxHash('');setDestination('');onClose?.()};
- const open=(next:Mode)=>{setMode(next);setFlowOpen(true);setMessage('');setAmount('25');setTxHash('');setDestination('');setNetworkCode('USDT_TRC20')};
+ const open=(next:Mode)=>{setMode(next);setFlowOpen(true);setMessage('');setAmount('25');setTxHash('');setDestination('');setNetworkCode('USDT_TRC20');setRequestKey(crypto.randomUUID())};
  const selectedNetwork=wallet?.networks.find(n=>n.network_code===networkCode);
  const available=Number(wallet?.availableUnits||0),reserved=Number(wallet?.reservedUnits||0);
  const amountNumber=Number(amount),validAmount=Number.isFinite(amountNumber)&&amountNumber>0&&/^\\d{1,9}(?:\\.\\d{1,6})?$/.test(amount.trim());
@@ -47,11 +47,11 @@ export function StageSixWallet({initialMode,showHistory=false,onClose}:Props){
   if(mode==='Withdrawal'&&!(networkCode==='USDT_TRC20'?/^T[1-9A-HJ-NP-Za-km-z]{33}$/:/^0x[a-fA-F0-9]{40}$/).test(destination.trim())){setMessage(t('Enter a valid destination address for the selected network.','أدخل عنوان وجهة صحيحاً للشبكة المحددة.'));return}
   setBusy(true);setMessage('');
   try{
-   const response=await fetch(mode==='Deposit'?'/api/wallet/deposits':'/api/wallet/withdrawals',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({amount:amount.trim(),networkCode,txHash:mode==='Deposit'?txHash.trim():undefined,destinationAddress:mode==='Withdrawal'?destination.trim():undefined,idempotencyKey:crypto.randomUUID()})});
+   const response=await fetch(mode==='Deposit'?'/api/wallet/deposits':'/api/wallet/withdrawals',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({amount:amount.trim(),networkCode,txHash:mode==='Deposit'?txHash.trim():undefined,destinationAddress:mode==='Withdrawal'?destination.trim():undefined,idempotencyKey:requestKey})});
    const body=await response.json();
    if(!response.ok||!body?.ok)throw new Error(body?.error||'Wallet request failed');
    setMessage(body.notice||t('Your request has been recorded.','تم تسجيل طلبك.'));
-   await load();
+   await load();setRequestKey(crypto.randomUUID());
    window.setTimeout(()=>{setFlowOpen(false);setTxHash('');setDestination('');setMessage('')},1300);
   }catch(e){setMessage(e instanceof Error?e.message:'Unable to submit wallet request');}
   finally{setBusy(false);}
