@@ -752,6 +752,11 @@ async function settleStoredTicket(env:Env,ticketId:string,checkedAt:string):Prom
   if(statements.length)await env.DB.batch(statements);
   if(finalStatus==="won"||finalStatus==="lost")await recordReferralQualification(env,ticket.user_id,"first_bet",ticketId);
   if(finalStatus==="won"||ticket.status==="won")await awardReferralCommissions(env,ticketId);
+  if(finalStatus){
+    const settled=await env.DB.prepare("SELECT stake,settled_return FROM bet_tickets WHERE id=?").bind(ticketId).first<any>();
+    const profit=Math.max(0,Number(settled?.settled_return||0)-Number(settled?.stake||0));
+    await createUserNotification(env,ticket.user_id,"bet-settled:"+ticketId,"bet","Bet settled: "+finalStatus.toUpperCase(),"Ticket "+ticketId+" has settled. "+(finalStatus==="won"?"Profit: "+profit.toFixed(2)+" USDT.":finalStatus==="lost"?"The ticket was settled as a loss.":"The ticket was voided and stake returned."),"تمت تسوية الرهان","تمت تسوية التذكرة "+ticketId+". "+(finalStatus==="won"?"الربح: "+profit.toFixed(2)+" USDT.":finalStatus==="lost"?"تمت تسوية الرهان كخسارة.":"تم إلغاء الرهان وإرجاع قيمة المشاركة."),"/bets");
+  }
   return {selectionUpdates,ticketStatus:finalStatus};
 }
 async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:number;selectionUpdates:number;ticketsSettled:number}>{
