@@ -318,8 +318,24 @@ type ApiFootballOdds = {
   fixture: { id: number };
   bookmakers: Array<{ id: number; name: string; bets: Array<{ id: number; name: string; values: Array<{ value: string; odd: string; handicap?: string | null; suspended?: boolean }> }> }>;
 };
+async function reserveApiFootballRequestSlot(env: Env): Promise<void> {
+  // Atomically reserve a provider request slot across all Worker instances and
+  // overlapping admin syncs. Eight seconds keeps usage below a 10/minute plan.
+  const slot = await env.DB.prepare(`
+    INSERT INTO api_football_rate_limit(id,next_allowed_at)
+    VALUES (1,unixepoch())
+    ON CONFLICT(id) DO UPDATE SET
+      next_allowed_at=MAX(api_football_rate_limit.next_allowed_at,unixepoch())+8
+    RETURNING next_allowed_at
+  `).first<{next_allowed_at:number}>();
+  if (slot?.next_allowed_at) {
+    const waitMs = slot.next_allowed_at * 1000 - Date.now();
+    if (waitMs > 0) await new Promise(resolve => setTimeout(resolve, waitMs));
+  }
+}
 async function apiFootball<T>(env: Env, path: string): Promise<{ response: T[]; paging?: { current: number; total: number } }> {
   if (!env.API_FOOTBALL_KEY) throw new Error("API_FOOTBALL_KEY is not configured");
+  await reserveApiFootballRequestSlot(env);
   // Build requests with URL/URLSearchParams so paired date filters are transmitted
   // as distinct query parameters (rather than relying on string concatenation).
   const endpoint = new URL(path, "https://v3.football.api-sports.io/");
