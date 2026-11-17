@@ -625,12 +625,27 @@ async function handleBetList(request:Request,env:Env):Promise<Response>{
   const limit=Math.min(50,Math.max(1,Number(new URL(request.url).searchParams.get("limit"))||25));
   const rows=await env.DB.prepare("SELECT * FROM bet_tickets WHERE user_id=? ORDER BY created_at DESC LIMIT ?").bind(session.user.id,limit).all<any>();
   const tickets=rows.results||[];
-  if(!tickets.length)return json({ok:true,bets:[]});
-  const placeholders=tickets.map(()=>"?").join(",");
-  const picks=await env.DB.prepare("SELECT * FROM bet_ticket_selections WHERE ticket_id IN ("+placeholders+") ORDER BY ticket_id,selection_index").bind(...tickets.map(t=>t.id)).all<any>();
   const grouped=new Map<string,any[]>();
-  for(const pick of picks.results||[]){const list=grouped.get(pick.ticket_id)||[];list.push(pick);grouped.set(pick.ticket_id,list);}
-  return json({ok:true,bets:tickets.map(ticket=>publicTicket(ticket,grouped.get(ticket.id)||[]))});
+  if(tickets.length){
+    const placeholders=tickets.map(()=>"?").join(",");
+    const picks=await env.DB.prepare("SELECT * FROM bet_ticket_selections WHERE ticket_id IN ("+placeholders+") ORDER BY ticket_id,selection_index").bind(...tickets.map(t=>t.id)).all<any>();
+    for(const pick of picks.results||[]){const list=grouped.get(pick.ticket_id)||[];list.push(pick);grouped.set(pick.ticket_id,list);}
+  }
+  const [aggregate,recent]=await Promise.all([
+    env.DB.prepare(`SELECT
+      SUM(CASE WHEN status='open' THEN 1 ELSE 0 END) AS open_count,
+      SUM(CASE WHEN status='won' THEN 1 ELSE 0 END) AS wins,
+      SUM(CASE WHEN status='lost' THEN 1 ELSE 0 END) AS losses,
+      SUM(CASE WHEN status='void' THEN 1 ELSE 0 END) AS voids,
+      COALESCE(SUM(CASE WHEN status IN ('won','lost','void') THEN COALESCE(settled_return,0)-stake ELSE 0 END),0) AS net_result,
+      COALESCE(MAX(CASE WHEN status IN ('won','lost','void') THEN COALESCE(settled_return,0) ELSE 0 END),0) AS best_return
+      FROM bet_tickets WHERE user_id=?`).bind(session.user.id).first<any>(),
+    env.DB.prepare("SELECT status FROM bet_tickets WHERE user_id=? AND status IN ('won','lost','void') ORDER BY settled_at DESC,created_at DESC LIMIT 100").bind(session.user.id).all<any>()
+  ]);
+  let winStreak=0;for(const item of recent.results||[]){if(item.status!=="won")break;winStreak++;}
+  const wins=Number(aggregate?.wins||0),losses=Number(aggregate?.losses||0);
+  const summary={openCount:Number(aggregate?.open_count||0),settledCount:wins+losses+Number(aggregate?.voids||0),wins,losses,voids:Number(aggregate?.voids||0),netResult:Number(aggregate?.net_result||0),bestReturn:Number(aggregate?.best_return||0),winStreak,accuracy:wins+losses?Math.round(wins/(wins+losses)*100):0};
+  return json({ok:true,bets:tickets.map(ticket=>publicTicket(ticket,grouped.get(ticket.id)||[])),summary});
 }
 type BetSettlementFixtureRow={id:string;status_short:string;result_home_score:number|null;result_away_score:number|null;result_checked_at:string|null};
 function settledSelectionResult(outcomeKey:string,fixture:BetSettlementFixtureRow):"won"|"lost"|"void"|null{
