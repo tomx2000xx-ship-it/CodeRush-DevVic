@@ -313,6 +313,7 @@ type ApiFootballFixture = {
   league: { id: number; name: string; country: string; season: number };
   teams: { home: { name: string; code?: string | null }; away: { name: string; code?: string | null } };
   goals: { home: number | null; away: number | null };
+  score?: { fulltime?: { home: number | null; away: number | null } | null };
 };
 type ApiFootballOdds = {
   fixture: { id: number };
@@ -398,25 +399,36 @@ const dayString = (date: Date) => date.toISOString().slice(0, 10);
 function fixtureIsLive(status: string): boolean {
   return ["1H","HT","2H","ET","BT","P","LIVE"].includes(status);
 }
+function fixtureSettlementScore(item:ApiFootballFixture):{home:number|null;away:number|null}{
+  const status=item.fixture.status.short;
+  const fulltime=item.score?.fulltime;
+  if(status==="AET"||status==="PEN")return {home:fulltime?.home??null,away:fulltime?.away??null};
+  if(["FT","AWD","WO"].includes(status))return {home:fulltime?.home??item.goals.home,away:fulltime?.away??item.goals.away};
+  return {home:null,away:null};
+}
 async function storeFootballFixtures(env: Env, fixtures: ApiFootballFixture[]): Promise<number> {
   if (!fixtures.length) return 0;
   const now = isoNow();
-  const statements = fixtures.map(item => env.DB.prepare(`
+  const statements = fixtures.map(item => {
+    const result=fixtureSettlementScore(item);
+    return env.DB.prepare(`
     INSERT INTO sports_fixtures
-      (id,league_id,league_name,country,season,kickoff,status_short,status_long,elapsed,home_team,away_team,home_code,away_code,home_score,away_score,is_live,updated_at,raw_json)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      (id,league_id,league_name,country,season,kickoff,status_short,status_long,elapsed,home_team,away_team,home_code,away_code,home_score,away_score,result_home_score,result_away_score,is_live,updated_at,raw_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(id) DO UPDATE SET
       league_id=excluded.league_id,league_name=excluded.league_name,country=excluded.country,season=excluded.season,
       kickoff=excluded.kickoff,status_short=excluded.status_short,status_long=excluded.status_long,elapsed=excluded.elapsed,
       home_team=excluded.home_team,away_team=excluded.away_team,home_code=excluded.home_code,away_code=excluded.away_code,
-      home_score=excluded.home_score,away_score=excluded.away_score,is_live=excluded.is_live,
+      home_score=excluded.home_score,away_score=excluded.away_score,result_home_score=excluded.result_home_score,
+      result_away_score=excluded.result_away_score,is_live=excluded.is_live,
       updated_at=excluded.updated_at,raw_json=excluded.raw_json
   `).bind(
     String(item.fixture.id),item.league.id,item.league.name,item.league.country||null,item.league.season||null,
     item.fixture.date,item.fixture.status.short,item.fixture.status.long,item.fixture.status.elapsed,
     item.teams.home.name,item.teams.away.name,item.teams.home.code||null,item.teams.away.code||null,
-    item.goals.home,item.goals.away,fixtureIsLive(item.fixture.status.short)?1:0,now,JSON.stringify(item)
-  ));
+    item.goals.home,item.goals.away,result.home,result.away,fixtureIsLive(item.fixture.status.short)?1:0,now,JSON.stringify(item)
+  );
+  });
   await env.DB.batch(statements);
   return fixtures.length;
 }
@@ -620,6 +632,98 @@ async function handleBetList(request:Request,env:Env):Promise<Response>{
   for(const pick of picks.results||[]){const list=grouped.get(pick.ticket_id)||[];list.push(pick);grouped.set(pick.ticket_id,list);}
   return json({ok:true,bets:tickets.map(ticket=>publicTicket(ticket,grouped.get(ticket.id)||[]))});
 }
+type BetSettlementFixtureRow={id:string;status_short:string;result_home_score:number|null;result_away_score:number|null;result_checked_at:string|null};
+function settledSelectionResult(outcomeKey:string,fixture:BetSettlementFixtureRow):"won"|"lost"|"void"|null{
+  const status=fixture.status_short;
+  if(["CANC","ABD"].includes(status))return "void";
+  if(!["FT","AET","PEN","AWD","WO"].includes(status))return null;
+  const home=fixture.result_home_score,away=fixture.result_away_score;
+  if(home===null||away===null){
+    if(status==="AWD"||status==="WO")return "void";
+    return null;
+  }
+  const actual=home>away?"home":home<away?"away":"draw";
+  return actual===outcomeKey?"won":"lost";
+}
+async function settleStoredTicket(env:Env,ticketId:string,checkedAt:string):Promise<{selectionUpdates:number;ticketStatus:string|null}>{
+  const ticket=await env.DB.prepare("SELECT * FROM bet_tickets WHERE id=?").bind(ticketId).first<any>();
+  if(!ticket)return {selectionUpdates:0,ticketStatus:null};
+  const rows=await env.DB.prepare(`
+    SELECT s.*,f.status_short,f.result_home_score AS fixture_home_score,
+      f.result_away_score AS fixture_away_score,f.result_checked_at AS fixture_result_checked_at
+    FROM bet_ticket_selections s JOIN sports_fixtures f ON f.id=s.fixture_id
+    WHERE s.ticket_id=? ORDER BY s.selection_index
+  `).bind(ticketId).all<any>();
+  const picks=rows.results||[];
+  const now=isoNow(),statements:D1PreparedStatement[]=[];
+  const outcomes:string[]=[];
+  let selectionUpdates=0;
+  for(const pick of picks){
+    let result=pick.result_status||"pending";
+    const fixture:BetSettlementFixtureRow={id:pick.fixture_id,status_short:pick.status_short,result_home_score:pick.fixture_home_score,result_away_score:pick.fixture_away_score,result_checked_at:pick.fixture_result_checked_at};
+    if(result==="pending"&&fixture.result_checked_at){
+      const computed=settledSelectionResult(pick.outcome_key,fixture);
+      if(computed){
+        result=computed;selectionUpdates++;
+        statements.push(env.DB.prepare("UPDATE bet_ticket_selections SET result_status=?,result_home_score=?,result_away_score=?,result_fixture_status=?,result_checked_at=?,settled_at=? WHERE id=? AND result_status='pending'").bind(result,fixture.result_home_score,fixture.result_away_score,fixture.status_short,fixture.result_checked_at,now,pick.id));
+        statements.push(env.DB.prepare("INSERT OR IGNORE INTO bet_settlement_events(id,event_key,ticket_id,selection_id,event_type,previous_status,new_status,details_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),"selection:"+pick.id,ticketId,pick.id,"selection_result","pending",result,JSON.stringify({fixtureId:pick.fixture_id,home:pick.home_team,away:pick.away_team,homeScore:fixture.result_home_score,awayScore:fixture.result_away_score,fixtureStatus:fixture.status_short,outcome:pick.outcome_key,odd:Number(pick.odd)}),now));
+      }
+    }
+    outcomes.push(result);
+  }
+  let finalStatus:string|null=null;
+  if(ticket.status==="open"){
+    const hasLoss=outcomes.includes("lost"),hasPending=outcomes.includes("pending"),hasWin=outcomes.includes("won");
+    if(hasLoss)finalStatus="lost";
+    else if(!hasPending)finalStatus=hasWin?"won":"void";
+    if(finalStatus){
+      const settledOdds=Number(picks.filter((p:any,i:number)=>(outcomes[i]||p.result_status)==="won").reduce((product:number,p:any)=>product*Number(p.odd),1).toFixed(6));
+      const settledReturn=finalStatus==="won"?Number((Number(ticket.stake)*settledOdds).toFixed(2)):finalStatus==="void"?Number(ticket.stake):0;
+      statements.push(env.DB.prepare("UPDATE bet_tickets SET status=?,settled_odds=?,settled_return=?,settled_at=?,updated_at=? WHERE id=? AND status='open'").bind(finalStatus,settledOdds,settledReturn,now,now,ticketId));
+      statements.push(env.DB.prepare("INSERT OR IGNORE INTO bet_settlement_events(id,event_key,ticket_id,selection_id,event_type,previous_status,new_status,details_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),"ticket:"+ticketId,ticketId,null,"ticket_settled","open",finalStatus,JSON.stringify({stake:Number(ticket.stake),settledOdds,settledReturn,selectionResults:outcomes}),now));
+    }
+  }
+  if(statements.length)await env.DB.batch(statements);
+  return {selectionUpdates,ticketStatus:finalStatus};
+}
+async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:number;selectionUpdates:number;ticketsSettled:number}>{
+  const now=isoNow(),cutoff=new Date(Date.now()-110*60*1000).toISOString();
+  const due=await env.DB.prepare(`
+    SELECT DISTINCT f.id
+    FROM bet_ticket_selections s
+    JOIN bet_tickets t ON t.id=s.ticket_id
+    JOIN sports_fixtures f ON f.id=s.fixture_id
+    WHERE s.result_status='pending' AND datetime(f.kickoff)<=datetime(?)
+      AND (f.result_checked_at IS NULL OR datetime(f.result_checked_at)<=datetime(?))
+    ORDER BY CASE WHEN f.result_checked_at IS NULL THEN 0 ELSE 1 END,f.result_checked_at ASC,f.kickoff ASC
+    LIMIT 20
+  `).bind(now,cutoff).all<{id:string}>();
+  const fixtureIds=(due.results||[]).map(row=>row.id);
+  if(!fixtureIds.length)return {checkedFixtures:0,selectionUpdates:0,ticketsSettled:0};
+  const response=await apiFootball<ApiFootballFixture>(env,"fixtures?ids="+fixtureIds.join("-"));
+  await storeFootballFixtures(env,response.response||[]);
+  const checkedAt=isoNow();
+  await env.DB.batch(fixtureIds.map(id=>env.DB.prepare("UPDATE sports_fixtures SET result_checked_at=? WHERE id=?").bind(checkedAt,id)));
+  const placeholders=fixtureIds.map(()=>"?").join(",");
+  const affected=await env.DB.prepare("SELECT DISTINCT ticket_id FROM bet_ticket_selections WHERE result_status='pending' AND fixture_id IN ("+placeholders+")").bind(...fixtureIds).all<{ticket_id:string}>();
+  let selectionUpdates=0,ticketsSettled=0;
+  for(const row of affected.results||[]){
+    const result=await settleStoredTicket(env,row.ticket_id,checkedAt);
+    selectionUpdates+=result.selectionUpdates;
+    if(result.ticketStatus)ticketsSettled++;
+  }
+  return {checkedFixtures:fixtureIds.length,selectionUpdates,ticketsSettled};
+}
+async function handleBetSettlementDiagnostics(request:Request,env:Env):Promise<Response>{
+  const session=await currentSession(request,env);
+  if(!session||session.user.role!=="admin")return json({ok:false,error:"Administrator access required"},403);
+  const [pending,counts,events]=await Promise.all([
+    env.DB.prepare("SELECT COUNT(DISTINCT s.fixture_id) AS fixtures FROM bet_ticket_selections s JOIN sports_fixtures f ON f.id=s.fixture_id WHERE s.result_status='pending' AND datetime(f.kickoff)<=datetime(?)").bind(isoNow()).first<any>(),
+    env.DB.prepare("SELECT status,COUNT(*) AS total FROM bet_tickets GROUP BY status").all<any>(),
+    env.DB.prepare("SELECT e.id,e.event_type,e.previous_status,e.new_status,e.details_json,e.created_at,t.id AS ticket_id FROM bet_settlement_events e JOIN bet_tickets t ON t.id=e.ticket_id ORDER BY e.created_at DESC LIMIT 30").all<any>()
+  ]);
+  return json({ok:true,pendingResultFixtures:Number(pending?.fixtures||0),ticketCounts:counts.results||[],recentEvents:(events.results||[]).map((e:any)=>({...e,details:JSON.parse(e.details_json)}))});
+}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -658,6 +762,7 @@ export default {
     if (url.pathname === "/api/bets/quote" && request.method === "POST") return handleBetQuote(request, env);
     if (url.pathname === "/api/bets" && request.method === "POST") return handleBetCreate(request, env);
     if (url.pathname === "/api/bets" && request.method === "GET") return handleBetList(request, env);
+    if (url.pathname === "/api/admin/bet-settlements" && request.method === "GET") return handleBetSettlementDiagnostics(request, env);
     if (url.pathname === "/api/profile" && request.method === "POST") return handleProfileUpdate(request, env);
     if (url.pathname === "/api/sports/fixtures" && request.method === "GET") return handleSportsFixtures(request, env);
     if (url.pathname === "/api/sports/sync" && request.method === "POST") return handleSportsSync(request, env);
@@ -712,6 +817,8 @@ export default {
     try {
       if (controller.cron === "*/30 * * * *") {
         await syncFootballLive(env);
+      } else if (controller.cron === "0 */2 * * *") {
+        await refreshAndSettleBetResults(env);
       } else if (controller.cron === "15 0 * * *") {
         await syncFootballRange(env, dayString(new Date()), dayString(new Date()));
       }
