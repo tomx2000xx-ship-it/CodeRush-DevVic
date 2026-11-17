@@ -43,7 +43,7 @@ export function StageFourMatches(){
     const response=await fetch('/api/bets/quote',{method:'POST',headers:{'content-type':'application/json'},credentials:'same-origin',signal:controller.signal,body:JSON.stringify({selections:slip.map(p=>({fixtureId:p.fixtureId,outcome:p.outcome}))})});
     const body=await response.json();
     if(!response.ok||!body?.ok||!body?.quote)throw new Error(body?.error||'Ticket validation failed.');
-    if(active){setTicketQuote(body.quote);setSlip(current=>{let changed=false;const next=current.map(p=>{const fresh=body.quote.selections.find((s:any)=>s.fixtureId===p.fixtureId&&s.outcomeKey===(['Home win','Draw','Away win'][['Home win','Draw','Away win'].indexOf(p.outcome)]==='Home win'?'home':['Home win','Draw','Away win'].indexOf(p.outcome)===1?'draw':'away'));if(fresh&&fresh.odd!==p.odd){changed=true;return {...p,odd:fresh.odd};}return p;});return changed?next:current;});setQuoteError('');}
+    if(active){setTicketQuote(body.quote);setSlip(current=>{let changed=false;const next=current.map(p=>{const key=p.outcome==='Home win'?'home':p.outcome==='Draw'?'draw':'away';const fresh=body.quote.selections.find((s:any)=>s.fixtureId===p.fixtureId&&s.outcomeKey===key);if(fresh&&fresh.odd!==p.odd){changed=true;return {...p,odd:fresh.odd};}return p;});return changed?next:current;});setQuoteError('');}
    }catch(error){if(active&&!controller.signal.aborted)setQuoteError(error instanceof Error?error.message:'Ticket validation failed.');}
    finally{if(active)setQuoteLoading(false);}
   },250);
