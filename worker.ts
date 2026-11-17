@@ -66,8 +66,7 @@ const welcomeText = [
   "📊 تابع المواجهات، استكشف الاحتمالات، وجرّب أدوات CodeRush في بيئة تجريبية مصممة لتمنحك تجربة ممتعة وسهلة.", "",
   "تنبيه: CodeRush حالياً نسخة تجريبية فقط. جميع الأرصدة والاحتمالات والأنشطة افتراضية، ولا توجد أموال حقيقية أو رهانات أو مدفوعات.", "",
   "👋 أهلاً بك، ونتمنى لك تجربة ممتعة!"
-].join("
-");
+].join("\\n");
 
 async function sendWelcome(chatId: number, env: Env) {
   const keyboard: Array<Array<Record<string, unknown>>> = [[{ text: "⚽ افتح CodeRush وابدأ الاستكشاف", web_app: { url: APP_URL } }]];
@@ -580,7 +579,7 @@ async function handleBetCreate(request:Request,env:Env):Promise<Response>{
   let body:{selections?:BetQuoteSelectionInput[];stake?:unknown;idempotencyKey?:unknown};
   try{body=await request.json() as typeof body;}catch{return json({ok:false,error:"Invalid ticket request."},400);}
   const stake=Number(body.stake);
-  if(!Number.isFinite(stake)||stake<1||stake>5000||Math.round(stake*100)!==stake*100)return json({ok:false,error:"Stake must be between 1.00 and 5,000.00."},400);
+  if(!Number.isFinite(stake)||stake<1||stake>5000||Math.abs(Math.round(stake*100)-stake*100)>1e-8)return json({ok:false,error:"Stake must be between 1.00 and 5,000.00."},400);
   const idempotencyKey=typeof body.idempotencyKey==="string"?body.idempotencyKey.trim():"";
   if(!/^[A-Za-z0-9_-]{16,80}$/.test(idempotencyKey))return json({ok:false,error:"A valid ticket submission key is required."},400);
   const prior=await env.DB.prepare("SELECT * FROM bet_tickets WHERE user_id=? AND idempotency_key=?").bind(session.user.id,idempotencyKey).first<any>();
