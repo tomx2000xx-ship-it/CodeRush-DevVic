@@ -743,6 +743,167 @@ async function handleBetSettlementDiagnostics(request:Request,env:Env):Promise<R
   return json({ok:true,pendingResultFixtures:Number(pending?.fixtures||0),ticketCounts:counts.results||[],recentEvents:(events.results||[]).map((e:any)=>({...e,details:JSON.parse(e.details_json)}))});
 }
 
+
+const USDT_SCALE = 1_000_000;
+const WALLET_NETWORKS = ["USDT_TRC20","USDT_ERC20","USDT_BEP20"] as const;
+type WalletNetworkCode = typeof WALLET_NETWORKS[number];
+function parseUsdtUnits(value: unknown): number | null {
+  const raw=String(value??"").trim();
+  if(!/^\\d{1,9}(?:\\.\\d{1,6})?$/.test(raw))return null;
+  const [whole,fraction=""]=raw.split(".");
+  const units=Number(whole)*USDT_SCALE+Number((fraction+"000000").slice(0,6));
+  return Number.isSafeInteger(units)&&units>0?units:null;
+}
+function walletAddressValid(network:WalletNetworkCode,address:string):boolean {
+  if(network==="USDT_TRC20")return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address);
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
+}
+function walletHashValid(value:string):boolean{return /^(?:0x)?[a-fA-F0-9]{64}$/.test(value);}
+async function walletAccount(env:Env,userId:string):Promise<any>{
+  await env.DB.prepare("INSERT OR IGNORE INTO wallet_accounts(id,user_id,asset) VALUES(?,?,'USDT')").bind("wa_"+userId,userId).run();
+  return await env.DB.prepare("SELECT id,user_id,asset FROM wallet_accounts WHERE user_id=? AND asset='USDT'").bind(userId).first<any>();
+}
+async function walletSettings(env:Env):Promise<any>{
+  return await env.DB.prepare("SELECT enabled,min_deposit_units,max_deposit_units,min_withdrawal_units,max_withdrawal_units FROM wallet_settings WHERE id=1").first<any>();
+}
+async function handleWalletGet(request:Request,env:Env):Promise<Response>{
+  const session=await currentSession(request,env);
+  if(!session)return json({ok:false,error:"Sign in through Telegram to access your wallet."},401);
+  const account=await walletAccount(env,session.user.id),settings=await walletSettings(env);
+  const [balance,networks,transactions]=await Promise.all([
+    env.DB.prepare("SELECT COALESCE(SUM(available_delta_units),0) AS available_units,COALESCE(SUM(reserved_delta_units),0) AS reserved_units FROM wallet_ledger_entries WHERE account_id=?").bind(account.id).first<any>(),
+    env.DB.prepare("SELECT network_code,asset,network_name,deposit_address,deposits_enabled,withdrawals_enabled FROM wallet_networks ORDER BY network_code").all<any>(),
+    env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,destination_address,payout_tx_hash,created_at,updated_at,review_note FROM wallet_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(session.user.id).all<any>()
+  ]);
+  return json({ok:true,wallet:{enabled:!!settings?.enabled,asset:"USDT",scale:USDT_SCALE,availableUnits:Number(balance?.available_units||0),reservedUnits:Number(balance?.reserved_units||0),minDepositUnits:Number(settings?.min_deposit_units||0),maxDepositUnits:Number(settings?.max_deposit_units||0),minWithdrawalUnits:Number(settings?.min_withdrawal_units||0),maxWithdrawalUnits:Number(settings?.max_withdrawal_units||0),networks:networks.results||[],transactions:transactions.results||[]}});
+}
+async function handleWalletDeposit(request:Request,env:Env):Promise<Response>{
+  const session=await currentSession(request,env);
+  if(!session)return json({ok:false,error:"Authentication required"},401);
+  if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);
+  if(!(request.headers.get("content-type")||"").toLowerCase().includes("application/json"))return json({ok:false,error:"Content-Type must be application/json."},415);
+  let body:{amount?:unknown;networkCode?:unknown;txHash?:unknown;idempotencyKey?:unknown};
+  try{body=await request.json() as typeof body}catch{return json({ok:false,error:"Invalid deposit request."},400)}
+  const units=parseUsdtUnits(body.amount),networkCode=String(body.networkCode||"") as WalletNetworkCode,txHash=String(body.txHash||"").trim().replace(/^0x/i,"").toLowerCase(),key=String(body.idempotencyKey||"");
+  if(!units||!WALLET_NETWORKS.includes(networkCode)||!walletHashValid(txHash)||!/^[A-Za-z0-9_-]{16,80}$/.test(key))return json({ok:false,error:"Enter a valid USDT amount, supported network, 64-character transaction hash and request key."},400);
+  const settings=await walletSettings(env),network=await env.DB.prepare("SELECT * FROM wallet_networks WHERE network_code=?").bind(networkCode).first<any>();
+  if(!settings?.enabled||!network?.deposits_enabled||!network.deposit_address)return json({ok:false,error:"Crypto deposits are not enabled for this network yet."},503);
+  if(units<Number(settings.min_deposit_units)||units>Number(settings.max_deposit_units))return json({ok:false,error:"Deposit amount is outside the configured limits."},400);
+  const prior=await env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,created_at FROM wallet_transactions WHERE user_id=? AND idempotency_key=?").bind(session.user.id,key).first<any>();
+  if(prior)return json({ok:true,duplicate:true,transaction:prior});
+  const account=await walletAccount(env,session.user.id),id=crypto.randomUUID();
+  try{
+    await env.DB.prepare("INSERT INTO wallet_transactions(id,account_id,user_id,type,status,amount_units,asset,network_code,tx_hash,idempotency_key) VALUES(?,?,?,'deposit','pending_review',?,'USDT',?,?,?)").bind(id,account.id,session.user.id,units,networkCode,txHash,key).run();
+  }catch{
+    const duplicate=await env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,created_at FROM wallet_transactions WHERE user_id=? AND idempotency_key=?").bind(session.user.id,key).first<any>();
+    if(duplicate)return json({ok:true,duplicate:true,transaction:duplicate});
+    return json({ok:false,error:"This transaction hash has already been submitted or the request could not be saved."},409);
+  }
+  await env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) VALUES(?,?,?,'deposit_submitted',?)").bind(crypto.randomUUID(),id,session.user.id,JSON.stringify({networkCode,amountUnits:units})).run();
+  return json({ok:true,transaction:{id,type:"deposit",status:"pending_review",amount_units:units,asset:"USDT",network_code:networkCode,tx_hash:txHash},notice:"Deposit submitted for manual on-chain verification. Your wallet is not credited until an administrator verifies the transaction."},201);
+}
+async function handleWalletWithdrawal(request:Request,env:Env):Promise<Response>{
+  const session=await currentSession(request,env);
+  if(!session)return json({ok:false,error:"Authentication required"},401);
+  if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);
+  if(!(request.headers.get("content-type")||"").toLowerCase().includes("application/json"))return json({ok:false,error:"Content-Type must be application/json."},415);
+  let body:{amount?:unknown;networkCode?:unknown;destinationAddress?:unknown;idempotencyKey?:unknown};
+  try{body=await request.json() as typeof body}catch{return json({ok:false,error:"Invalid withdrawal request."},400)}
+  const units=parseUsdtUnits(body.amount),networkCode=String(body.networkCode||"") as WalletNetworkCode,address=String(body.destinationAddress||"").trim(),key=String(body.idempotencyKey||"");
+  if(!units||!WALLET_NETWORKS.includes(networkCode)||!walletAddressValid(networkCode,address)||!/^[A-Za-z0-9_-]{16,80}$/.test(key))return json({ok:false,error:"Enter a valid USDT amount, supported network, destination address and request key."},400);
+  const settings=await walletSettings(env),network=await env.DB.prepare("SELECT * FROM wallet_networks WHERE network_code=?").bind(networkCode).first<any>();
+  if(!settings?.enabled||!network?.withdrawals_enabled)return json({ok:false,error:"Crypto withdrawals are not enabled for this network yet."},503);
+  if(units<Number(settings.min_withdrawal_units)||units>Number(settings.max_withdrawal_units))return json({ok:false,error:"Withdrawal amount is outside the configured limits."},400);
+  const prior=await env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,destination_address,created_at FROM wallet_transactions WHERE user_id=? AND idempotency_key=?").bind(session.user.id,key).first<any>();
+  if(prior)return json({ok:true,duplicate:true,transaction:prior});
+  const account=await walletAccount(env,session.user.id),id=crypto.randomUUID();
+  try{
+    await env.DB.prepare("INSERT INTO wallet_transactions(id,account_id,user_id,type,status,amount_units,asset,network_code,destination_address,idempotency_key) VALUES(?,?,?,'withdrawal','pending_review',?,'USDT',?,?,?)").bind(id,account.id,session.user.id,units,networkCode,address,key).run();
+  }catch{
+    const duplicate=await env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,destination_address,created_at FROM wallet_transactions WHERE user_id=? AND idempotency_key=?").bind(session.user.id,key).first<any>();
+    if(duplicate)return json({ok:true,duplicate:true,transaction:duplicate});
+    return json({ok:false,error:"The withdrawal request could not be saved."},409);
+  }
+  const reserve=await env.DB.prepare(`INSERT INTO wallet_ledger_entries(id,account_id,user_id,transaction_id,entry_type,available_delta_units,reserved_delta_units)
+    SELECT ?,?,?,?,'withdrawal_reserve',?,? WHERE COALESCE((SELECT SUM(available_delta_units) FROM wallet_ledger_entries WHERE account_id=?),0)>=?`)
+    .bind(crypto.randomUUID(),account.id,session.user.id,id,-units,units,account.id,units).run();
+  if(Number(reserve.meta?.changes||0)!==1){
+    await env.DB.prepare("DELETE FROM wallet_transactions WHERE id=? AND status='pending_review'").bind(id).run();
+    return json({ok:false,error:"Insufficient available USDT balance."},409);
+  }
+  await env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) VALUES(?,?,?,'withdrawal_submitted',?)").bind(crypto.randomUUID(),id,session.user.id,JSON.stringify({networkCode,amountUnits:units})).run();
+  return json({ok:true,transaction:{id,type:"withdrawal",status:"pending_review",amount_units:units,asset:"USDT",network_code:networkCode,destination_address:address},notice:"Withdrawal request received. The amount is reserved while an administrator reviews it; no payout has been sent yet."},201);
+}
+async function walletAdminSession(request:Request,env:Env):Promise<{id:string}|null>{
+  const session=await currentSession(request,env);
+  if(!session||session.user.role!=="admin")return null;
+  const admin=await env.DB.prepare("SELECT user_id FROM admin_accounts WHERE user_id=?").bind(session.user.id).first<any>();
+  return admin?{id:session.user.id}:null;
+}
+async function handleWalletAdminSettings(request:Request,env:Env):Promise<Response>{
+  const admin=await walletAdminSession(request,env);if(!admin)return json({ok:false,error:"Administrator access required"},403);
+  if(request.method==="GET"){
+    const [settings,networks]=await Promise.all([walletSettings(env),env.DB.prepare("SELECT network_code,network_name,deposit_address,deposits_enabled,withdrawals_enabled FROM wallet_networks ORDER BY network_code").all<any>()]);
+    return json({ok:true,settings,networks:networks.results||[]});
+  }
+  if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);
+  let body:{enabled?:unknown;networks?:Array<{networkCode?:unknown;depositAddress?:unknown;depositsEnabled?:unknown;withdrawalsEnabled?:unknown}>};
+  try{body=await request.json() as typeof body}catch{return json({ok:false,error:"Invalid wallet settings."},400)}
+  if(typeof body.enabled!=="boolean"||!Array.isArray(body.networks)||body.networks.length!==3)return json({ok:false,error:"Wallet settings must include the global switch and all three USDT networks."},400);
+  const statements:any[]=[env.DB.prepare("UPDATE wallet_settings SET enabled=?,updated_by=?,updated_at=? WHERE id=1").bind(body.enabled?1:0,admin.id,isoNow())];
+  for(const item of body.networks){
+    const code=String(item.networkCode||"") as WalletNetworkCode,address=String(item.depositAddress||"").trim();
+    if(!WALLET_NETWORKS.includes(code)||(address&&!walletAddressValid(code,address))||typeof item.depositsEnabled!=="boolean"||typeof item.withdrawalsEnabled!=="boolean")return json({ok:false,error:"A network address or switch is invalid."},400);
+    if(item.depositsEnabled&&!address)return json({ok:false,error:"A deposit address is required before enabling deposits on a network."},400);
+    statements.push(env.DB.prepare("UPDATE wallet_networks SET deposit_address=?,deposits_enabled=?,withdrawals_enabled=?,updated_by=?,updated_at=? WHERE network_code=?").bind(address||null,item.depositsEnabled?1:0,item.withdrawalsEnabled?1:0,admin.id,isoNow(),code));
+  }
+  await env.DB.batch(statements);
+  await env.DB.prepare("INSERT INTO admin_audit_logs(id,admin_user_id,action,target_type,target_id,metadata_json) VALUES(?,?,?,'wallet','global',?)").bind(crypto.randomUUID(),admin.id,"wallet_settings_updated",JSON.stringify({enabled:body.enabled,networks:body.networks.map(n=>({networkCode:n.networkCode,depositsEnabled:n.depositsEnabled,withdrawalsEnabled:n.withdrawalsEnabled}))})).run();
+  return json({ok:true});
+}
+async function handleWalletAdminTransactions(request:Request,env:Env):Promise<Response>{
+  const admin=await walletAdminSession(request,env);if(!admin)return json({ok:false,error:"Administrator access required"},403);
+  if(request.method==="GET"){
+    const rows=await env.DB.prepare("SELECT t.id,t.user_id,u.display_name,u.telegram_username,t.type,t.status,t.amount_units,t.asset,t.network_code,t.tx_hash,t.destination_address,t.payout_tx_hash,t.created_at,t.updated_at,t.review_note FROM wallet_transactions t JOIN users u ON u.id=t.user_id ORDER BY CASE WHEN t.status='pending_review' THEN 0 WHEN t.status='processing' THEN 1 ELSE 2 END,t.created_at DESC LIMIT 100").all<any>();
+    return json({ok:true,transactions:rows.results||[]});
+  }
+  if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);
+  let body:{action?:unknown;payoutTxHash?:unknown;note?:unknown};
+  try{body=await request.json() as typeof body}catch{return json({ok:false,error:"Invalid review request."},400)}
+  const id=decodeURIComponent(new URL(request.url).pathname.split("/").pop()||""),action=String(body.action||""),note=String(body.note||"").slice(0,500);
+  const tx=await env.DB.prepare("SELECT * FROM wallet_transactions WHERE id=?").bind(id).first<any>();
+  if(!tx)return json({ok:false,error:"Wallet transaction not found."},404);
+  if(tx.type==="deposit"){
+    if(action==="approve"){
+      if(tx.status!=="pending_review"&&tx.status!=="processing"&&tx.status!=="completed")return json({ok:false,error:"This deposit can no longer be approved."},409);
+      await env.DB.prepare("INSERT OR IGNORE INTO wallet_ledger_entries(id,account_id,user_id,transaction_id,entry_type,available_delta_units,reserved_delta_units) SELECT ?,?,?,?,'deposit_credit',?,0 WHERE EXISTS(SELECT 1 FROM wallet_transactions WHERE id=? AND status IN ('pending_review','processing','completed'))").bind(crypto.randomUUID(),tx.account_id,tx.user_id,tx.id,tx.amount_units,tx.id).run();
+      await env.DB.prepare("UPDATE wallet_transactions SET status='completed',reviewed_by=?,reviewed_at=?,review_note=?,updated_at=? WHERE id=? AND status IN ('pending_review','processing','completed')").bind(admin.id,isoNow(),note,isoNow(),id).run();
+    }else if(action==="reject"){
+      const r=await env.DB.prepare("UPDATE wallet_transactions SET status='rejected',reviewed_by=?,reviewed_at=?,review_note=?,updated_at=? WHERE id=? AND type='deposit' AND status='pending_review'").bind(admin.id,isoNow(),note,isoNow(),id).run();
+      if(Number(r.meta?.changes||0)!==1)return json({ok:false,error:"Only pending deposits can be rejected."},409);
+    }else return json({ok:false,error:"Deposit action must be approve or reject."},400);
+  }else{
+    if(action==="approve"){
+      const r=await env.DB.prepare("UPDATE wallet_transactions SET status='processing',reviewed_by=?,reviewed_at=?,review_note=?,updated_at=? WHERE id=? AND type='withdrawal' AND status='pending_review'").bind(admin.id,isoNow(),note,isoNow(),id).run();
+      if(Number(r.meta?.changes||0)!==1&&tx.status!=="processing")return json({ok:false,error:"Only pending withdrawals can be approved."},409);
+    }else if(action==="reject"){
+      const r=await env.DB.prepare("UPDATE wallet_transactions SET status='rejected',reviewed_by=?,reviewed_at=?,review_note=?,updated_at=? WHERE id=? AND type='withdrawal' AND status IN ('pending_review','processing')").bind(admin.id,isoNow(),note,isoNow(),id).run();
+      if(Number(r.meta?.changes||0)!==1&&tx.status!=="rejected")return json({ok:false,error:"This withdrawal can no longer be rejected."},409);
+      await env.DB.prepare("INSERT OR IGNORE INTO wallet_ledger_entries(id,account_id,user_id,transaction_id,entry_type,available_delta_units,reserved_delta_units) SELECT ?,?,?,?,'withdrawal_release',?,? WHERE EXISTS(SELECT 1 FROM wallet_transactions WHERE id=? AND status='rejected')").bind(crypto.randomUUID(),tx.account_id,tx.user_id,tx.id,tx.amount_units,-tx.amount_units,tx.id).run();
+    }else if(action==="paid"){
+      const payoutHash=String(body.payoutTxHash||"").trim().replace(/^0x/i,"").toLowerCase();
+      if(!walletHashValid(payoutHash))return json({ok:false,error:"Enter the 64-character blockchain payout transaction hash."},400);
+      if(tx.status!=="processing"&&tx.status!=="completed")return json({ok:false,error:"Approve the withdrawal before marking it paid."},409);
+      await env.DB.prepare("UPDATE wallet_transactions SET payout_tx_hash=?,updated_at=? WHERE id=? AND status IN ('processing','completed')").bind(payoutHash,isoNow(),id).run();
+      await env.DB.prepare("INSERT OR IGNORE INTO wallet_ledger_entries(id,account_id,user_id,transaction_id,entry_type,available_delta_units,reserved_delta_units) SELECT ?,?,?,?,'withdrawal_paid',0,? WHERE EXISTS(SELECT 1 FROM wallet_transactions WHERE id=? AND status IN ('processing','completed') AND payout_tx_hash=?)").bind(crypto.randomUUID(),tx.account_id,tx.user_id,tx.id,-tx.amount_units,tx.id,payoutHash).run();
+      await env.DB.prepare("UPDATE wallet_transactions SET status='completed',reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=? AND status='processing' AND payout_tx_hash=?").bind(admin.id,isoNow(),isoNow(),id,payoutHash).run();
+    }else return json({ok:false,error:"Withdrawal action must be approve, reject or paid."},400);
+  }
+  await env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),id,admin.id,"admin_"+action,JSON.stringify({note,payoutTxHash:body.payoutTxHash||null})).run();
+  const updated=await env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,destination_address,payout_tx_hash,updated_at FROM wallet_transactions WHERE id=?").bind(id).first<any>();
+  return json({ok:true,transaction:updated});
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -777,6 +938,12 @@ export default {
       const limiter = await env.DB.prepare("SELECT next_allowed_at,datetime(next_allowed_at,'unixepoch') AS next_allowed_utc FROM api_football_rate_limit WHERE id=1").first();
       return json({ok:true,diagnostics:diagnostics.results||[],sync:sync||null,limiter:limiter||null});
     }
+    if (url.pathname === "/api/wallet" && request.method === "GET") return handleWalletGet(request,env);
+    if (url.pathname === "/api/wallet/deposits" && request.method === "POST") return handleWalletDeposit(request,env);
+    if (url.pathname === "/api/wallet/withdrawals" && request.method === "POST") return handleWalletWithdrawal(request,env);
+    if (url.pathname === "/api/admin/wallet-settings" && (request.method === "GET" || request.method === "POST")) return handleWalletAdminSettings(request,env);
+    if (url.pathname === "/api/admin/wallet-transactions" && request.method === "GET") return handleWalletAdminTransactions(request,env);
+    if (url.pathname.startsWith("/api/admin/wallet-transactions/") && request.method === "POST") return handleWalletAdminTransactions(request,env);
     if (url.pathname === "/api/bets/quote" && request.method === "POST") return handleBetQuote(request, env);
     if (url.pathname === "/api/bets" && request.method === "POST") return handleBetCreate(request, env);
     if (url.pathname === "/api/bets" && request.method === "GET") return handleBetList(request, env);
