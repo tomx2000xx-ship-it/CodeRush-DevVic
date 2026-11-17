@@ -67,3 +67,14 @@ Required Worker secrets include `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BROADCAST_SEC
 ## Production status
 
 A successful build/deployment confirms the Worker bundle was published; it does not by itself confirm provider credentials, bookmaker coverage, Telegram login, or end-to-end wagering readiness. Those require configured third-party accounts and live integration testing.
+
+
+## Phase 4 — Results processing and demo-ticket settlement
+
+- The Worker refreshes due fixture IDs in batches of up to 20 using API-Football's `fixtures?ids=` parameter. A shared two-hour schedule performs this result check without multiplying provider calls for every selection.
+- Final 1X2 results are settled against the regulation-time full-time score. For matches decided after extra time or penalties, the provider's `score.fulltime` regulation-time score is used; the shootout/extra-time winner is not substituted for a 90-minute 1X2 result.
+- Full-time, after-extra-time and penalty statuses are eligible for result processing when a usable full-time score is present. Cancelled or abandoned fixtures are voided; postponed or suspended fixtures remain pending until a final result is available.
+- Accumulators are marked lost as soon as any leg loses. Otherwise they settle when every leg is resolved: winning legs multiply together, void legs are removed from the settled odds, and an all-void ticket is returned at its original demo stake.
+- Per-selection result snapshots and immutable settlement events are stored in D1. `GET /api/admin/bet-settlements` exposes protected settlement diagnostics to authenticated administrators.
+- My Bets displays each leg's score/result and server-calculated lifetime demo performance. This phase remains demo-only: no wallet debit, cash payout, or real-money wager is performed.
+- Provider result refresh runs every two hours, while live-score refresh remains every 30 minutes. The additional schedule keeps the planned API-Football request volume within the existing 75-request daily safety ceiling under normal scheduled operation.
