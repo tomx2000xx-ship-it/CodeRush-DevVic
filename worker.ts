@@ -421,12 +421,16 @@ async function storeFootballOdds(env: Env, entries: ApiFootballOdds[]): Promise<
   return count;
 }
 async function syncFootballRange(env: Env, from: string, to: string): Promise<{fixtures:number;odds:number}> {
-  const fixtureParams = new URLSearchParams();
-  fixtureParams.set("from", from);
-  fixtureParams.set("to", to);
-  fixtureParams.set("timezone", "Africa/Lagos");
-  const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?"+fixtureParams.toString());
-  const fixtures=await storeFootballFixtures(env,fixtureData.response);
+  // Fetch fixtures one calendar date at a time. API-Football's date filter
+  // avoids the provider's inconsistent validation of combined from/to/timezone
+  // filters observed in production. Fixture timestamps remain UTC and are
+  // localized by the client device.
+  let fixtures=0;
+  for (let cursor=new Date(from+"T00:00:00Z"); cursor<=new Date(to+"T00:00:00Z"); cursor.setUTCDate(cursor.getUTCDate()+1)) {
+    const date=dayString(cursor);
+    const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?date="+date);
+    fixtures+=await storeFootballFixtures(env,fixtureData.response);
+  }
   let odds=0;
   // API-Football pre-match odds are date-scoped and paginated. Pull the first 10 pages per day.
   for (let cursor=new Date(from+"T00:00:00Z"); cursor<=new Date(to+"T00:00:00Z"); cursor.setUTCDate(cursor.getUTCDate()+1)) {
