@@ -1225,8 +1225,13 @@ export default {
       const supplied = request.headers.get("X-Telegram-Bot-Api-Secret-Token") || "";
       if (!constantTimeEqual(supplied, expected)) return json({ ok: false, error: "Unauthorized" }, 401);
       try {
-        await processUpdate(await request.json() as { message?: TelegramMessage }, env);
-        return json({ ok: true });
+        const update=await request.json() as {update_id?:number;message?:TelegramMessage};
+        if(Number.isSafeInteger(update.update_id)){
+          const receipt=await env.DB.prepare("INSERT OR IGNORE INTO telegram_command_events(update_id,telegram_user_id,command) VALUES(?,?,?)").bind(String(update.update_id),String(update.message?.from?.id||"")||null,(update.message?.text||"").slice(0,64)||"message").run();
+          if(Number(receipt.meta?.changes||0)===0)return json({ok:true,duplicate:true});
+        }
+        await processUpdate(update,env);
+        return json({ok:true});
       } catch (error) {
         console.error("Telegram webhook processing failed", error);
         return json({ ok: false, error: "Unable to process Telegram update" }, 500);
