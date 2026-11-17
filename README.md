@@ -69,21 +69,21 @@ Required Worker secrets include `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BROADCAST_SEC
 A successful build/deployment confirms the Worker bundle was published; it does not by itself confirm provider credentials, bookmaker coverage, Telegram login, or end-to-end wagering readiness. Those require configured third-party accounts and live integration testing.
 
 
-## Phase 4 — Results processing and demo-ticket settlement
+## Phase 4 — Results processing and ticket settlement foundation
 
 - The Worker refreshes due fixture IDs in batches of up to 20 using API-Football's `fixtures?ids=` parameter. A shared two-hour schedule performs this result check without multiplying provider calls for every selection.
 - Final 1X2 results are settled against the regulation-time full-time score. For matches decided after extra time or penalties, the provider's `score.fulltime` regulation-time score is used; the shootout/extra-time winner is not substituted for a 90-minute 1X2 result.
 - Full-time, after-extra-time and penalty statuses are eligible for result processing when a usable regulation-time score is present; awarded/walkover results are only processed when the provider supplies a score. Cancelled fixtures are voided immediately. Abandoned fixtures receive a 24-hour resumption window; postponed, suspended or interrupted fixtures receive a 48-hour resumption window before being voided. If the provider reschedules a fixture, its updated kickoff keeps the ticket pending.
 - Accumulators are marked lost as soon as any leg loses. Otherwise they settle when every leg is resolved: winning legs multiply together, void legs are removed from the settled odds, and an all-void ticket is returned at its original demo stake.
 - Per-selection result snapshots and immutable settlement events are stored in D1. `GET /api/admin/bet-settlements` exposes protected settlement diagnostics to authenticated administrators.
-- My Bets displays each leg's score/result and server-calculated lifetime demo performance. This phase remains demo-only: no wallet debit, cash payout, or real-money wager is performed.
+- My Bets displays each leg's score/result and server-calculated lifetime ticket performance. Real-money ticket placement is currently disabled. The ticket history and settlement engine must be connected to the live USDT wallet ledger before wagers can be accepted.
 - Provider result refresh runs every two hours, while live-score refresh remains every 30 minutes. The additional schedule keeps the planned API-Football request volume within the existing 75-request daily safety ceiling under normal scheduled operation.
 
 ## Phase 5 — USDT wallet foundation and controlled crypto operations
 
 Migrations: `migrations/0008_wallet_ledger.sql`, `migrations/0009_wallet_audit_hardening.sql`, `migrations/0010_wallet_automatic_deposits.sql`, `migrations/0011_wallet_deposit_address_snapshot.sql`
 
-- Introduces a separate server-authoritative USDT wallet account for each authenticated user. The Phase 3 demo ticket reference balance remains separate and cannot be withdrawn.
+- Introduces a separate server-authoritative USDT wallet account for each authenticated user. The betting engine does not use a simulated reference balance. Real-money ticket placement remains disabled until the wallet-backed staking and settlement integration is completed.
 - Stores balances as integer micro-USDT units (six decimal places), deriving available and reserved balances from an append-only D1 ledger. Ledger and wallet audit rows are protected against update and deletion; payout transaction hashes are unique per network.
 - Supports USDT on TRON/TRC20, Ethereum/ERC20 and BNB Smart Chain/BEP20. Each network has independent deposit-address and deposit/withdrawal enablement.
 - User endpoints: `GET /api/wallet`, `POST /api/wallet/deposits`, and `POST /api/wallet/withdrawals`.
