@@ -6,6 +6,8 @@ interface Env {
   TELEGRAM_CHANNEL_URL?: string;
   TELEGRAM_GROUP_URL?: string;
   CODERUSH_ADMIN_TELEGRAM_IDS?: string;
+  API_FOOTBALL_KEY?: string;
+  API_FOOTBALL_BOOKMAKER_ID?: string;
 }
 
 const APP_URL = "https://coderush-devvic.tomx2000xx.workers.dev";
@@ -294,6 +296,167 @@ async function handleProfileUpdate(request: Request, env: Env): Promise<Response
   return json({ ok: true, user });
 }
 
+
+type ApiFootballFixture = {
+  fixture: { id: number; date: string; status: { short: string; long: string; elapsed: number | null } };
+  league: { id: number; name: string; country: string; season: number };
+  teams: { home: { name: string; code?: string | null }; away: { name: string; code?: string | null } };
+  goals: { home: number | null; away: number | null };
+};
+type ApiFootballOdds = {
+  fixture: { id: number };
+  bookmakers: Array<{ id: number; name: string; bets: Array<{ id: number; name: string; values: Array<{ value: string; odd: string; handicap?: string | null; suspended?: boolean }> }> }>;
+};
+async function apiFootball<T>(env: Env, path: string): Promise<{ response: T[]; paging?: { current: number; total: number } }> {
+  if (!env.API_FOOTBALL_KEY) throw new Error("API_FOOTBALL_KEY is not configured");
+  const response = await fetch("https://v3.football.api-sports.io/" + path, {
+    headers: { "x-apisports-key": env.API_FOOTBALL_KEY, "accept": "application/json" },
+    cf: { cacheTtl: 0, cacheEverything: false }
+  });
+  if (!response.ok) throw new Error("API-Football returned HTTP " + response.status);
+  const payload = await response.json() as { response?: T[]; errors?: unknown; paging?: { current: number; total: number } };
+  if (payload.errors && (Array.isArray(payload.errors) ? payload.errors.length : Object.keys(payload.errors as object).length)) {
+    throw new Error("API-Football rejected the request: " + JSON.stringify(payload.errors).slice(0, 300));
+  }
+  return { response: payload.response || [], paging: payload.paging };
+}
+const isoNow = () => new Date().toISOString();
+const dayString = (date: Date) => date.toISOString().slice(0, 10);
+function fixtureIsLive(status: string): boolean {
+  return ["1H","HT","2H","ET","BT","P","LIVE"].includes(status);
+}
+async function storeFootballFixtures(env: Env, fixtures: ApiFootballFixture[]): Promise<number> {
+  if (!fixtures.length) return 0;
+  const now = isoNow();
+  const statements = fixtures.map(item => env.DB.prepare(`
+    INSERT INTO sports_fixtures
+      (id,league_id,league_name,country,season,kickoff,status_short,status_long,elapsed,home_team,away_team,home_code,away_code,home_score,away_score,is_live,updated_at,raw_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(id) DO UPDATE SET
+      league_id=excluded.league_id,league_name=excluded.league_name,country=excluded.country,season=excluded.season,
+      kickoff=excluded.kickoff,status_short=excluded.status_short,status_long=excluded.status_long,elapsed=excluded.elapsed,
+      home_team=excluded.home_team,away_team=excluded.away_team,home_code=excluded.home_code,away_code=excluded.away_code,
+      home_score=excluded.home_score,away_score=excluded.away_score,is_live=excluded.is_live,
+      updated_at=excluded.updated_at,raw_json=excluded.raw_json
+  `).bind(
+    String(item.fixture.id),item.league.id,item.league.name,item.league.country||null,item.league.season||null,
+    item.fixture.date,item.fixture.status.short,item.fixture.status.long,item.fixture.status.elapsed,
+    item.teams.home.name,item.teams.away.name,item.teams.home.code||null,item.teams.away.code||null,
+    item.goals.home,item.goals.away,fixtureIsLive(item.fixture.status.short)?1:0,now,JSON.stringify(item)
+  ));
+  await env.DB.batch(statements);
+  return fixtures.length;
+}
+async function storeFootballOdds(env: Env, entries: ApiFootballOdds[]): Promise<number> {
+  let count=0;
+  const configuredBookmaker=Number(env.API_FOOTBALL_BOOKMAKER_ID||0);
+  const statements: D1PreparedStatement[]=[];
+  for (const entry of entries) {
+    const bookmaker = configuredBookmaker
+      ? entry.bookmakers.find(item=>item.id===configuredBookmaker)
+      : entry.bookmakers[0];
+    if (!bookmaker) continue;
+    for (const market of bookmaker.bets) {
+      if (market.id !== 1) continue;
+      for (const value of market.values) {
+        const label=value.value.toLowerCase();
+        const key=label.includes("home")? "home" : label.includes("draw")? "draw" : label.includes("away")? "away" : "";
+        const odd=Number(value.odd);
+        if (!key || !Number.isFinite(odd) || odd<=1) continue;
+        statements.push(env.DB.prepare(`
+          INSERT INTO sports_odds (fixture_id,bookmaker_id,bookmaker_name,market_id,market_name,outcome_key,outcome_name,odd,handicap,suspended,updated_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?)
+          ON CONFLICT(fixture_id,bookmaker_id,market_id,outcome_key,handicap) DO UPDATE SET
+            bookmaker_name=excluded.bookmaker_name,market_name=excluded.market_name,outcome_name=excluded.outcome_name,
+            odd=excluded.odd,suspended=excluded.suspended,updated_at=excluded.updated_at
+        `).bind(String(entry.fixture.id),bookmaker.id,bookmaker.name,market.id,market.name,key,value.value,odd,value.handicap||"",value.suspended?1:0,isoNow()));
+        count++;
+      }
+    }
+  }
+  for(let i=0;i<statements.length;i+=80) await env.DB.batch(statements.slice(i,i+80));
+  return count;
+}
+async function syncFootballRange(env: Env, from: string, to: string): Promise<{fixtures:number;odds:number}> {
+  const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?from="+encodeURIComponent(from)+"&to="+encodeURIComponent(to)+"&timezone=UTC");
+  const fixtures=await storeFootballFixtures(env,fixtureData.response);
+  let odds=0;
+  // API-Football pre-match odds are date-scoped and paginated. Pull the first 10 pages per day.
+  for (let cursor=new Date(from+"T00:00:00Z"); cursor<=new Date(to+"T00:00:00Z"); cursor.setUTCDate(cursor.getUTCDate()+1)) {
+    const date=dayString(cursor);
+    for(let page=1;page<=10;page++) {
+      const data=await apiFootball<ApiFootballOdds>(env,"odds?date="+date+"&bet=1&page="+page);
+      if(!data.response.length) break;
+      odds+=await storeFootballOdds(env,data.response);
+      if(!data.paging || page>=data.paging.total) break;
+    }
+  }
+  await env.DB.prepare(`
+    INSERT INTO sports_sync_state(provider,last_fixtures_sync,last_odds_sync,last_error,updated_at)
+    VALUES ('api-football',?,?,NULL,?)
+    ON CONFLICT(provider) DO UPDATE SET last_fixtures_sync=excluded.last_fixtures_sync,last_odds_sync=excluded.last_odds_sync,last_error=NULL,updated_at=excluded.updated_at
+  `).bind(isoNow(),isoNow(),isoNow()).run();
+  return {fixtures,odds};
+}
+async function syncFootballLive(env: Env): Promise<{fixtures:number;odds:number}> {
+  const live=await apiFootball<ApiFootballFixture>(env,"fixtures?live=all");
+  const fixtures=await storeFootballFixtures(env,live.response);
+  const oddsData=await apiFootball<ApiFootballOdds>(env,"odds/live?bet=1");
+  const odds=await storeFootballOdds(env,oddsData.response);
+  await env.DB.prepare(`
+    INSERT INTO sports_sync_state(provider,last_live_sync,last_odds_sync,last_error,updated_at)
+    VALUES ('api-football',?,?,NULL,?)
+    ON CONFLICT(provider) DO UPDATE SET last_live_sync=excluded.last_live_sync,last_odds_sync=excluded.last_odds_sync,last_error=NULL,updated_at=excluded.updated_at
+  `).bind(isoNow(),isoNow(),isoNow()).run();
+  return {fixtures,odds};
+}
+async function handleSportsFixtures(request: Request, env: Env): Promise<Response> {
+  if (!env.API_FOOTBALL_KEY) return json({ok:true,configured:false,provider:"API-Football",fixtures:[],message:"Sports data provider is not configured yet."});
+  const url=new URL(request.url);
+  const from=url.searchParams.get("from")||dayString(new Date());
+  const to=url.searchParams.get("to")||dayString(new Date(Date.now()+7*86400000));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||to<from) return json({ok:false,error:"Invalid date range"},400);
+  const rows=await env.DB.prepare(`
+    SELECT f.id,f.league_name,f.country,f.kickoff,f.status_short,f.elapsed,f.home_team,f.away_team,f.home_code,f.away_code,
+      f.home_score,f.away_score,o.bookmaker_name,o.outcome_key,o.odd,o.suspended,o.updated_at AS odds_updated_at
+    FROM sports_fixtures f LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1
+    WHERE substr(f.kickoff,1,10)>=? AND substr(f.kickoff,1,10)<=?
+    ORDER BY f.kickoff ASC
+  `).bind(from,to).all<Record<string,unknown>>();
+  const map=new Map<string,Record<string,unknown>>();
+  for(const row of rows.results||[]){
+    let item=map.get(String(row.id));
+    if(!item){item={id:String(row.id),league:String(row.league_name),country:row.country||"",kickoff:row.kickoff,home:String(row.home_team),away:String(row.away_team),homeCode:row.home_code||"",awayCode:row.away_code||"",status:String(row.status_short),minute:row.elapsed,live:fixtureIsLive(String(row.status_short)),completed:["FT","AET","PEN"].includes(String(row.status_short)),score:row.home_score===null||row.away_score===null?null:String(row.home_score)+" : "+String(row.away_score),odds:[null,null,null],bookmaker:null,oddsUpdatedAt:null};map.set(String(row.id),item);}
+    if(row.outcome_key==="home") (item.odds as (number|null)[])[0]=row.suspended?null:Number(row.odd);
+    if(row.outcome_key==="draw") (item.odds as (number|null)[])[1]=row.suspended?null:Number(row.odd);
+    if(row.outcome_key==="away") (item.odds as (number|null)[])[2]=row.suspended?null:Number(row.odd);
+    if(row.bookmaker_name){item.bookmaker=row.bookmaker_name;item.oddsUpdatedAt=row.odds_updated_at;}
+  }
+  const state=await env.DB.prepare("SELECT last_fixtures_sync,last_live_sync,last_odds_sync,last_error FROM sports_sync_state WHERE provider='api-football'").first<Record<string,unknown>>();
+  return new Response(JSON.stringify({ok:true,configured:true,provider:"API-Football",fixtures:Array.from(map.values()),sync:state}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
+}
+async function handleSportsSync(request: Request, env: Env): Promise<Response> {
+  const session=await currentSession(request,env);
+  if(!session) return json({ok:false,error:"Authentication required"},401);
+  if(session.user.role!=="admin") return json({ok:false,error:"Administrator access required"},403);
+  if(!env.API_FOOTBALL_KEY) return json({ok:false,error:"API_FOOTBALL_KEY is not configured in Cloudflare."},503);
+  const url=new URL(request.url);
+  const from=url.searchParams.get("from")||dayString(new Date());
+  const to=url.searchParams.get("to")||dayString(new Date(Date.now()+7*86400000));
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||to<from||(new Date(to).getTime()-new Date(from).getTime())>14*86400000) return json({ok:false,error:"Choose a valid date range of no more than 15 days."},400);
+  try{
+    const result=await syncFootballRange(env,from,to);
+    return json({ok:true,provider:"API-Football",range:{from,to},...result});
+  }catch(error){
+    const message=error instanceof Error?error.message:"Sports provider sync failed";
+    await env.DB.prepare(`
+      INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('api-football',?,?)
+      ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at
+    `).bind(message.slice(0,500),isoNow()).run();
+    return json({ok:false,error:message},502);
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -303,6 +466,8 @@ export default {
     if (url.pathname === "/api/auth/logout" && request.method === "POST") return handleLogout(request, env);
     if (url.pathname === "/api/admin/session" && request.method === "GET") return handleAdminSession(request, env);
     if (url.pathname === "/api/profile" && request.method === "POST") return handleProfileUpdate(request, env);
+    if (url.pathname === "/api/sports/fixtures" && request.method === "GET") return handleSportsFixtures(request, env);
+    if (url.pathname === "/api/sports/sync" && request.method === "POST") return handleSportsSync(request, env);
 
     if (url.pathname === "/api/health" && request.method === "GET") {
       if (!env.TELEGRAM_BOT_TOKEN) return json({ ok: true, service: "coderush", runtime: "cloudflare-worker", telegramTokenConfigured: false, databaseConfigured: !!env.DB });
