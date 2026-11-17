@@ -100,7 +100,6 @@ export function StageFourMatches(){
 export function StageFourBets({onBrowse}:{onBrowse:()=>void}){
  const [bets,setBets]=useState<Bet[]>(()=>readJson<Bet[]>('coderush-stage4-bets',[]));
  const [summary,setSummary]=useState<{openCount:number;settledCount:number;wins:number;losses:number;voids:number;netResult:number;bestReturn:number;winStreak:number;accuracy:number}|null>(null);
- const [,setSlip]=useState<Selection[]>(readSelections);
  const [view,setView]=useState<'Active'|'Settled'>('Active');
  const [showMoreBets,setShowMoreBets]=useState(false);
  const isArabic=document.documentElement.lang==='ar'||document.documentElement.dir==='rtl';
@@ -113,7 +112,6 @@ export function StageFourBets({onBrowse}:{onBrowse:()=>void}){
     if(!response.ok||!body?.ok)throw new Error(body?.error||'Unable to load ticket history');
     if(active){setBets(Array.isArray(body.bets)?body.bets:[]);setSummary(body.summary||null);}
    }catch{if(active){setBets([]);setSummary(null);}}
-   if(active)setSlip(readSelections());
   };
   refresh();window.addEventListener('focus',refresh);window.addEventListener('coderush:bets-updated',refresh);
   return()=>{active=false;window.removeEventListener('focus',refresh);window.removeEventListener('coderush:bets-updated',refresh)};
