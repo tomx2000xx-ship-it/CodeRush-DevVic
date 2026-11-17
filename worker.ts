@@ -784,14 +784,16 @@ async function rpcJson<T>(url:string,method:string,params:unknown[]):Promise<T>{
  if(body.error)throw new Error(body.error.message||"Blockchain RPC returned an error");
  return body.result as T;
 }
-function base58ToHexPayload(address:string):string{
+async function base58ToHexPayload(address:string):Promise<string>{
  const alphabet="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";let value=0n;
  for(const ch of address){const n=alphabet.indexOf(ch);if(n<0)throw new Error("Invalid TRON address");value=value*58n+BigInt(n)}
  let hex=value.toString(16);if(hex.length%2)hex="0"+hex;
  const bytes=hex.match(/.{2}/g)?.map(x=>parseInt(x,16))||[];
  for(const ch of address){if(ch!=="1")break;bytes.unshift(0)}
  if(bytes.length!==25)throw new Error("Invalid TRON address length");
- return bytes.slice(0,21).map(x=>x.toString(16).padStart(2,"0")).join("");
+ const payload=new Uint8Array(bytes.slice(0,21)),first=await crypto.subtle.digest("SHA-256",payload),second=await crypto.subtle.digest("SHA-256",first),checksum=Array.from(new Uint8Array(second).slice(0,4));
+ if(checksum.some((value,index)=>value!==bytes[21+index]))throw new Error("TRON address checksum is invalid");
+ return Array.from(payload).map(x=>x.toString(16).padStart(2,"0")).join("");
 }
 async function verifyEvmDeposit(tx:any,network:any):Promise<DepositCheck>{
  const isEth=tx.network_code==="USDT_ERC20",rpcUrl=tx.rpcUrl as string,expectedChain=isEth?"0x1":"0x38";
@@ -827,7 +829,8 @@ async function verifyTronDeposit(tx:any,network:any,env:Env):Promise<DepositChec
  const info=await response.json() as any;
  if(!info||!info.id||!info.blockNumber)return {state:"pending",blockNumber:null,confirmations:null,amountUnits:null,fromAddress:null,error:"Transaction is not solidified on TRON yet."};
  if(info.receipt?.result&&info.receipt.result!=="SUCCESS")return {state:"failed",blockNumber:Number(info.blockNumber),confirmations:1,amountUnits:null,fromAddress:null,error:"The TRON smart-contract transaction failed."};
- const token=base58ToHexPayload(USDT_CONTRACTS.USDT_TRC20).slice(-40),destination=base58ToHexPayload(String(network.deposit_address)).slice(-40);
+ const [tokenPayload,destinationPayload]=await Promise.all([base58ToHexPayload(USDT_CONTRACTS.USDT_TRC20),base58ToHexPayload(String(network.deposit_address))]);
+ const token=tokenPayload.slice(-40),destination=destinationPayload.slice(-40);
  let total=0n,from:string|null=null;
  for(const log of info.log||[]){
   const contract=String(log.address||"").toLowerCase().replace(/^41/,"");
