@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS referral_accounts (
   CHECK((referred_by_user_id IS NULL AND attributed_at IS NULL) OR (referred_by_user_id IS NOT NULL AND attributed_at IS NOT NULL))
 );
 CREATE INDEX IF NOT EXISTS idx_referral_accounts_referrer ON referral_accounts(referred_by_user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_referral_accounts_recent_attributed ON referral_accounts(attributed_at DESC) WHERE referred_by_user_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS referral_qualifications (
   id TEXT PRIMARY KEY,
   referred_user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE RESTRICT,
