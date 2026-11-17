@@ -778,7 +778,7 @@ async function handleWalletGet(request:Request,env:Env):Promise<Response>{
   const account=await walletAccount(env,session.user.id),settings=await walletSettings(env);
   const [balance,networks,transactions]=await Promise.all([
     env.DB.prepare("SELECT COALESCE(SUM(available_delta_units),0) AS available_units,COALESCE(SUM(reserved_delta_units),0) AS reserved_units FROM wallet_ledger_entries WHERE account_id=?").bind(account.id).first<any>(),
-    env.DB.prepare("SELECT network_code,asset,network_name,deposit_address,deposits_enabled,withdrawals_enabled FROM wallet_networks ORDER BY network_code").all<any>(),
+    env.DB.prepare("SELECT network_code,asset,network_name,CASE WHEN deposits_enabled=1 AND (SELECT enabled FROM wallet_settings WHERE id=1)=1 THEN deposit_address ELSE NULL END AS deposit_address,deposits_enabled,withdrawals_enabled FROM wallet_networks ORDER BY network_code").all<any>(),
     env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,destination_address,payout_tx_hash,created_at,updated_at,review_note FROM wallet_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(session.user.id).all<any>()
   ]);
   return json({ok:true,wallet:{enabled:!!settings?.enabled,asset:"USDT",scale:USDT_SCALE,availableUnits:Number(balance?.available_units||0),reservedUnits:Number(balance?.reserved_units||0),minDepositUnits:Number(settings?.min_deposit_units||0),maxDepositUnits:Number(settings?.max_deposit_units||0),minWithdrawalUnits:Number(settings?.min_withdrawal_units||0),maxWithdrawalUnits:Number(settings?.max_withdrawal_units||0),networks:networks.results||[],transactions:transactions.results||[]}});
@@ -899,7 +899,7 @@ async function handleWalletAdminTransactions(request:Request,env:Env):Promise<Re
     }else if(action==="paid"){
       const payoutHash=String(body.payoutTxHash||"").trim().replace(/^0x/i,"").toLowerCase();
       if(!walletHashValid(payoutHash))return json({ok:false,error:"Enter the 64-character blockchain payout transaction hash."},400);
-      if(tx.status!=="processing"&&tx.status!=="completed")return json({ok:false,error:"Approve the withdrawal before marking it paid."},409);
+      if(tx.status==="completed"){if(tx.payout_tx_hash===payoutHash)return json({ok:true,transaction:tx});return json({ok:false,error:"This withdrawal is already completed with a different payout hash."},409)}if(tx.status!=="processing")return json({ok:false,error:"Approve the withdrawal before marking it paid."},409);
       await env.DB.prepare("UPDATE wallet_transactions SET payout_tx_hash=?,updated_at=? WHERE id=? AND status IN ('processing','completed')").bind(payoutHash,isoNow(),id).run();
       await env.DB.prepare("INSERT OR IGNORE INTO wallet_ledger_entries(id,account_id,user_id,transaction_id,entry_type,available_delta_units,reserved_delta_units) SELECT ?,?,?,?,'withdrawal_paid',0,? WHERE EXISTS(SELECT 1 FROM wallet_transactions WHERE id=? AND status IN ('processing','completed') AND payout_tx_hash=?)").bind(crypto.randomUUID(),tx.account_id,tx.user_id,tx.id,-tx.amount_units,tx.id,payoutHash).run();
       await env.DB.prepare("UPDATE wallet_transactions SET status='completed',reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=? AND status='processing' AND payout_tx_hash=?").bind(admin.id,isoNow(),isoNow(),id,payoutHash).run();
