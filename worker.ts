@@ -418,6 +418,51 @@ async function apiFootball<T>(env: Env, path: string): Promise<{ response: T[]; 
   }
   return { response: payload.response || [], paging: payload.paging };
 }
+async function createUserNotification(env:Env,userId:string,eventKey:string,category:"bet"|"wallet"|"referral"|"system",titleEn:string,bodyEn:string,titleAr:string,bodyAr:string,deepLink:string):Promise<void>{
+ const user=await env.DB.prepare("SELECT language FROM users WHERE id=? AND status='active'").bind(userId).first<{language:string}>();if(!user)return;
+ const prefs=await env.DB.prepare("SELECT in_app_enabled,telegram_enabled FROM notification_preferences WHERE user_id=?").bind(userId).first<any>();
+ const title=user.language==="AR"?titleAr:titleEn,body=user.language==="AR"?bodyAr:bodyEn,now=isoNow(),id=crypto.randomUUID();
+ await env.DB.prepare("INSERT OR IGNORE INTO user_notifications(id,user_id,event_key,category,title,body,deep_link,created_at) VALUES(?,?,?,?,?,?,?,?)").bind(id,userId,eventKey,category,title,body,deepLink,now).run();
+ const notification=await env.DB.prepare("SELECT id FROM user_notifications WHERE event_key=?").bind(eventKey).first<{id:string}>();if(!notification||Number(prefs?.telegram_enabled??1)!==1)return;
+ await env.DB.prepare("INSERT OR IGNORE INTO telegram_notification_outbox(id,notification_id,user_id,chat_id,message_text) SELECT ?,?,?,s.chat_id,? FROM telegram_subscribers s WHERE s.telegram_user_id=? AND s.status='active' AND s.opted_out=0 ORDER BY s.last_seen_at DESC LIMIT 1").bind(crypto.randomUUID(),notification.id,userId,title+"\n\n"+body,userId).run();
+}
+async function deliverTelegramNotificationOutbox(env:Env):Promise<void>{
+ if(!env.TELEGRAM_BOT_TOKEN)return;const now=isoNow();
+ const rows=await env.DB.prepare("SELECT id,chat_id,message_text,attempts FROM telegram_notification_outbox WHERE (status='pending' AND datetime(next_attempt_at)<=datetime(?)) OR (status='sending' AND datetime(locked_until)<=datetime(?)) ORDER BY created_at LIMIT 15").bind(now,now).all<any>();
+ for(const row of rows.results||[]){
+  const lock=await env.DB.prepare("UPDATE telegram_notification_outbox SET status='sending',locked_until=?,attempts=attempts+1 WHERE id=? AND ((status='pending' AND datetime(next_attempt_at)<=datetime(?)) OR (status='sending' AND datetime(locked_until)<=datetime(?)))").bind(new Date(Date.now()+60000).toISOString(),row.id,now,now).run();if(Number(lock.meta?.changes||0)!==1)continue;
+  try{await telegram(env,"sendMessage",{chat_id:row.chat_id,text:row.message_text,disable_web_page_preview:true});await env.DB.prepare("UPDATE telegram_notification_outbox SET status='sent',sent_at=?,locked_until=NULL,last_error=NULL WHERE id=? AND status='sending'").bind(isoNow(),row.id).run();}
+  catch(error){const detail=(error instanceof Error?error.message:String(error)).slice(0,500),attempts=Number(row.attempts||0)+1,blocked=/blocked|deactivated|chat not found|bot was blocked/i.test(detail),terminal=blocked||attempts>=8,delay=Math.min(21600,30*Math.pow(2,Math.min(attempts,10)));await env.DB.prepare("UPDATE telegram_notification_outbox SET status=?,next_attempt_at=?,locked_until=NULL,last_error=? WHERE id=? AND status='sending'").bind(terminal?"failed":"pending",new Date(Date.now()+delay*1000).toISOString(),detail,row.id).run();if(blocked)await env.DB.prepare("UPDATE telegram_subscribers SET status='blocked',last_error=? WHERE chat_id=?").bind(detail,row.chat_id).run();}
+  await sleep(40);
+ }
+}
+async function handleNotifications(request:Request,env:Env):Promise<Response>{
+ const session=await currentSession(request,env);if(!session)return json({ok:false,error:"Authentication required"},401);
+ if(request.method==="GET"){
+  await env.DB.prepare("INSERT OR IGNORE INTO notification_preferences(user_id) VALUES(?)").bind(session.user.id).run();
+  const [items,prefs,unread]=await Promise.all([env.DB.prepare("SELECT id,category,title,body,deep_link,created_at,read_at FROM user_notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 100").bind(session.user.id).all<any>(),env.DB.prepare("SELECT in_app_enabled,telegram_enabled FROM notification_preferences WHERE user_id=?").bind(session.user.id).first<any>(),env.DB.prepare("SELECT COUNT(*) AS total FROM user_notifications WHERE user_id=? AND read_at IS NULL").bind(session.user.id).first<any>()]);
+  const enabled=Number(prefs?.in_app_enabled??1)===1;return json({ok:true,notifications:enabled?(items.results||[]):[],unreadCount:enabled?Number(unread?.total||0):0,preferences:{inAppEnabled:enabled,telegramEnabled:Number(prefs?.telegram_enabled??1)===1}});
+ }
+ if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);let body:any;try{body=await request.json()}catch{return json({ok:false,error:"Invalid request body"},400)}
+ if(request.method==="POST"){if(body.markAll===true)await env.DB.prepare("UPDATE user_notifications SET read_at=? WHERE user_id=? AND read_at IS NULL").bind(isoNow(),session.user.id).run();else if(typeof body.id==="string")await env.DB.prepare("UPDATE user_notifications SET read_at=? WHERE id=? AND user_id=? AND read_at IS NULL").bind(isoNow(),body.id,session.user.id).run();else return json({ok:false,error:"Provide an id or markAll=true."},400);return json({ok:true});}
+ if(request.method==="PATCH"){if(typeof body.inAppEnabled!=="boolean"||typeof body.telegramEnabled!=="boolean")return json({ok:false,error:"Preferences must be boolean values."},400);await env.DB.prepare("INSERT INTO notification_preferences(user_id,in_app_enabled,telegram_enabled,updated_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET in_app_enabled=excluded.in_app_enabled,telegram_enabled=excluded.telegram_enabled,updated_at=excluded.updated_at").bind(session.user.id,body.inAppEnabled?1:0,body.telegramEnabled?1:0,isoNow()).run();return json({ok:true,preferences:{inAppEnabled:body.inAppEnabled,telegramEnabled:body.telegramEnabled}});}
+ return json({ok:false,error:"Method not allowed"},405);
+}
+async function handleAdminTelegram(request:Request,env:Env):Promise<Response>{
+ const session=await currentSession(request,env);if(!session||session.user.role!=="admin")return json({ok:false,error:"Administrator access required"},403);const admin=await env.DB.prepare("SELECT is_super_admin FROM admin_accounts WHERE user_id=?").bind(session.user.id).first<any>();if(!admin)return json({ok:false,error:"Administrator access required"},403);
+ if(request.method==="GET"){const [stats,history]=await Promise.all([env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN status='active' AND opted_out=0 THEN 1 ELSE 0 END) AS reachable,SUM(CASE WHEN opted_out=1 THEN 1 ELSE 0 END) AS opted_out,SUM(CASE WHEN status='blocked' THEN 1 ELSE 0 END) AS blocked FROM telegram_subscribers").first<any>(),env.DB.prepare("SELECT id,message,sent_count,failed_count,blocked_count,created_at FROM telegram_broadcasts ORDER BY created_at DESC LIMIT 20").all<any>()]);return json({ok:true,subscribers:{total:Number(stats?.total||0),reachable:Number(stats?.reachable||0),optedOut:Number(stats?.opted_out||0),blocked:Number(stats?.blocked||0)},broadcasts:history.results||[]});}
+ if(Number(admin.is_super_admin)!==1)return json({ok:false,error:"Super Admin access required"},403);if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);let body:any;try{body=await request.json()}catch{return json({ok:false,error:"Invalid request body"},400)}
+ const message=String(body.text||"").trim();if(!message||message.length>4096)return json({ok:false,error:"Message must contain 1–4096 characters."},400);const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM telegram_subscribers WHERE status='active' AND opted_out=0").first<any>();const total=Number(count?.total||0);if(!total)return json({ok:false,error:"No active Telegram subscribers are available."},409);const id=crypto.randomUUID();
+ await env.DB.prepare("INSERT INTO telegram_broadcast_jobs(id,created_by,message,audience,status,total_count,created_at) VALUES(?,?,?,'all_active','queued',?,?)").bind(id,session.user.id,message,total,isoNow()).run();return json({ok:true,broadcastId:id,totalQueued:total,status:"queued"},202);
+}
+async function deliverTelegramBroadcastJobs(env:Env):Promise<void>{
+ if(!env.TELEGRAM_BOT_TOKEN)return;const jobs=await env.DB.prepare("SELECT * FROM telegram_broadcast_jobs WHERE status IN ('queued','sending') ORDER BY created_at LIMIT 1").all<any>();
+ for(const job of jobs.results||[]){await env.DB.prepare("UPDATE telegram_broadcast_jobs SET status='sending',started_at=COALESCE(started_at,?) WHERE id=? AND status IN ('queued','sending')").bind(isoNow(),job.id).run();
+  const recipients=await env.DB.prepare("SELECT chat_id FROM telegram_subscribers WHERE status='active' AND opted_out=0 AND chat_id>? ORDER BY chat_id LIMIT 20").bind(job.last_chat_id||"").all<{chat_id:string}>();let sent=0,failed=0,blocked=0;
+  for(const recipient of recipients.results||[]){try{await telegram(env,"sendMessage",{chat_id:recipient.chat_id,text:job.message,disable_web_page_preview:true});sent++;}catch(error){const detail=(error instanceof Error?error.message:String(error)).slice(0,500);if(/blocked|deactivated|chat not found/i.test(detail)){blocked++;await env.DB.prepare("UPDATE telegram_subscribers SET status='blocked',last_error=? WHERE chat_id=?").bind(detail,recipient.chat_id).run();}else failed++;}await sleep(40);}
+  const last=recipients.results?.[recipients.results.length-1]?.chat_id||null;await env.DB.prepare("UPDATE telegram_broadcast_jobs SET sent_count=sent_count+?,failed_count=failed_count+?,blocked_count=blocked_count+?,last_chat_id=COALESCE(?,last_chat_id),status=CASE WHEN ? IS NULL THEN 'completed' ELSE 'sending' END,completed_at=CASE WHEN ? IS NULL THEN ? ELSE completed_at END WHERE id=?").bind(sent,failed,blocked,last,last,last,isoNow(),job.id).run();break;
+ }
+}
 const isoNow = () => new Date().toISOString();
 const dayString = (date: Date) => date.toISOString().slice(0, 10);
 function fixtureIsLive(status: string): boolean {
@@ -1080,6 +1125,8 @@ export default {
     if (url.pathname === "/api/auth/telegram" && request.method === "POST") return handleTelegramAuth(request, env);
     if (url.pathname === "/api/auth/session" && request.method === "GET") return handleAuthSession(request, env);
     if (url.pathname === "/api/auth/logout" && request.method === "POST") return handleLogout(request, env);
+    if (url.pathname === "/api/notifications" && (request.method === "GET" || request.method === "POST" || request.method === "PATCH")) return handleNotifications(request,env);
+    if (url.pathname === "/api/admin/telegram" && (request.method === "GET" || request.method === "POST")) return handleAdminTelegram(request,env);
     if (url.pathname === "/api/admin/setup-status" && request.method === "GET") return json({ok:true,setupRequired:(await adminCount(env))===0});
     if (url.pathname === "/api/admin/setup" && request.method === "POST") return adminSetup(request,env);
     if (url.pathname === "/api/admin/login" && request.method === "POST") return adminLogin(request,env);
@@ -1168,6 +1215,7 @@ export default {
     return env.ASSETS.fetch(request);
   },
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    if (controller.cron === "* * * * *") { await deliverTelegramNotificationOutbox(env); await deliverTelegramBroadcastJobs(env); return; }
     if (controller.cron === "*/5 * * * *") {
       await monitorPendingWalletDeposits(env);
       return;
