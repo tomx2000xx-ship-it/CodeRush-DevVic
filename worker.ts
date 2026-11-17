@@ -696,6 +696,7 @@ async function settleStoredTicket(env:Env,ticketId:string,checkedAt:string):Prom
   }
   if(statements.length)await env.DB.batch(statements);
   if(finalStatus==="won"||finalStatus==="lost")await recordReferralQualification(env,ticket.user_id,"first_bet",ticketId);
+  if(finalStatus==="won")await awardReferralCommissions(env,ticketId);
   return {selectionUpdates,ticketStatus:finalStatus};
 }
 async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:number;selectionUpdates:number;ticketsSettled:number}>{
@@ -878,29 +879,70 @@ async function recordReferralQualification(env:Env,referredUserId:string,action:
   const inserted=await env.DB.prepare("INSERT OR IGNORE INTO referral_qualifications(id,referred_user_id,referrer_user_id,qualifying_action,source_id,qualified_at) SELECT ?,ra.user_id,ra.referred_by_user_id,?,?,? FROM referral_accounts ra WHERE ra.user_id=? AND ra.referred_by_user_id IS NOT NULL AND EXISTS(SELECT 1 FROM referral_program_settings WHERE id=1 AND tracking_enabled=1)").bind(id,action,sourceId,at,referredUserId).run();
   if(Number(inserted.meta?.changes||0)===1)await env.DB.prepare("INSERT INTO referral_audit_events(id,actor_user_id,event_type,subject_user_id,details_json) VALUES(?,NULL,'referral_qualified',?,?)").bind(crypto.randomUUID(),referredUserId,JSON.stringify({action,sourceId,qualifiedAt:at})).run();
 }
+async function awardReferralCommissions(env:Env,ticketId:string):Promise<void>{
+  const ticket=await env.DB.prepare("SELECT id,user_id,stake,settled_return,status,settled_at FROM bet_tickets WHERE id=?").bind(ticketId).first<any>();
+  if(!ticket||ticket.status!=="won"||!ticket.settled_at)return;
+  const profitUnits=Math.max(0,Math.round((Number(ticket.settled_return)-Number(ticket.stake))*USDT_SCALE));
+  if(!Number.isSafeInteger(profitUnits)||profitUnits<=0)return;
+  const settings=await env.DB.prepare("SELECT rewards_enabled,level1_rate_bps,level2_rate_bps,level3_rate_bps FROM referral_program_settings WHERE id=1").first<any>();
+  if(!settings||Number(settings.rewards_enabled)!==1)return;
+  const rates=[Number(settings.level1_rate_bps),Number(settings.level2_rate_bps),Number(settings.level3_rate_bps)];
+  let ancestor:string|null=ticket.user_id;
+  for(let level=1;level<=3;level++){
+    const parent=await env.DB.prepare("SELECT referred_by_user_id FROM referral_accounts WHERE user_id=?").bind(ancestor).first<{referred_by_user_id:string|null}>();
+    ancestor=parent?.referred_by_user_id||null;if(!ancestor)break;
+    const rate=rates[level-1];if(!Number.isInteger(rate)||rate<=0||rate>10000)continue;
+    const amount=Math.floor(profitUnits*rate/10000);if(amount<=0)continue;
+    const account=await walletAccount(env,ancestor);
+    const inserted=await env.DB.prepare(`INSERT OR IGNORE INTO wallet_referral_credits
+      (id,account_id,user_id,source_ticket_id,referred_user_id,referral_level,rate_bps,profit_units,amount_units)
+      SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM bet_tickets WHERE id=? AND status='won' AND settled_at IS NOT NULL)
+      AND EXISTS(SELECT 1 FROM referral_program_settings WHERE id=1 AND rewards_enabled=1)`)
+      .bind(crypto.randomUUID(),account.id,ancestor,ticket.id,ticket.user_id,level,rate,profitUnits,amount,ticket.id).run();
+    if(Number(inserted.meta?.changes||0)===1)await env.DB.prepare("INSERT INTO referral_audit_events(id,actor_user_id,event_type,subject_user_id,details_json) VALUES(?,NULL,'referral_commission_credited',?,?)").bind(crypto.randomUUID(),ancestor,JSON.stringify({ticketId:ticket.id,referredUserId:ticket.user_id,level,rateBps:rate,profitUnits,amountUnits:amount})).run();
+  }
+}
 async function handleReferralMe(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);if(!session)return json({ok:false,error:"Authentication required"},401);
   await env.DB.prepare("INSERT OR IGNORE INTO referral_accounts(user_id,referral_code) VALUES(?,?)").bind(session.user.id,newReferralCode()).run();
-  const [account,counts]=await Promise.all([env.DB.prepare("SELECT referral_code FROM referral_accounts WHERE user_id=?").bind(session.user.id).first<{referral_code:string}>(),env.DB.prepare("SELECT COUNT(*) AS registrations,SUM(CASE WHEN q.referred_user_id IS NOT NULL THEN 1 ELSE 0 END) AS qualified FROM referral_accounts r LEFT JOIN referral_qualifications q ON q.referred_user_id=r.user_id WHERE r.referred_by_user_id=?").bind(session.user.id).first<any>()]);
-  return json({ok:true,referralCode:account?.referral_code||("u"+session.user.id),stats:{registrations:Number(counts?.registrations||0),qualified:Number(counts?.qualified||0)},qualificationRule:"first_verified_deposit_or_first_settled_bet",rewardsEnabled:false});
+  const [account,counts,earnings,history]=await Promise.all([
+    env.DB.prepare("SELECT referral_code FROM referral_accounts WHERE user_id=?").bind(session.user.id).first<{referral_code:string}>(),
+    env.DB.prepare("SELECT COUNT(*) AS registrations,SUM(CASE WHEN q.referred_user_id IS NOT NULL THEN 1 ELSE 0 END) AS qualified FROM referral_accounts r LEFT JOIN referral_qualifications q ON q.referred_user_id=r.user_id WHERE r.referred_by_user_id=?").bind(session.user.id).first<any>(),
+    env.DB.prepare("SELECT COALESCE(SUM(amount_units),0) AS total_units,COUNT(*) AS awards FROM wallet_referral_credits WHERE user_id=?").bind(session.user.id).first<any>(),
+    env.DB.prepare("SELECT c.id,c.amount_units,c.profit_units,c.referral_level,c.rate_bps,c.created_at,c.source_ticket_id,u.display_name AS referred_name FROM wallet_referral_credits c LEFT JOIN users u ON u.id=c.referred_user_id WHERE c.user_id=? ORDER BY c.created_at DESC LIMIT 50").bind(session.user.id).all<any>()
+  ]);
+  return json({ok:true,referralCode:account?.referral_code||("u"+session.user.id),stats:{registrations:Number(counts?.registrations||0),qualified:Number(counts?.qualified||0)},qualificationRule:"first_verified_deposit_or_first_settled_bet",commissionRates:{level1:10,level2:5,level3:3},rewardsEnabled:true,earnings:{totalUnits:Number(earnings?.total_units||0),awards:Number(earnings?.awards||0)},history:history.results||[]});
 }
 async function handleAdminReferrals(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);if(!session||session.user.role!=="admin")return json({ok:false,error:"Administrator access required"},403);
   const admin=await env.DB.prepare("SELECT is_super_admin FROM admin_accounts WHERE user_id=?").bind(session.user.id).first<any>();if(!admin)return json({ok:false,error:"Administrator access required"},403);
-  if(request.method==="POST"){if(Number(admin.is_super_admin)!==1)return json({ok:false,error:"Super Admin access required"},403);if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);let body:{trackingEnabled?:unknown};try{body=await request.json() as typeof body}catch{return json({ok:false,error:"Invalid request"},400)}if(typeof body.trackingEnabled!=="boolean")return json({ok:false,error:"Invalid tracking setting"},400);await env.DB.prepare("UPDATE referral_program_settings SET tracking_enabled=?,updated_by=?,updated_at=? WHERE id=1").bind(body.trackingEnabled?1:0,session.user.id,isoNow()).run();await env.DB.prepare("INSERT INTO referral_audit_events(id,actor_user_id,event_type,subject_user_id,details_json) VALUES(?,?,'referral_tracking_setting_changed',NULL,?)").bind(crypto.randomUUID(),session.user.id,JSON.stringify({trackingEnabled:body.trackingEnabled})).run();}
-  const [settings,totals,rows]=await Promise.all([env.DB.prepare("SELECT tracking_enabled,rewards_enabled,qualification_policy,reward_amount_units,updated_at FROM referral_program_settings WHERE id=1").first<any>(),env.DB.prepare("SELECT COUNT(*) AS registrations,SUM(CASE WHEN q.referred_user_id IS NOT NULL THEN 1 ELSE 0 END) AS qualified,COUNT(DISTINCT r.referred_by_user_id) AS active_referrers FROM referral_accounts r LEFT JOIN referral_qualifications q ON q.referred_user_id=r.user_id WHERE r.referred_by_user_id IS NOT NULL").first<any>(),env.DB.prepare("SELECT r.referral_code,r.referred_by_user_id AS referrer_id,ref.display_name AS referrer_name,r.user_id AS referred_user_id,u.display_name AS referred_name,r.attributed_at,q.qualifying_action,q.qualified_at FROM referral_accounts r JOIN users u ON u.id=r.user_id LEFT JOIN users ref ON ref.id=r.referred_by_user_id LEFT JOIN referral_qualifications q ON q.referred_user_id=r.user_id WHERE r.referred_by_user_id IS NOT NULL ORDER BY r.attributed_at DESC LIMIT 100").all<any>()]);
-  return json({ok:true,settings,totals:{registrations:Number(totals?.registrations||0),qualified:Number(totals?.qualified||0),activeReferrers:Number(totals?.active_referrers||0)},referrals:rows.results||[]});
+  if(request.method==="POST"){
+    if(Number(admin.is_super_admin)!==1)return json({ok:false,error:"Super Admin access required"},403);
+    if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);
+    let body:{trackingEnabled?:unknown;rewardsEnabled?:unknown};try{body=await request.json() as typeof body}catch{return json({ok:false,error:"Invalid request"},400)}
+    if(typeof body.trackingEnabled!=="boolean"||typeof body.rewardsEnabled!=="boolean")return json({ok:false,error:"Both referral settings must be boolean values."},400);
+    await env.DB.prepare("UPDATE referral_program_settings SET tracking_enabled=?,rewards_enabled=?,updated_by=?,updated_at=? WHERE id=1").bind(body.trackingEnabled?1:0,body.rewardsEnabled?1:0,session.user.id,isoNow()).run();
+    await env.DB.prepare("INSERT INTO referral_audit_events(id,actor_user_id,event_type,subject_user_id,details_json) VALUES(?,?,'referral_program_settings_changed',NULL,?)").bind(crypto.randomUUID(),session.user.id,JSON.stringify({trackingEnabled:body.trackingEnabled,rewardsEnabled:body.rewardsEnabled,rates:{level1:10,level2:5,level3:3}})).run();
+  }
+  const [settings,totals,rows,awards]=await Promise.all([
+    env.DB.prepare("SELECT tracking_enabled,rewards_enabled,level1_rate_bps,level2_rate_bps,level3_rate_bps,updated_at FROM referral_program_settings WHERE id=1").first<any>(),
+    env.DB.prepare("SELECT COUNT(*) AS registrations,SUM(CASE WHEN q.referred_user_id IS NOT NULL THEN 1 ELSE 0 END) AS qualified,COUNT(DISTINCT r.referred_by_user_id) AS active_referrers FROM referral_accounts r LEFT JOIN referral_qualifications q ON q.referred_user_id=r.user_id WHERE r.referred_by_user_id IS NOT NULL").first<any>(),
+    env.DB.prepare("SELECT r.referral_code,r.referred_by_user_id AS referrer_id,ref.display_name AS referrer_name,r.user_id AS referred_user_id,u.display_name AS referred_name,r.attributed_at,q.qualifying_action,q.qualified_at FROM referral_accounts r JOIN users u ON u.id=r.user_id LEFT JOIN users ref ON ref.id=r.referred_by_user_id LEFT JOIN referral_qualifications q ON q.referred_user_id=r.user_id WHERE r.referred_by_user_id IS NOT NULL ORDER BY r.attributed_at DESC LIMIT 100").all<any>(),
+    env.DB.prepare("SELECT c.id,c.user_id,c.referred_user_id,c.source_ticket_id,c.referral_level,c.rate_bps,c.profit_units,c.amount_units,c.created_at,u.display_name AS beneficiary_name FROM wallet_referral_credits c LEFT JOIN users u ON u.id=c.user_id ORDER BY c.created_at DESC LIMIT 100").all<any>()
+  ]);
+  return json({ok:true,settings,totals:{registrations:Number(totals?.registrations||0),qualified:Number(totals?.qualified||0),activeReferrers:Number(totals?.active_referrers||0)},referrals:rows.results||[],awards:awards.results||[]});
 }
 async function handleWalletGet(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
   if(!session)return json({ok:false,error:"Sign in through Telegram to access your wallet."},401);
   const account=await walletAccount(env,session.user.id),settings=await walletSettings(env);
-  const [balance,networks,transactions]=await Promise.all([
-    env.DB.prepare("SELECT COALESCE(SUM(available_delta_units),0) AS available_units,COALESCE(SUM(reserved_delta_units),0) AS reserved_units FROM wallet_ledger_entries WHERE account_id=?").bind(account.id).first<any>(),
+  const [balance,networks,transactions,referralRewards]=await Promise.all([
+    env.DB.prepare("SELECT COALESCE((SELECT SUM(available_delta_units) FROM wallet_ledger_entries WHERE account_id=?),0)+COALESCE((SELECT SUM(amount_units) FROM wallet_referral_credits WHERE account_id=?),0) AS available_units,COALESCE((SELECT SUM(reserved_delta_units) FROM wallet_ledger_entries WHERE account_id=?),0) AS reserved_units").bind(account.id,account.id,account.id).first<any>(),
     env.DB.prepare("SELECT network_code,asset,network_name,CASE WHEN deposits_enabled=1 AND (SELECT enabled FROM wallet_settings WHERE id=1)=1 THEN deposit_address ELSE NULL END AS deposit_address,deposits_enabled,withdrawals_enabled,monitor_enabled FROM wallet_networks ORDER BY network_code").all<any>(),
-    env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,destination_address,payout_tx_hash,chain_confirmations,chain_error,chain_verified_at,created_at,updated_at FROM wallet_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(session.user.id).all<any>()
+    env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,destination_address,payout_tx_hash,chain_confirmations,chain_error,chain_verified_at,created_at,updated_at FROM wallet_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(session.user.id).all<any>(),
+    env.DB.prepare("SELECT id,amount_units,referral_level,rate_bps,source_ticket_id,created_at FROM wallet_referral_credits WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(session.user.id).all<any>()
   ]);
-  return json({ok:true,wallet:{enabled:!!settings?.enabled,asset:"USDT",scale:USDT_SCALE,availableUnits:Number(balance?.available_units||0),reservedUnits:Number(balance?.reserved_units||0),minDepositUnits:Number(settings?.min_deposit_units||0),maxDepositUnits:Number(settings?.max_deposit_units||0),minWithdrawalUnits:Number(settings?.min_withdrawal_units||0),maxWithdrawalUnits:Number(settings?.max_withdrawal_units||0),networks:networks.results||[],transactions:transactions.results||[]}});
+  return json({ok:true,wallet:{enabled:!!settings?.enabled,asset:"USDT",scale:USDT_SCALE,availableUnits:Number(balance?.available_units||0),reservedUnits:Number(balance?.reserved_units||0),minDepositUnits:Number(settings?.min_deposit_units||0),maxDepositUnits:Number(settings?.max_deposit_units||0),minWithdrawalUnits:Number(settings?.min_withdrawal_units||0),maxWithdrawalUnits:Number(settings?.max_withdrawal_units||0),networks:networks.results||[],transactions:transactions.results||[],referralRewards:referralRewards.results||[]}});
 }
 async function handleWalletDeposit(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
@@ -952,8 +994,8 @@ async function handleWalletWithdrawal(request:Request,env:Env):Promise<Response>
     return json({ok:false,error:"The withdrawal request could not be saved."},409);
   }
   const reserve=await env.DB.prepare(`INSERT INTO wallet_ledger_entries(id,account_id,user_id,transaction_id,entry_type,available_delta_units,reserved_delta_units)
-    SELECT ?,?,?,?,'withdrawal_reserve',?,? WHERE COALESCE((SELECT SUM(available_delta_units) FROM wallet_ledger_entries WHERE account_id=?),0)>=?`)
-    .bind(crypto.randomUUID(),account.id,session.user.id,id,-units,units,account.id,units).run();
+    SELECT ?,?,?,?,'withdrawal_reserve',?,? WHERE (COALESCE((SELECT SUM(available_delta_units) FROM wallet_ledger_entries WHERE account_id=?),0)+COALESCE((SELECT SUM(amount_units) FROM wallet_referral_credits WHERE account_id=?),0))>=?`)
+    .bind(crypto.randomUUID(),account.id,session.user.id,id,-units,units,account.id,account.id,units).run();
   if(Number(reserve.meta?.changes||0)!==1){
     await env.DB.prepare("DELETE FROM wallet_transactions WHERE id=? AND status='pending_review'").bind(id).run();
     return json({ok:false,error:"Insufficient available USDT balance."},409);
