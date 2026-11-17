@@ -1248,7 +1248,6 @@ export default {
   },
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     if (controller.cron === "* * * * *") { await deliverTelegramNotificationOutbox(env); await deliverTelegramBroadcastJobs(env); return; }
-    if (controller.cron === "* * * * *") { await deliverTelegramNotificationOutbox(env); await deliverTelegramBroadcastJobs(env); return; }
     if (controller.cron === "*/5 * * * *") {
       await monitorPendingWalletDeposits(env);
       return;
