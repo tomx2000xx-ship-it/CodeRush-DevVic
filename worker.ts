@@ -647,10 +647,11 @@ async function handleBetList(request:Request,env:Env):Promise<Response>{
   const summary={openCount:Number(aggregate?.open_count||0),settledCount:wins+losses+Number(aggregate?.voids||0),wins,losses,voids:Number(aggregate?.voids||0),netResult:Number(aggregate?.net_result||0),bestReturn:Number(aggregate?.best_return||0),winStreak,accuracy:wins+losses?Math.round(wins/(wins+losses)*100):0};
   return json({ok:true,bets:tickets.map(ticket=>publicTicket(ticket,grouped.get(ticket.id)||[])),summary});
 }
-type BetSettlementFixtureRow={id:string;status_short:string;result_home_score:number|null;result_away_score:number|null;result_checked_at:string|null};
+type BetSettlementFixtureRow={id:string;kickoff:string;status_short:string;result_home_score:number|null;result_away_score:number|null;result_checked_at:string|null};
 function settledSelectionResult(outcomeKey:string,fixture:BetSettlementFixtureRow):"won"|"lost"|"void"|null{
   const status=fixture.status_short;
-  if(["CANC","ABD"].includes(status))return "void";
+  if(status==="CANC")return "void";
+  if(status==="ABD"){const kickoff=Date.parse(fixture.kickoff);return Number.isFinite(kickoff)&&Date.now()-kickoff>=24*60*60*1000?"void":null;}
   if(!["FT","AET","PEN","AWD","WO"].includes(status))return null;
   const home=fixture.result_home_score,away=fixture.result_away_score;
   if(home===null||away===null){
@@ -664,7 +665,7 @@ async function settleStoredTicket(env:Env,ticketId:string,checkedAt:string):Prom
   const ticket=await env.DB.prepare("SELECT * FROM bet_tickets WHERE id=?").bind(ticketId).first<any>();
   if(!ticket)return {selectionUpdates:0,ticketStatus:null};
   const rows=await env.DB.prepare(`
-    SELECT s.*,f.status_short,f.result_home_score AS fixture_home_score,
+    SELECT s.*,f.kickoff,f.status_short,f.result_home_score AS fixture_home_score,
       f.result_away_score AS fixture_away_score,f.result_checked_at AS fixture_result_checked_at
     FROM bet_ticket_selections s JOIN sports_fixtures f ON f.id=s.fixture_id
     WHERE s.ticket_id=? ORDER BY s.selection_index
@@ -675,7 +676,7 @@ async function settleStoredTicket(env:Env,ticketId:string,checkedAt:string):Prom
   let selectionUpdates=0;
   for(const pick of picks){
     let result=pick.result_status||"pending";
-    const fixture:BetSettlementFixtureRow={id:pick.fixture_id,status_short:pick.status_short,result_home_score:pick.fixture_home_score,result_away_score:pick.fixture_away_score,result_checked_at:pick.fixture_result_checked_at};
+    const fixture:BetSettlementFixtureRow={id:pick.fixture_id,kickoff:pick.kickoff,status_short:pick.status_short,result_home_score:pick.fixture_home_score,result_away_score:pick.fixture_away_score,result_checked_at:pick.fixture_result_checked_at};
     if(result==="pending"&&fixture.result_checked_at){
       const computed=settledSelectionResult(pick.outcome_key,fixture);
       if(computed){
