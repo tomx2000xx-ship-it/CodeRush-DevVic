@@ -779,7 +779,7 @@ async function handleWalletGet(request:Request,env:Env):Promise<Response>{
   const [balance,networks,transactions]=await Promise.all([
     env.DB.prepare("SELECT COALESCE(SUM(available_delta_units),0) AS available_units,COALESCE(SUM(reserved_delta_units),0) AS reserved_units FROM wallet_ledger_entries WHERE account_id=?").bind(account.id).first<any>(),
     env.DB.prepare("SELECT network_code,asset,network_name,CASE WHEN deposits_enabled=1 AND (SELECT enabled FROM wallet_settings WHERE id=1)=1 THEN deposit_address ELSE NULL END AS deposit_address,deposits_enabled,withdrawals_enabled FROM wallet_networks ORDER BY network_code").all<any>(),
-    env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,destination_address,payout_tx_hash,created_at,updated_at,review_note FROM wallet_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(session.user.id).all<any>()
+    env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,destination_address,payout_tx_hash,created_at,updated_at FROM wallet_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(session.user.id).all<any>()
   ]);
   return json({ok:true,wallet:{enabled:!!settings?.enabled,asset:"USDT",scale:USDT_SCALE,availableUnits:Number(balance?.available_units||0),reservedUnits:Number(balance?.reserved_units||0),minDepositUnits:Number(settings?.min_deposit_units||0),maxDepositUnits:Number(settings?.max_deposit_units||0),minWithdrawalUnits:Number(settings?.min_withdrawal_units||0),maxWithdrawalUnits:Number(settings?.max_withdrawal_units||0),networks:networks.results||[],transactions:transactions.results||[]}});
 }
@@ -843,8 +843,8 @@ async function handleWalletWithdrawal(request:Request,env:Env):Promise<Response>
 async function walletAdminSession(request:Request,env:Env):Promise<{id:string}|null>{
   const session=await currentSession(request,env);
   if(!session||session.user.role!=="admin")return null;
-  const admin=await env.DB.prepare("SELECT user_id FROM admin_accounts WHERE user_id=?").bind(session.user.id).first<any>();
-  return admin?{id:session.user.id}:null;
+  const admin=await env.DB.prepare("SELECT user_id,is_super_admin FROM admin_accounts WHERE user_id=?").bind(session.user.id).first<any>();
+  return admin&&Number(admin.is_super_admin)===1?{id:session.user.id}:null;
 }
 async function handleWalletAdminSettings(request:Request,env:Env):Promise<Response>{
   const admin=await walletAdminSession(request,env);if(!admin)return json({ok:false,error:"Administrator access required"},403);
