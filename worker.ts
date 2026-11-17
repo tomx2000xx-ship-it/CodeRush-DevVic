@@ -320,14 +320,18 @@ type ApiFootballOdds = {
 };
 async function apiFootball<T>(env: Env, path: string): Promise<{ response: T[]; paging?: { current: number; total: number } }> {
   if (!env.API_FOOTBALL_KEY) throw new Error("API_FOOTBALL_KEY is not configured");
-  const response = await fetch("https://v3.football.api-sports.io/" + path, {
+  // Build requests with URL/URLSearchParams so paired date filters are transmitted
+  // as distinct query parameters (rather than relying on string concatenation).
+  const endpoint = new URL(path, "https://v3.football.api-sports.io/");
+  const response = await fetch(endpoint.toString(), {
+    method: "GET",
     headers: { "x-apisports-key": env.API_FOOTBALL_KEY, "accept": "application/json" },
     cf: { cacheTtl: 0, cacheEverything: false }
   });
-  if (!response.ok) throw new Error("API-Football returned HTTP " + response.status);
+  if (!response.ok) throw new Error("API-Football " + endpoint.pathname + " returned HTTP " + response.status);
   const payload = await response.json() as { response?: T[]; errors?: unknown; paging?: { current: number; total: number } };
   if (payload.errors && (Array.isArray(payload.errors) ? payload.errors.length : Object.keys(payload.errors as object).length)) {
-    throw new Error("API-Football rejected the request: " + JSON.stringify(payload.errors).slice(0, 300));
+    throw new Error("API-Football " + endpoint.pathname + " rejected the request: " + JSON.stringify(payload.errors).slice(0, 300));
   }
   return { response: payload.response || [], paging: payload.paging };
 }
@@ -389,7 +393,11 @@ async function storeFootballOdds(env: Env, entries: ApiFootballOdds[]): Promise<
   return count;
 }
 async function syncFootballRange(env: Env, from: string, to: string): Promise<{fixtures:number;odds:number}> {
-  const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?from="+encodeURIComponent(from)+"&to="+encodeURIComponent(to)+"&timezone=UTC");
+  const fixtureParams = new URLSearchParams();
+  fixtureParams.set("from", from);
+  fixtureParams.set("to", to);
+  fixtureParams.set("timezone", "Africa/Lagos");
+  const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?"+fixtureParams.toString());
   const fixtures=await storeFootballFixtures(env,fixtureData.response);
   let odds=0;
   // API-Football pre-match odds are date-scoped and paginated. Pull the first 10 pages per day.
