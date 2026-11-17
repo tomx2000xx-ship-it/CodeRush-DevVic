@@ -17,6 +17,9 @@
       "database_id": "2c9e1bb7-6fdc-4f06-9a2c-0ed6fc323d6e"
     }
   ],
+  "triggers": {
+    "crons": ["*/30 * * * *", "15 0 * * *"]
+  },
   "observability": {
     "enabled": true,
     "traces": {
