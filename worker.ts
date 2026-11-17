@@ -913,6 +913,7 @@ async function monitorPendingWalletDeposits(env:Env):Promise<void>{
       env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) SELECT ?,?,NULL,'deposit_auto_credited',? WHERE EXISTS(SELECT 1 FROM wallet_ledger_entries WHERE transaction_id=? AND entry_type='deposit_credit') AND NOT EXISTS(SELECT 1 FROM wallet_audit_events WHERE transaction_id=? AND event_type='deposit_auto_credited')").bind(crypto.randomUUID(),tx.id,JSON.stringify({networkCode:tx.network_code,blockNumber:check.blockNumber,confirmations:check.confirmations,amountUnits:check.amountUnits,fromAddress:check.fromAddress}),tx.id,tx.id)
      ]);
      await recordReferralQualification(env,tx.user_id,"first_deposit",tx.id);
+     await createUserNotification(env,tx.user_id,"deposit-credited:"+tx.id,"wallet","Deposit confirmed","Your "+(Number(tx.amount_units)/USDT_SCALE).toFixed(2)+" USDT deposit has been verified and credited.","تم تأكيد الإيداع","تم التحقق من إيداعك بقيمة "+(Number(tx.amount_units)/USDT_SCALE).toFixed(2)+" USDT وإضافته إلى محفظتك.","/wallet");
     }
    }else if(check.state==="failed"){
     await env.DB.prepare("UPDATE wallet_transactions SET status='rejected',chain_block_number=?,chain_confirmations=?,chain_error=?,monitor_attempts=monitor_attempts+1,updated_at=? WHERE id=? AND status IN ('pending_review','processing')").bind(check.blockNumber,check.confirmations,check.error||"Blockchain transaction failed",checkedAt,tx.id).run();
