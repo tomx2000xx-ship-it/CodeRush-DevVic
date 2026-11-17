@@ -2,12 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Bell, CheckCheck, ChevronRight, Copy, Gift, Link2, Users, Wallet, Sparkles } from 'lucide-react';
 
 type Notice={id:string;title:string;body:string;category:'Rewards'|'Activity'|'Updates';date:string;read:boolean};
-const initialNotices:Notice[]=[
-{id:'n1',title:'Welcome to CodeRush',body:'Your demo profile is ready. Explore matches, sample selections and your personal arena.',category:'Updates',date:'Just now',read:false},
-{id:'n2',title:'Your referral rewards',body:'Your invite dashboard shows how the three-level demo commission structure works.',category:'Rewards',date:'Today',read:false},
-{id:'n3',title:'Match centre is ready',body:'Browse sample fixtures and add an outcome to your demo slip. No real bets are placed.',category:'Activity',date:'Today',read:true},
-{id:'n4',title:'Demo wallet reminder',body:'All displayed balances and wallet activity are simulated and have no cash value.',category:'Updates',date:'Yesterday',read:true}
-];
+const initialNotices:Notice[]=[];
 const safeRead=():Notice[]=>initialNotices;
 export function StageFiveFriends(){
  const [copied,setCopied]=useState(false);const [team,setTeam]=useState(1);const [openFaq,setOpenFaq]=useState<number|null>(null);
