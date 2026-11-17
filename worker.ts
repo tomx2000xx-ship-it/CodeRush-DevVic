@@ -319,15 +319,12 @@ type ApiFootballOdds = {
   bookmakers: Array<{ id: number; name: string; bets: Array<{ id: number; name: string; values: Array<{ value: string; odd: string; handicap?: string | null; suspended?: boolean }> }> }>;
 };
 async function reserveApiFootballRequestSlot(env: Env): Promise<void> {
-  // Atomically reserve a provider request slot across all Worker instances and
-  // overlapping admin syncs. Eight seconds keeps usage below a 10/minute plan.
-  const slot = await env.DB.prepare(`
-    INSERT INTO api_football_rate_limit(id,next_allowed_at)
-    VALUES (1,unixepoch())
-    ON CONFLICT(id) DO UPDATE SET
-      next_allowed_at=MAX(api_football_rate_limit.next_allowed_at,unixepoch())+8
-    RETURNING next_allowed_at
-  `).first<{next_allowed_at:number}>();
+  // Keep CodeRush below the 100/day Free allowance with a 75-request safety ceiling.
+  const utcDate = new Date().toISOString().slice(0, 10);
+  const usage = await env.DB.prepare("INSERT INTO api_football_usage(utc_date,request_count) VALUES (?,1) ON CONFLICT(utc_date) DO UPDATE SET request_count=api_football_usage.request_count+1 WHERE api_football_usage.request_count < 75 RETURNING request_count").bind(utcDate).first<{request_count:number}>();
+  if (!usage) throw new Error("CodeRush daily API-Football safety budget (75 requests) has been reached. Requests resume after 00:00 UTC.");
+  // Shared atomic spacing across Worker instances.
+  const slot = await env.DB.prepare("INSERT INTO api_football_rate_limit(id,next_allowed_at) VALUES (1,unixepoch()) ON CONFLICT(id) DO UPDATE SET next_allowed_at=MAX(api_football_rate_limit.next_allowed_at,unixepoch())+8 RETURNING next_allowed_at").first<{next_allowed_at:number}>();
   if (slot?.next_allowed_at) {
     const waitMs = slot.next_allowed_at * 1000 - Date.now();
     if (waitMs > 0) await new Promise(resolve => setTimeout(resolve, waitMs));
@@ -453,46 +450,23 @@ async function storeFootballOdds(env: Env, entries: ApiFootballOdds[]): Promise<
   for(let i=0;i<statements.length;i+=80) await env.DB.batch(statements.slice(i,i+80));
   return count;
 }
-async function syncFootballRange(env: Env, from: string, to: string): Promise<{fixtures:number;odds:number}> {
-  // Fetch fixtures one calendar date at a time. API-Football's date filter
-  // avoids the provider's inconsistent validation of combined from/to/timezone
-  // filters observed in production. Fixture timestamps remain UTC and are
-  // localized by the client device.
-  let fixtures=0;
-  for (let cursor=new Date(from+"T00:00:00Z"); cursor<=new Date(to+"T00:00:00Z"); cursor.setUTCDate(cursor.getUTCDate()+1)) {
-    const date=dayString(cursor);
-    const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?date="+date);
-    fixtures+=await storeFootballFixtures(env,fixtureData.response);
-  }
-  let odds=0;
-  // API-Football pre-match odds are date-scoped and paginated. Pull the first 10 pages per day.
-  for (let cursor=new Date(from+"T00:00:00Z"); cursor<=new Date(to+"T00:00:00Z"); cursor.setUTCDate(cursor.getUTCDate()+1)) {
-    const date=dayString(cursor);
-    for(let page=1;page<=10;page++) {
-      const data=await apiFootball<ApiFootballOdds>(env,"odds?date="+date+"&bet=1&page="+page);
-      if(!data.response.length) break;
-      odds+=await storeFootballOdds(env,data.response);
-      if(!data.paging || page>=data.paging.total) break;
-    }
-  }
-  await env.DB.prepare(`
-    INSERT INTO sports_sync_state(provider,last_fixtures_sync,last_odds_sync,last_error,updated_at)
-    VALUES ('api-football',?,?,NULL,?)
-    ON CONFLICT(provider) DO UPDATE SET last_fixtures_sync=excluded.last_fixtures_sync,last_odds_sync=excluded.last_odds_sync,last_error=NULL,updated_at=excluded.updated_at
-  `).bind(isoNow(),isoNow(),isoNow()).run();
+async function syncFootballRange(env: Env, _from: string, _to: string): Promise<{fixtures:number;odds:number}> {
+  // One request retrieves the next 100 fixtures instead of one request per day.
+  const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?next=100");
+  const fixtures=await storeFootballFixtures(env,fixtureData.response);
+  // Only today's first odds page is fetched; no 10-page-per-day loops.
+  const today=dayString(new Date());
+  const oddsData=await apiFootball<ApiFootballOdds>(env,"odds?date="+today+"&bet=1&page=1");
+  const odds=await storeFootballOdds(env,oddsData.response);
+  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_fixtures_sync,last_odds_sync,last_error,updated_at) VALUES ('api-football',?,?,NULL,?) ON CONFLICT(provider) DO UPDATE SET last_fixtures_sync=excluded.last_fixtures_sync,last_odds_sync=excluded.last_odds_sync,last_error=NULL,updated_at=excluded.updated_at").bind(isoNow(),isoNow(),isoNow()).run();
   return {fixtures,odds};
 }
 async function syncFootballLive(env: Env): Promise<{fixtures:number;odds:number}> {
+  // One request for live scores; live odds are not polled on every refresh.
   const live=await apiFootball<ApiFootballFixture>(env,"fixtures?live=all");
   const fixtures=await storeFootballFixtures(env,live.response);
-  const oddsData=await apiFootball<ApiFootballOdds>(env,"odds/live?bet=1");
-  const odds=await storeFootballOdds(env,oddsData.response);
-  await env.DB.prepare(`
-    INSERT INTO sports_sync_state(provider,last_live_sync,last_odds_sync,last_error,updated_at)
-    VALUES ('api-football',?,?,NULL,?)
-    ON CONFLICT(provider) DO UPDATE SET last_live_sync=excluded.last_live_sync,last_odds_sync=excluded.last_odds_sync,last_error=NULL,updated_at=excluded.updated_at
-  `).bind(isoNow(),isoNow(),isoNow()).run();
-  return {fixtures,odds};
+  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_live_sync,last_error,updated_at) VALUES ('api-football',?,NULL,?) ON CONFLICT(provider) DO UPDATE SET last_live_sync=excluded.last_live_sync,last_error=NULL,updated_at=excluded.updated_at").bind(isoNow(),isoNow()).run();
+  return {fixtures,odds:0};
 }
 async function handleSportsFixtures(request: Request, env: Env): Promise<Response> {
   if (!env.API_FOOTBALL_KEY) return json({ok:true,configured:false,provider:"API-Football",fixtures:[],message:"Sports data provider is not configured yet."});
@@ -624,5 +598,19 @@ export default {
 
     if (url.pathname.startsWith("/api/")) return json({ ok: false, error: "API route not found" }, 404);
     return env.ASSETS.fetch(request);
+  },
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    if (!env.API_FOOTBALL_KEY) return;
+    try {
+      if (controller.cron === "*/30 * * * *") {
+        await syncFootballLive(env);
+      } else if (controller.cron === "15 0 * * *") {
+        await syncFootballRange(env, dayString(new Date()), dayString(new Date()));
+      }
+    } catch (error) {
+      const message=error instanceof Error?error.message:"Scheduled sports refresh failed";
+      await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('api-football',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind(message.slice(0,500),isoNow()).run();
+      console.error("Scheduled API-Football refresh failed", message);
+    }
   },
 } satisfies ExportedHandler<Env>;
