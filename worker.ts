@@ -844,7 +844,7 @@ async function verifyTronDeposit(tx:any,network:any,env:Env):Promise<DepositChec
  return {state:"verified",blockNumber:Number(info.blockNumber),confirmations:1,amountUnits,fromAddress:from};
 }
 async function monitorPendingWalletDeposits(env:Env):Promise<void>{
- const rows=await env.DB.prepare("SELECT t.*,n.deposit_address,n.monitor_enabled FROM wallet_transactions t JOIN wallet_networks n ON n.network_code=t.network_code WHERE t.type='deposit' AND t.status IN ('pending_review','processing') ORDER BY t.created_at ASC LIMIT 10").all<any>();
+ const rows=await env.DB.prepare("SELECT t.*,COALESCE(t.deposit_address_snapshot,n.deposit_address) AS deposit_address,n.monitor_enabled FROM wallet_transactions t JOIN wallet_networks n ON n.network_code=t.network_code WHERE t.type='deposit' AND t.status IN ('pending_review','processing') AND n.monitor_enabled=1 ORDER BY t.created_at ASC LIMIT 10").all<any>();
  for(const tx of rows.results||[]){
   const network={deposit_address:tx.deposit_address};
   try{
@@ -885,7 +885,7 @@ async function handleWalletGet(request:Request,env:Env):Promise<Response>{
   const [balance,networks,transactions]=await Promise.all([
     env.DB.prepare("SELECT COALESCE(SUM(available_delta_units),0) AS available_units,COALESCE(SUM(reserved_delta_units),0) AS reserved_units FROM wallet_ledger_entries WHERE account_id=?").bind(account.id).first<any>(),
     env.DB.prepare("SELECT network_code,asset,network_name,CASE WHEN deposits_enabled=1 AND (SELECT enabled FROM wallet_settings WHERE id=1)=1 THEN deposit_address ELSE NULL END AS deposit_address,deposits_enabled,withdrawals_enabled,monitor_enabled FROM wallet_networks ORDER BY network_code").all<any>(),
-    env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,destination_address,payout_tx_hash,created_at,updated_at FROM wallet_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(session.user.id).all<any>()
+    env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,destination_address,payout_tx_hash,chain_confirmations,chain_error,chain_verified_at,created_at,updated_at FROM wallet_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(session.user.id).all<any>()
   ]);
   return json({ok:true,wallet:{enabled:!!settings?.enabled,asset:"USDT",scale:USDT_SCALE,availableUnits:Number(balance?.available_units||0),reservedUnits:Number(balance?.reserved_units||0),minDepositUnits:Number(settings?.min_deposit_units||0),maxDepositUnits:Number(settings?.max_deposit_units||0),minWithdrawalUnits:Number(settings?.min_withdrawal_units||0),maxWithdrawalUnits:Number(settings?.max_withdrawal_units||0),networks:networks.results||[],transactions:transactions.results||[]}});
 }
@@ -906,7 +906,7 @@ async function handleWalletDeposit(request:Request,env:Env):Promise<Response>{
   if(prior)return json({ok:true,duplicate:true,transaction:prior});
   const account=await walletAccount(env,session.user.id),id=crypto.randomUUID();
   try{
-    await env.DB.prepare("INSERT INTO wallet_transactions(id,account_id,user_id,type,status,amount_units,asset,network_code,tx_hash,idempotency_key) VALUES(?,?,?,'deposit','pending_review',?,'USDT',?,?,?)").bind(id,account.id,session.user.id,units,networkCode,txHash,key).run();
+    await env.DB.prepare("INSERT INTO wallet_transactions(id,account_id,user_id,type,status,amount_units,asset,network_code,tx_hash,idempotency_key,deposit_address_snapshot) VALUES(?,?,?,'deposit','pending_review',?,'USDT',?,?,?,?)").bind(id,account.id,session.user.id,units,networkCode,txHash,key,network.deposit_address).run();
   }catch{
     const duplicate=await env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,created_at FROM wallet_transactions WHERE user_id=? AND idempotency_key=?").bind(session.user.id,key).first<any>();
     if(duplicate)return json({ok:true,duplicate:true,transaction:duplicate});
