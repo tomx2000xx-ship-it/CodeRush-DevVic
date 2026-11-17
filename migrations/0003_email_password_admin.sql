@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS admin_accounts(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,email TEXT NOT NULL COLLATE NOCASE UNIQUE,password_hash TEXT NOT NULL,password_salt TEXT NOT NULL,is_super_admin INTEGER NOT NULL DEFAULT 0 CHECK(is_super_admin IN (0,1)),created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_one_super_admin ON admin_accounts(is_super_admin) WHERE is_super_admin=1;
+CREATE TABLE IF NOT EXISTS admin_login_attempts(id TEXT PRIMARY KEY,email TEXT NOT NULL COLLATE NOCASE,success INTEGER NOT NULL CHECK(success IN (0,1)),created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')));
+CREATE INDEX IF NOT EXISTS idx_admin_login_attempts_email_time ON admin_login_attempts(email,created_at);
