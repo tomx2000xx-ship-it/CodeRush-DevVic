@@ -66,7 +66,7 @@ const welcomeText = [
   "📊 تابع المواجهات، استكشف الاحتمالات، وجرّب أدوات CodeRush في بيئة تجريبية مصممة لتمنحك تجربة ممتعة وسهلة.", "",
   "تنبيه: CodeRush حالياً نسخة تجريبية فقط. جميع الأرصدة والاحتمالات والأنشطة افتراضية، ولا توجد أموال حقيقية أو رهانات أو مدفوعات.", "",
   "👋 أهلاً بك، ونتمنى لك تجربة ممتعة!"
-].join("\\n");
+].join("\n");
 
 async function sendWelcome(chatId: number, env: Env) {
   const keyboard: Array<Array<Record<string, unknown>>> = [[{ text: "⚽ افتح CodeRush وابدأ الاستكشاف", web_app: { url: APP_URL } }]];
