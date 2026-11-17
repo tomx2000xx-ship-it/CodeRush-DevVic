@@ -590,6 +590,7 @@ async function handleBetCreate(request:Request,env:Env):Promise<Response>{
   if(!validated.ok)return json({ok:false,error:validated.error},validated.status);
   const quoteTime=typeof body.quoteValidatedAt==="string"?Date.parse(body.quoteValidatedAt):NaN;
   if(!Number.isFinite(quoteTime)||quoteTime>Date.now()+60000)return json({ok:false,error:"The ticket quote timestamp is invalid. Refresh the ticket prices."},400);
+  if(Date.now()-quoteTime>30000)return json({ok:false,error:"The ticket quote has expired. Updated prices are being loaded; review them before saving."},409);
   if(!Array.isArray(body.quotedOdds)||body.quotedOdds.length!==validated.selections.length)return json({ok:false,error:"The ticket price snapshot is missing. Refresh the ticket prices."},400);
   const quoted=new Map(body.quotedOdds.map(q=>[String(q.fixtureId)+":"+String(q.outcomeKey),Number(q.odd)]));
   if(validated.selections.some(pick=>quoted.get(pick.fixtureId+":"+pick.outcomeKey)!==pick.odd))return json({ok:false,error:"Odds have changed since this ticket was quoted. The updated prices are being loaded; review them before saving."},409);
