@@ -1132,6 +1132,10 @@ async function handleWalletAdminTransactions(request:Request,env:Env):Promise<Re
   }
   await env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),id,admin.id,"admin_"+action,JSON.stringify({note,payoutTxHash:body.payoutTxHash||null})).run();
   const updated=await env.DB.prepare("SELECT id,type,status,amount_units,asset,network_code,tx_hash,destination_address,payout_tx_hash,updated_at FROM wallet_transactions WHERE id=?").bind(id).first<any>();
+  if(tx.type==="withdrawal"&&updated?.status!==tx.status){
+    const state=updated.status==="processing"?"approved":updated.status==="rejected"?"rejected":updated.status==="completed"?"paid":String(updated.status),amount=(Number(tx.amount_units)/USDT_SCALE).toFixed(2);
+    await createUserNotification(env,tx.user_id,"withdrawal-status:"+id+":"+updated.status,"wallet","Withdrawal "+state,"Your "+amount+" USDT withdrawal request is now "+state+". "+(updated.status==="completed"?"The manual payout has been recorded.":updated.status==="rejected"?"The request was rejected and reserved funds were released.":"An administrator approved the request; payout remains manual."),"تحديث حالة السحب","تم تحديث طلب السحب بقيمة "+amount+" USDT إلى الحالة: "+state+".","/wallet");
+  }
   return json({ok:true,transaction:updated});
 }
 
