@@ -43,7 +43,7 @@ test("bet placement remains safely blocked until real-money ledger and settlemen
 
 test("withdrawals remain manually reviewed and manually paid", () => {
   assert.match(worker, /action==="paid"/);
-  assert.match(worker, /Manual payout has been recorded/);
+  assert.match(worker, /manual payout has been recorded/i);
   assert.doesNotMatch(worker, /eth_sendRawTransaction|wallet_sendTransaction|privateKey.*signTransaction/i);
 });
 
