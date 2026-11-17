@@ -1398,3 +1398,37 @@ html[dir="rtl"] .app :where(.nav-item,.quick-actions button,.daily-reward>button
   html[dir="rtl"] .app :where(.quick-actions b){font-size:8px}
   html[dir="rtl"] .app :where(.nav-item){min-width:0;flex:1}
 }
+
+
+/* Phase 5 server-backed USDT wallet */
+.wallet-server-view{padding-bottom:34px}
+.wallet-server-balance{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 15px;padding:20px;border:1px solid #f3d5da;border-radius:18px;background:linear-gradient(130deg,#fff7f8,#ffffff);color:#5c202a}
+.wallet-server-balance>div{min-width:0}
+.wallet-server-balance span{display:block;color:#c23a50;font-size:9px;font-weight:800;letter-spacing:1px}
+.wallet-server-balance strong{display:block;margin-top:5px;font:700 30px 'Space Grotesk';overflow-wrap:anywhere}
+.wallet-server-balance strong small{font-size:13px;color:#b23a4d}
+.wallet-server-balance p{margin:7px 0 0;color:#9a6a72;font-size:10px}
+.wallet-server-balance>svg{flex:none;color:#c12842}
+.wallet-server-notice{display:flex;align-items:flex-start;gap:10px;margin:14px 0;padding:14px;border:1px solid #f0d4d9;border-radius:14px;background:#fff5f6;color:#9d3548}
+.wallet-server-notice>svg{flex:none;margin-top:2px}
+.wallet-server-notice b{display:block;font-size:12px}
+.wallet-server-notice p{margin:5px 0 0;color:#8f626a;font-size:10px;line-height:1.65}
+.wallet-server-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.wallet-server-actions button{min-height:48px;display:flex;align-items:center;justify-content:center;gap:7px;border:0;border-radius:12px;background:#bd3048;color:#fff;font-size:11px;font-weight:800}
+.wallet-server-actions button+button{background:#292126}
+.wallet-network-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 11px;border:1px solid #f4dce0;border-radius:12px;background:#fff;margin-top:8px}
+.wallet-network-row>div{min-width:0;display:flex;flex-direction:column;gap:4px}
+.wallet-network-row b{font-size:11px;color:#5d222c}
+.wallet-network-row small{font-size:9px;color:#b24a5b;overflow-wrap:anywhere}
+.wallet-network-row button{width:36px;height:36px;flex:none;display:grid;place-items:center;border:1px solid #f1d4d9;border-radius:9px;background:#fff4f6;color:#be324a}
+.wallet-server-footnote{margin:16px 4px 0;color:#98777c;font-size:9px;line-height:1.7}
+.wallet-server-error{padding:10px;color:#a52c3f;font-size:11px}
+.wallet-server-refresh{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-height:40px;margin:12px 0;border:1px solid #f2d6db;border-radius:10px;background:#fff;color:#b72f47;font-size:10px}
+.wallet-network-select{width:100%;min-height:44px;margin:4px 0 13px;padding:10px;border:1px solid #f0d0d6;border-radius:10px;background:#fff7f8;color:#642530;font:inherit;font-size:12px}
+.wallet-sample-address code{display:block;margin:10px 0;padding:10px;border-radius:8px;background:#fff;color:#692b35;font-size:10px;overflow-wrap:anywhere;user-select:text}
+.wallet-sample-address button{display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px 10px;border:1px solid #f0d0d6;border-radius:8px;background:#fff;color:#b52f46;font-size:10px}
+.wallet-flow-primary:disabled{opacity:.45;cursor:not-allowed}
+.wallet-server-view .wallet-live-pill{padding:6px 9px;border-radius:20px;background:#fff0f2;color:#b72e46;font-size:8px}
+.wallet-server-view .wallet-live-pill.active{background:#e9f8ef;color:#218653}
+.wallet-server-view .stage6-tx-copy small{overflow-wrap:anywhere}
+@media(max-width:370px){.wallet-server-balance{padding:15px}.wallet-server-balance strong{font-size:25px}.wallet-server-actions button{font-size:10px}}
