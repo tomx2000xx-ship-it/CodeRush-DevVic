@@ -870,7 +870,7 @@ async function handleWalletAdminSettings(request:Request,env:Env):Promise<Respon
 async function handleWalletAdminTransactions(request:Request,env:Env):Promise<Response>{
   const admin=await walletAdminSession(request,env);if(!admin)return json({ok:false,error:"Administrator access required"},403);
   if(request.method==="GET"){
-    const rows=await env.DB.prepare("SELECT t.id,t.user_id,u.display_name,u.telegram_username,t.type,t.status,t.amount_units,t.asset,t.network_code,t.tx_hash,t.destination_address,t.payout_tx_hash,t.created_at,t.updated_at,t.review_note FROM wallet_transactions t JOIN users u ON u.id=t.user_id ORDER BY CASE WHEN t.status='pending_review' THEN 0 WHEN t.status='processing' THEN 1 ELSE 2 END,t.created_at DESC LIMIT 100").all<any>();
+    const rows=await env.DB.prepare("SELECT t.id,t.user_id,u.display_name,u.telegram_username,t.type,t.status,t.amount_units,t.asset,t.network_code,t.tx_hash,t.destination_address,t.payout_tx_hash,t.created_at,t.updated_at,t.review_note FROM wallet_transactions t JOIN users u ON u.id=t.user_id WHERE t.status IN ('pending_review','processing') ORDER BY CASE WHEN t.status='pending_review' THEN 0 WHEN t.status='processing' THEN 1 ELSE 2 END,t.created_at DESC LIMIT 100").all<any>();
     return json({ok:true,transactions:rows.results||[]});
   }
   if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);
