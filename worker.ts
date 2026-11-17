@@ -779,7 +779,7 @@ async function verifyEvmDeposit(tx:any,network:any):Promise<DepositCheck>{
  let total=0n,from:string|null=null;
  for(const log of receipt.logs||[]){
   if(String(log.address||"").toLowerCase()!==token)continue;
-  const topics=(log.topics||[]).map((x:string)=>String(x).toLowerCase());
+  const topics=(log.topics||[]).map((x:string)=>String(x).toLowerCase().replace(/^0x/,""));
   if(topics[0]!==("0x"+USDT_TRANSFER_TOPIC)||topics.length<3||topics[2].slice(-40)!==destination)continue;
   total+=BigInt(log.data||"0x0");if(!from)from="0x"+topics[1].slice(-40);
  }
@@ -803,7 +803,7 @@ async function verifyTronDeposit(tx:any,network:any,env:Env):Promise<DepositChec
  let total=0n,from:string|null=null;
  for(const log of info.log||[]){
   const contract=String(log.address||"").toLowerCase().replace(/^41/,"");
-  const topics=(log.topics||[]).map((x:string)=>String(x).toLowerCase());
+  const topics=(log.topics||[]).map((x:string)=>String(x).toLowerCase().replace(/^0x/,""));
   if(contract!==token||topics[0]!==USDT_TRANSFER_TOPIC||topics.length<3||topics[2].slice(-40)!==destination)continue;
   total+=BigInt("0x"+String(log.data||"0"));if(!from)from=topics[1].slice(-40);
  }
@@ -813,6 +813,8 @@ async function verifyTronDeposit(tx:any,network:any,env:Env):Promise<DepositChec
  return {state:"verified",blockNumber:Number(info.blockNumber),confirmations:1,amountUnits,fromAddress:from};
 }
 async function monitorPendingWalletDeposits(env:Env):Promise<void>{
+ const scanStarted=isoNow();
+ await env.DB.prepare("UPDATE wallet_monitor_state SET last_checked_at=?,updated_at=?").bind(scanStarted,scanStarted).run();
  const rows=await env.DB.prepare("SELECT t.*,COALESCE(t.deposit_address_snapshot,n.deposit_address) AS deposit_address,n.monitor_enabled FROM wallet_transactions t JOIN wallet_networks n ON n.network_code=t.network_code WHERE t.type='deposit' AND t.status IN ('pending_review','processing') AND n.monitor_enabled=1 ORDER BY t.created_at ASC LIMIT 10").all<any>();
  for(const tx of rows.results||[]){
   const network={deposit_address:tx.deposit_address};
