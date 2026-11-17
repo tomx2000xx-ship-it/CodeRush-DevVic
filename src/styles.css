@@ -24,8 +24,8 @@
 .match-detail-inline{margin-top:9px;padding:10px;border-radius:9px;background:#1e1013;border:1px solid #502b31}.match-detail-inline>p{font-size:9px;color:#dc7c8c;margin:7px 0}
 .bet-slip{margin-top:15px;padding:15px;border:1px solid #512e34;border-radius:15px;background:linear-gradient(145deg,#18271f,#231316)}.slip-title,.demo-bet-top,.history-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px}.slip-title h3{font:700 17px 'Space Grotesk';margin:5px 0}.slip-title h3 span{display:inline-grid;place-items:center;width:19px;height:19px;border-radius:50%;background:#ef687f;color:#1a0e10;font:700 10px 'DM Sans'}.clear-slip{border:0;background:transparent;color:#ed8798;font-size:9px}
 .slip-pick{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:11px 0;border-top:1px solid #2b3a31}.slip-pick div{min-width:0}.slip-pick b{display:block;font-size:10px;overflow-wrap:anywhere}.slip-pick small{display:block;color:#91a18f;font-size:8px;margin-top:4px}.slip-pick strong{color:#f3899a;font-size:12px}.slip-pick button{width:28px;height:28px;border:1px solid #533d41;border-radius:7px;background:#202d24;color:#e9aeb8;display:grid;place-items:center}
-.stake-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-top:1px solid #2b3a31;color:#dfe8dc;font-size:10px}.stake-row>div{display:flex;align-items:center;gap:6px}.stake-row button{width:30px;height:30px;border:1px solid #513a3e;border-radius:7px;background:#202d24;color:#ef687f;display:grid;place-items:center}.stake-row input{width:75px;height:32px;border:1px solid #513a3e;border-radius:7px;background:#1a0e10;color:#fcf4f5;text-align:center;font-weight:700}.slip-totals{display:grid;gap:8px;padding:12px;border-radius:9px;background:#1d1012}.slip-totals span{display:flex;justify-content:space-between;color:#9caaad;font-size:9px}.slip-totals b{color:#f7e2e5}.slip-totals strong{color:#f27f92;font-size:12px}.place-demo{width:100%;margin-top:11px;padding:13px;border:0;border-radius:9px;background:#ef687f;color:#190d0f;display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;font-weight:800}.place-demo:disabled{opacity:.45}
-.history-heading{display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px}.history-heading h3{font:700 15px 'Space Grotesk';margin:0}.history-heading span{font-size:9px;color:#da7384}.demo-bet-card{margin-bottom:10px;padding:13px;border:1px solid #502c32;border-radius:12px;background:#231316}.demo-bet-top{font-size:8px;color:#d2566b;letter-spacing:.4px}.demo-open{color:#ef687f}.history-pick{padding:10px 0 6px;border-bottom:1px solid #4a272d}.history-pick b{display:block;font-size:10px}.history-pick small{display:block;margin-top:4px;color:#dc7d8d;font-size:8px}.history-bottom{padding-top:10px;color:#d66678;font-size:8px}.history-bottom b{display:block;color:#f4d7dc;font-size:10px;margin-top:4px}
+.stake-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-top:1px solid #2b3a31;color:#dfe8dc;font-size:10px}.stake-row>div{display:flex;align-items:center;gap:6px}.stake-row button{width:30px;height:30px;border:1px solid #513a3e;border-radius:7px;background:#202d24;color:#ef687f;display:grid;place-items:center}.stake-row input{width:75px;height:32px;border:1px solid #513a3e;border-radius:7px;background:#1a0e10;color:#fcf4f5;text-align:center;font-weight:700}.slip-totals{display:grid;gap:8px;padding:12px;border-radius:9px;background:#1d1012}.slip-totals span{display:flex;justify-content:space-between;color:#9caaad;font-size:9px}.slip-totals b{color:#f7e2e5}.slip-totals strong{color:#f27f92;font-size:12px}.place-bet-disabled{width:100%;margin-top:11px;padding:13px;border:0;border-radius:9px;background:#ef687f;color:#190d0f;display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;font-weight:800}.place-bet-disabled:disabled{opacity:.45}
+.history-heading{display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px}.history-heading h3{font:700 15px 'Space Grotesk';margin:0}.history-heading span{font-size:9px;color:#da7384}.demo-bet-card{margin-bottom:10px;padding:13px;border:1px solid #502c32;border-radius:12px;background:#231316}.demo-bet-top{font-size:8px;color:#d2566b;letter-spacing:.4px}.bet-status-pill{color:#ef687f}.history-pick{padding:10px 0 6px;border-bottom:1px solid #4a272d}.history-pick b{display:block;font-size:10px}.history-pick small{display:block;margin-top:4px;color:#dc7d8d;font-size:8px}.history-bottom{padding-top:10px;color:#d66678;font-size:8px}.history-bottom b{display:block;color:#f4d7dc;font-size:10px;margin-top:4px}
 
 /* Stage 5 — profile activity, referrals and notifications */
 .stage5-ref{position:relative;overflow:hidden}.stage5-ref-icon{float:inline-end;width:42px;height:42px;display:grid;place-items:center;border-radius:13px;background:#43272c;color:#f28194}.stage5-ref h2{margin-top:12px}.ref-code{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:17px;padding:11px;border:1px solid #3a4b35;border-radius:10px;background:#1d1012}.ref-code span{display:grid;gap:4px}.ref-code small{font-size:7px;letter-spacing:1px;color:#94a48c}.ref-code b{font:700 15px 'Space Grotesk';letter-spacing:1.5px;color:#f4d7dc}.ref-code button{display:flex;align-items:center;gap:5px;border:0;border-radius:8px;background:#ef687f;color:#190d0f;padding:9px 10px;font-size:9px;font-weight:800}.stage5-hint{display:block;margin-top:8px;color:#d04e64;font-size:8px}.stage5-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}.stage5-stats>div{display:grid;gap:5px;padding:14px;border:1px solid #502c32;border-radius:12px;background:#231316;color:#ef687f}.stage5-stats small{font-size:9px;color:#dc7c8c}.stage5-stats b{font:700 21px 'Space Grotesk';color:#fbf0f2}.stage5-stats span{font-size:8px;color:#d2566b}.stage5-levels{margin-top:13px}.stage5-section-head{display:flex;align-items:center;justify-content:space-between;color:#ef687f}.stage5-section-head h3{margin:5px 0 8px}.stage5-level{align-items:center!important}.stage5-level span{display:grid;gap:3px}.stage5-level span b{color:#f8e6e9}.stage5-level span small{font-size:8px;color:#d3596d}.stage5-level strong{font:700 17px 'Space Grotesk';color:#ef687f}.stage5-activity{margin-top:23px}.stage5-notice-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px}.stage5-notice-toolbar .filter-row{margin:0 0 12px}.stage5-markall{display:flex;align-items:center;gap:5px;border:0;background:transparent;color:#ef687f;font-size:8px;white-space:nowrap}.stage5-markall:disabled{opacity:.35}.stage5-notice-list{display:grid;gap:8px;margin-top:14px}.stage5-notice{display:flex;align-items:flex-start;gap:10px;padding:13px;border:1px solid #452e32;border-radius:12px;background:#17241f}.stage5-notice.read{border-color:#4b292f;background:#231315}.stage5-notice-icon{width:33px;height:33px;flex:none;display:grid;place-items:center;border-radius:10px;background:#332023;color:#ef687f}.stage5-notice-copy{min-width:0;flex:1}.stage5-notice-copy>div{display:flex;align-items:center;gap:7px}.stage5-notice-copy b{font-size:10px;color:#faebee}.stage5-notice-copy i{width:6px;height:6px;border-radius:50%;background:#ef687f}.stage5-notice-copy p{margin:5px 0;color:#dc7c8c;font-size:9px;line-height:1.55}.stage5-notice-copy small{font-size:8px;color:#d2566b}.stage5-notice>svg:last-child{margin-top:8px;color:#ce475d}.stage5-disclaimer{margin-top:16px}
@@ -54,7 +54,7 @@ html[dir="rtl"] input[type="number"]{direction:ltr;text-align:center}
 html[dir="rtl"] .odds,html[dir="rtl"] .detail-odds,html[dir="rtl"] .quick-actions,html[dir="rtl"] .summary-grid,html[dir="rtl"] .stage5-stats,html[dir="rtl"] .stage6-totals{direction:rtl}
 html[dir="rtl"] .stage5-notice,html[dir="rtl"] .stage6-notice{direction:rtl}
 html[dir="rtl"] .stage6-tx{direction:rtl}
-html[dir="rtl"] .onboard-submit,html[dir="rtl"] .primary,html[dir="rtl"] .place-demo{direction:rtl}
+html[dir="rtl"] .onboard-submit,html[dir="rtl"] .primary,html[dir="rtl"] .place-bet-disabled{direction:rtl}
 html[dir="rtl"] .toast{direction:rtl}
 
 /* Stage 8 — demo readiness, accessibility and device-safe polish */
@@ -134,7 +134,7 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 .match-card,.betting-match{position:relative;padding:12px;border:1px solid #f3d4d9;border-radius:16px;background:#ffffff;box-shadow:0 4px 14px #5d212b0b;color:#321d20}.match-meta{font-size:8px;color:#7d8b98}.match-meta .live{padding:4px 8px;border-radius:14px;background:#fef1f3;color:#df596f}.teams{margin:13px 3px}.team{font-size:10px;color:#41292d}.crest{width:43px;height:43px;border-radius:50%;background:#ffffff;border:1px solid #f5dbdf;box-shadow:0 3px 9px #4e202820;color:#c9354e}.club-crest img{width:34px;height:34px;object-fit:contain}.versus{padding:8px 12px;border-radius:12px;background:#fbf1f3;color:#ca3951;font-size:11px}.odds{gap:7px}.odd{min-height:54px;padding:8px 9px;border:1px solid #f4d7dc;border-radius:11px;background:#fcf4f5;color:#42292d;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px}.odd small{font-size:8px;color:#7e8c99}.odd b{font:800 14px 'Space Grotesk';color:#c6354d}.odd.selected{border:2px solid #dc4d65;background:#fde7eb;color:#b7233c;box-shadow:0 4px 12px #d54d6426}.market-head{display:flex;justify-content:space-between;align-items:center;margin:8px 0;font-size:8px;color:#6f8190}.market-head small{color:#cd445b}.match-details-link{border-top:1px solid #f8e3e7;color:#c8354e}.match-detail-inline{background:#fef6f7;border-color:#f6dde1}.detail-odds{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.detail-odd{border:1px solid #f4d7dc;background:#ffffff;border-radius:9px;padding:8px;color:#b93148}.detail-odd b{display:block;color:#c8354e;margin-top:4px}.detail-odd.chosen{border-color:#d4425a;background:#fdecef}
 .page-title{padding:17px 0 11px}.page-title p{color:#81909d;font-size:10px}.league-ribbon{display:flex;align-items:center;gap:10px;margin:10px 0;padding:12px;border:1px solid #f4d7dc;border-radius:13px;background:#ffffff}.league-ribbon>div{display:grid;gap:4px;flex:1}.league-ribbon b{font-size:11px;color:#493034}.league-ribbon small{font-size:8px;color:#8795a2}.league-pill{padding:5px 8px;border-radius:12px;background:#fdeaed;color:#c7354d;font-size:8px}.match-search{height:44px;display:flex;align-items:center;gap:9px;padding:0 12px;margin:10px 0;border:1px solid #f4d7dc;border-radius:12px;background:#ffffff;color:#d04c62}.match-search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:#382125;font:inherit;font-size:10px}.match-toolbar{display:flex;align-items:center;justify-content:space-between;gap:6px}.match-toolbar .filter-row{overflow:auto;min-width:0;gap:5px;margin:6px 0 10px}.filter{padding:8px 10px;border-color:#f4d7dc;background:#ffffff;color:#6f7f8e;white-space:nowrap}.filter.active{background:#dd4b63;border-color:#dd4b63;color:#ffffff}.favorite-filter,.match-sort button{display:flex;align-items:center;gap:5px;border:1px solid #f4d7dc;border-radius:18px;background:#ffffff;color:#728292;padding:8px 10px;font-size:8px;white-space:nowrap}.favorite-filter.active{background:#fdeaed;border-color:#ea8c9c;color:#c7354d}.match-sort{display:flex;align-items:center;justify-content:space-between;margin:6px 0 10px;color:#9aa6b1;font-size:8px}.fixture-star{position:absolute;left:10px;top:10px;width:28px;height:28px;border:0;border-radius:9px;background:#fbedef;color:#d2586c;display:grid;place-items:center}.fixture-star.saved{color:#e33653;background:#fcdce2}.match-progress{display:flex;gap:3px;margin:7px 0}.match-progress span{height:4px;flex:1;border-radius:6px;background:#f7e2e5}.match-progress span:first-child{background:linear-gradient(90deg,#f06b81,#ee536d)}
 .live-sim-panel{margin:15px 0;padding:14px;border:1px solid #eebec6;border-radius:16px;background:linear-gradient(145deg,#ffffff,#fef8f9);color:#3f272b}.live-sim-head{color:#d95369;font-size:9px}.live-sim-score{margin:12px 0}.live-sim-score strong{font-size:25px;color:#d94d64}.sim-progress{height:5px;background:#f7e3e6;border-radius:8px}.sim-progress span{display:block;height:100%;background:linear-gradient(90deg,#ed647b,#ef6178);border-radius:8px}.sim-timeline>div{border-bottom:1px solid #f6dee2;color:#748290}.sim-disclaimer{color:#9aa5af}
-.bet-slip{border:1px solid #f3d3d8;background:linear-gradient(145deg,#fef3f5,#ffffff);border-radius:17px;color:#3f272b}.slip-title h3{color:#42262b}.slip-title h3 svg{color:#d74b62}.clear-slip{color:#cb3d54}.slip-pick{border-color:#f6dce0}.slip-pick b{color:#472d31}.slip-pick strong{color:#c7344d}.slip-pick button{background:#ffffff;border-color:#f4d7dc;color:#7c8c99}.stake-row{border-color:#f6dce0;color:#4e3438}.stake-row button{background:#fdedf0;border-color:#f4d5da;color:#ca364f}.stake-row input{background:#ffffff;border-color:#f4d7dc;color:#42272c}.slip-totals{background:#fceaed}.slip-totals span{color:#ca3951}.slip-totals b{color:#492d32}.slip-totals strong{color:#c6314a}.place-demo{background:linear-gradient(110deg,#e14d66,#c6324b);color:#ffffff;border-radius:11px}
+.bet-slip{border:1px solid #f3d3d8;background:linear-gradient(145deg,#fef3f5,#ffffff);border-radius:17px;color:#3f272b}.slip-title h3{color:#42262b}.slip-title h3 svg{color:#d74b62}.clear-slip{color:#cb3d54}.slip-pick{border-color:#f6dce0}.slip-pick b{color:#472d31}.slip-pick strong{color:#c7344d}.slip-pick button{background:#ffffff;border-color:#f4d7dc;color:#7c8c99}.stake-row{border-color:#f6dce0;color:#4e3438}.stake-row button{background:#fdedf0;border-color:#f4d5da;color:#ca364f}.stake-row input{background:#ffffff;border-color:#f4d7dc;color:#42272c}.slip-totals{background:#fceaed}.slip-totals span{color:#ca3951}.slip-totals b{color:#492d32}.slip-totals strong{color:#c6314a}.place-bet-disabled{background:linear-gradient(110deg,#e14d66,#c6324b);color:#ffffff;border-radius:11px}
 .stage5-ref,.ref-card{background:linear-gradient(135deg,#1d1012,#271518 60%,#190d0f);border:1px solid #55252d;color:#ffffff;border-radius:19px;box-shadow:0 9px 24px #4c1b231a}.stage5-ref h2{color:#ffffff}.stage5-ref p{color:#e7a4af}.stage5-ref .eyebrow{color:#ed6f84}.stage5-ref-icon{background:#4c1b23;color:#ee7589}.ref-code{background:#2b171b;border-color:#69353e}.ref-code b{color:#ef768a}.ref-code button{background:#e24c65;color:white}.stage5-stats>div,.levels,.account-card{background:#ffffff;border-color:#f4d7dc;color:#4d3337}.stage5-stats>div{color:#d54a61}.stage5-stats small,.stage5-stats span{color:#82909d}.stage5-stats b{color:#40262a}.stage5-section-head{color:#d0475e}.stage5-level{border-color:#f6dde1!important}.stage5-level span b{color:#452b2f}.stage5-level strong{color:#d3354f}.stage5-activity .empty{background:#ffffff;border-color:#f4d7dc;color:#d45b6f}.stage5-activity .empty h3{color:#42272c}.detail-disclaimer{color:#d45c70}.stage5-notice{background:#fdeff1;border-color:#efbac3;color:#43292d;box-shadow:0 4px 12px #804b540a}.stage5-notice.read{background:#ffffff;border-color:#f5d9de}.stage5-notice-copy b{color:#40272b}.stage5-notice-copy p{color:#788897}.stage5-notice-icon{background:#fcdce2;color:#d0334d}
 .stage6-wallet-card{background:linear-gradient(125deg,#df4a63,#dc4d65);border:0;border-radius:20px;box-shadow:0 10px 24px #d3425a2b;color:white}.stage6-wallet-head{color:white}.stage6-wallet-card small,.stage6-wallet-foot{color:#fce5e9}.stage6-wallet-card h2{color:#ffffff;font-size:34px}.stage6-wallet-card h2 em{color:#fde7eb}.stage6-totals{grid-template-columns:repeat(2,minmax(0,1fr))}.stage6-totals>div{background:#ffffff;border:1px solid #f4d7dc;border-radius:15px;padding:15px;color:#d24c62}.stage6-totals small{color:#d04f64}.stage6-totals b{color:#40272b}.stage6-action-card,.stage6-history{background:#ffffff;border-color:#f4d7dc;color:#40272b}.stage6-mode{background:#fcf1f3}.stage6-mode button{color:#778795}.stage6-mode button.active{background:#dd4b63;color:#ffffff}.stage6-action-card label{color:#748493}.stage6-amount{background:#fef8f9;border-color:#f4d7dc}.stage6-amount input{color:#40272b}.stage6-network{border-color:#f6dee2}.stage6-network span{color:#81909c}.stage6-network b{color:#ca3850}.stage6-submit{background:#dd4b63;color:white}.stage6-notice{background:#fcf0f2;border-color:#f5dbdf;color:#72818f}.stage6-tx{border-color:#f6dee2}.stage6-tx-copy b{color:#40272b}.stage6-tx-copy small{color:#82909c}.stage6-reset{border-color:#f4d7dc;color:#6f7f8c;background:#ffffff}
 .page-title h1{color:#321d20}.page-title p{color:#7e8c99}.empty{background:#ffffff;border-color:#f4d7dc;color:#81909d}.empty h3{color:#40272b}.empty .primary{background:#dd4b63;color:white}.account-card{background:#ffffff;color:#40272b}.menu-row{color:#4f3439;border-color:#f6dfe3}.menu-row svg{color:#d15267}.menu-row svg:last-child{color:#8c9aa6}.promo{background:linear-gradient(120deg,#fdeaed,#ffffff);border-color:#f5d5da;color:#41262b}.promo h3{color:#41272b}.promo p{color:#7f8d99}.promo button{color:#c9364e}.promo-icon{color:#dc556c}
@@ -670,7 +670,7 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 .sb-page-heading{display:flex;align-items:center;justify-content:space-between;margin:5px 0 13px}
 .sb-page-heading>div>span{font-size:9px;letter-spacing:1.8px;font-weight:800;color:#dd7d8d}
 .sb-page-heading h2{font-size:24px;line-height:1.1;margin:4px 0 0;font-weight:800}
-.sb-demo-tag{font-size:8px;font-weight:800;letter-spacing:.8px;border:1px solid #763641;background:#2b171a;color:#f27b8f;border-radius:20px;padding:6px 9px}
+.sb-provider-tag{font-size:8px;font-weight:800;letter-spacing:.8px;border:1px solid #763641;background:#2b171a;color:#f27b8f;border-radius:20px;padding:6px 9px}
 .sb-summary-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px}
 .sb-summary-strip>div{background:#251417;border:1px solid #4a262c;border-radius:12px;padding:9px 10px;display:flex;flex-direction:column;gap:4px}
 .sb-summary-strip small{font-size:9px;color:#d7687b}
@@ -774,7 +774,7 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 .sb-ticket-sheet .slip-totals{display:flex;flex-direction:column;gap:8px;margin:12px 0;padding:11px;border-radius:10px;background:#321b1f}
 .sb-ticket-sheet .slip-totals>span{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:#e49aa6}
 .sb-ticket-sheet .slip-totals b,.sb-ticket-sheet .slip-totals strong{color:#ffffff;font-size:12px}
-.sb-ticket-sheet .place-demo{width:100%;margin-top:3px}
+.sb-ticket-sheet .place-bet-disabled{width:100%;margin-top:3px}
 .sb-ticket-clear{width:100%;margin-top:9px;padding:9px;border:1px solid #684047;border-radius:9px;background:transparent;color:#ecb7c0;font-size:10px}
 .sb-ticket-sheet .detail-disclaimer{text-align:center;font-size:9px;color:#d55f73;margin:10px 0 0}
 
@@ -784,7 +784,7 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 .sb-page-heading{margin:7px 2px 12px}
 .sb-page-heading>div>span{color:#82909d;font-size:9px;letter-spacing:1.35px}
 .sb-page-heading h2{color:#321d20;font-size:25px;font-weight:900}
-.sb-demo-tag{border:1px solid #eeb9c2;background:#fceaed;color:#cb3d54;padding:6px 10px}
+.sb-provider-tag{border:1px solid #eeb9c2;background:#fceaed;color:#cb3d54;padding:6px 10px}
 .sb-summary-strip{gap:8px;margin-bottom:12px}
 .sb-summary-strip>div{min-height:75px;padding:11px 12px;border:1px solid #f4d4da;border-radius:17px;background:#ffffff;box-shadow:0 5px 16px #5d28310a}
 .sb-summary-strip small{font-size:9px;color:#82909d}
@@ -869,7 +869,7 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 .sb-ticket-sheet .slip-totals{background:#fcf1f3;border:1px solid #f6dde1}
 .sb-ticket-sheet .slip-totals>span{color:#718090}
 .sb-ticket-sheet .slip-totals b,.sb-ticket-sheet .slip-totals strong{color:#40262a}
-.sb-ticket-sheet .place-demo{background:#e04b64;color:#ffffff}
+.sb-ticket-sheet .place-bet-disabled{background:#e04b64;color:#ffffff}
 .sb-ticket-clear{border-color:#f4d4da;color:#718090}
 .sb-ticket-sheet .detail-disclaimer{color:#82909d}
 .sporty-matches .empty{background:#ffffff;border-color:#f4d4da;color:#718090}
@@ -1035,12 +1035,12 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 .wallet-review-list span{color:#d86c7e}
 .wallet-review-list b{text-align:end;color:#f8e4e7}
 .wallet-review-list .total b{color:#a9e5bd;font-size:12px}
-.wallet-sample-address{margin:12px 0;padding:12px;border:1px dashed #bb3249;border-radius:11px;background:#271a1c}
-.wallet-sample-address>div{display:flex;align-items:center;gap:7px;color:#f493a3}
-.wallet-sample-address>div b{font-size:8px;letter-spacing:.4px}
-.wallet-sample-address code{display:block;margin:10px 0;overflow-wrap:anywhere;color:#fac9d1;font:700 10px 'DM Sans'}
-.wallet-sample-address button{display:flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid #804751;border-radius:7px;background:#44262b;color:#f7b2bd;font-size:9px}
-.wallet-demo-warning{color:#e59ba7;font-size:8px;line-height:1.5}
+.wallet-deposit-address{margin:12px 0;padding:12px;border:1px dashed #bb3249;border-radius:11px;background:#271a1c}
+.wallet-deposit-address>div{display:flex;align-items:center;gap:7px;color:#f493a3}
+.wallet-deposit-address>div b{font-size:8px;letter-spacing:.4px}
+.wallet-deposit-address code{display:block;margin:10px 0;overflow-wrap:anywhere;color:#fac9d1;font:700 10px 'DM Sans'}
+.wallet-deposit-address button{display:flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid #804751;border-radius:7px;background:#44262b;color:#f7b2bd;font-size:9px}
+.wallet-transaction-warning{color:#e59ba7;font-size:8px;line-height:1.5}
 .wallet-processing-state,.wallet-success-state{text-align:center;padding:23px 4px 5px}
 .wallet-processing-orbit{width:70px;height:70px;margin:0 auto 14px;display:grid;place-items:center;border:1px solid #78474f;border-radius:50%;background:#351c20;color:#f1778b;animation:walletPulse 1.3s ease-in-out infinite}
 .wallet-processing-orbit svg{animation:walletSpin 1.5s linear infinite}
@@ -1065,7 +1065,7 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 .rtl .wallet-redesign .wallet-hero-demo{left:auto;right:21px}
 .rtl .wallet-stepper>div{flex-direction:row-reverse}
 .rtl .wallet-method-option,.rtl .wallet-selected-method,.rtl .wallet-review-banner,.rtl .wallet-security-line{direction:rtl}
-.rtl .wallet-sample-address code{text-align:start;direction:ltr}
+.rtl .wallet-deposit-address code{text-align:start;direction:ltr}
 .rtl .wallet-review-list b{text-align:start}
 @media(max-width:370px){.wallet-stepper span{font-size:7px}.wallet-redesign .wallet-summary-card b{font-size:14px}.wallet-redesign .wallet-action-card{padding:11px}}
 
@@ -1093,7 +1093,7 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 .wallet-redesign .wallet-method-option>span:nth-child(2) b{font-size:11px}
 .wallet-redesign .wallet-method-option small{font-size:9px}
 .wallet-redesign .wallet-method-option strong{padding:5px 8px;border:1px solid #3b6252;border-radius:7px;background:#1a3a30;color:#b7f1d0;font-size:9px}
-.wallet-redesign .wallet-sample-address p{margin:9px 0 0;color:#e8a9b3;font-size:9px;line-height:1.65}
+.wallet-redesign .wallet-deposit-address p{margin:9px 0 0;color:#e8a9b3;font-size:9px;line-height:1.65}
 .wallet-redesign .wallet-action-card.deposit .wallet-action-symbol{background:#21443a;color:#8de0b4}
 .wallet-redesign .wallet-action-card.withdraw .wallet-action-symbol{background:#443033;color:#e9a8b3}
 
@@ -1156,11 +1156,11 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 .wallet-review-list span{color:#cc4057}
 .wallet-review-list b{color:#67242f}
 .wallet-review-list .total b{color:#b6243c}
-.wallet-sample-address{border-color:#efc3ca;background:#fef2f4}
-.wallet-sample-address>div{color:#b62840}
-.wallet-sample-address p{color:#c7354d}
-.wallet-sample-address code{color:#67242f}
-.wallet-demo-warning{color:#cc4057}
+.wallet-deposit-address{border-color:#efc3ca;background:#fef2f4}
+.wallet-deposit-address>div{color:#b62840}
+.wallet-deposit-address p{color:#c7354d}
+.wallet-deposit-address code{color:#67242f}
+.wallet-transaction-warning{color:#cc4057}
 .wallet-processing-orbit{border-color:#f2c9d0;background:#fef0f3;color:#c12842}
 .wallet-processing-state p,.wallet-success-state p{color:#cc4057}
 .wallet-processing-track{background:#f7e2e5}
@@ -1201,16 +1201,16 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 .profile-wallet-actions>button:after,
 .profile-wallet-actions>button.profile-withdraw-action:after{color:#c12842!important}
 .wallet-modal-backdrop .wallet-flow-card{background:#ffffff!important;color:#60222c!important}
-.wallet-modal-backdrop .wallet-flow-card :is(.wallet-method-option,.wallet-selected-method,.wallet-review-list,.wallet-success-reference,.wallet-success-balance,.wallet-sample-address,.wallet-destination-input,.wallet-amount-input,.wallet-quick-amounts button,.wallet-flow-close){background:#fef6f7!important;border-color:#f4d6db!important;color:#682530!important}
+.wallet-modal-backdrop .wallet-flow-card :is(.wallet-method-option,.wallet-selected-method,.wallet-review-list,.wallet-success-reference,.wallet-success-balance,.wallet-deposit-address,.wallet-destination-input,.wallet-amount-input,.wallet-quick-amounts button,.wallet-flow-close){background:#fef6f7!important;border-color:#f4d6db!important;color:#682530!important}
 .wallet-modal-backdrop .wallet-flow-card :is(input,textarea){background:#fef6f7!important;color:#682530!important;border-color:#f2d0d5!important;box-shadow:none!important}
 .wallet-modal-backdrop .wallet-flow-card :is(input,textarea):focus{border-color:#cb3951!important;outline:2px solid rgba(57,137,203,.12)!important}
 .wallet-modal-backdrop .wallet-flow-card .wallet-method-option.selected,
 .wallet-modal-backdrop .wallet-flow-card .wallet-quick-amounts button.active{background:#fdecef!important;border-color:#cb3951!important;color:#9b3747!important}
 .wallet-modal-backdrop .wallet-flow-card .wallet-review-banner,
 .wallet-modal-backdrop .wallet-flow-card .wallet-security-line{background:#fef0f3!important;border-color:#f7d4da!important;color:#b62840!important}
-.wallet-modal-backdrop .wallet-flow-card .wallet-sample-address{background:#fef2f4!important;border:1px dashed #efc3ca!important}
-.wallet-modal-backdrop .wallet-flow-card .wallet-sample-address :is(b,p,code){color:#8e424f!important}
-.wallet-modal-backdrop .wallet-flow-card .wallet-demo-warning{color:#ce475d!important}
+.wallet-modal-backdrop .wallet-flow-card .wallet-deposit-address{background:#fef2f4!important;border:1px dashed #efc3ca!important}
+.wallet-modal-backdrop .wallet-flow-card .wallet-deposit-address :is(b,p,code){color:#8e424f!important}
+.wallet-modal-backdrop .wallet-flow-card .wallet-transaction-warning{color:#ce475d!important}
 .wallet-modal-backdrop .wallet-flow-card .wallet-processing-orbit{background:#fdeff1!important;border-color:#f4cfd5!important;color:#c12842!important}
 .wallet-modal-backdrop .wallet-flow-card .wallet-processing-track{background:#f8e5e8!important}
 .wallet-modal-backdrop .wallet-flow-card .wallet-processing-track i{background:#cb3951!important}
@@ -1229,7 +1229,7 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 .wallet-modal-backdrop .wallet-flow-card .wallet-method-option>i>span,
 .wallet-modal-backdrop .wallet-flow-card .wallet-selected-method .wallet-method-mark,
 .wallet-modal-backdrop .wallet-flow-card .wallet-review-banner>svg,
-.wallet-modal-backdrop .wallet-flow-card .wallet-sample-address>div>svg{
+.wallet-modal-backdrop .wallet-flow-card .wallet-deposit-address>div>svg{
  background:#fdecef!important;
  border-color:#f4cfd5!important;
  color:#c12842!important;
@@ -1246,7 +1246,7 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 }
 .wallet-modal-backdrop .wallet-flow-card .stage6-amount input{background:transparent!important;color:#682530!important}
 .wallet-modal-backdrop .wallet-flow-card .wallet-stepper>div.active i{background:#c12842!important;color:#ffffff!important;border-color:#c12842!important}
-.wallet-modal-backdrop .wallet-flow-card :is(.wallet-method-option,.wallet-selected-method,.wallet-review-list,.wallet-review-banner,.wallet-sample-address,.wallet-processing-orbit,.wallet-processing-track,.wallet-flow-close,.wallet-quick-amounts button,.stage6-amount) :is(svg,b,strong,span){text-shadow:none!important}
+.wallet-modal-backdrop .wallet-flow-card :is(.wallet-method-option,.wallet-selected-method,.wallet-review-list,.wallet-review-banner,.wallet-deposit-address,.wallet-processing-orbit,.wallet-processing-track,.wallet-flow-close,.wallet-quick-amounts button,.stage6-amount) :is(svg,b,strong,span){text-shadow:none!important}
 .wallet-history-only{padding-bottom:28px}
 .wallet-history-only .wallet-history-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}
 .wallet-history-only .wallet-history-overview>div{display:flex;flex-direction:column;gap:7px;padding:12px 9px;border:1px solid #f5dbdf;border-radius:12px;background:#ffffff;min-width:0}
@@ -1425,8 +1425,8 @@ html[dir="rtl"] .app :where(.nav-item,.quick-actions button,.daily-reward>button
 .wallet-server-error{padding:10px;color:#a52c3f;font-size:11px}
 .wallet-server-refresh{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-height:40px;margin:12px 0;border:1px solid #f2d6db;border-radius:10px;background:#fff;color:#b72f47;font-size:10px}
 .wallet-network-select{width:100%;min-height:44px;margin:4px 0 13px;padding:10px;border:1px solid #f0d0d6;border-radius:10px;background:#fff7f8;color:#642530;font:inherit;font-size:12px}
-.wallet-sample-address code{display:block;margin:10px 0;padding:10px;border-radius:8px;background:#fff;color:#692b35;font-size:10px;overflow-wrap:anywhere;user-select:text}
-.wallet-sample-address button{display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px 10px;border:1px solid #f0d0d6;border-radius:8px;background:#fff;color:#b52f46;font-size:10px}
+.wallet-deposit-address code{display:block;margin:10px 0;padding:10px;border-radius:8px;background:#fff;color:#692b35;font-size:10px;overflow-wrap:anywhere;user-select:text}
+.wallet-deposit-address button{display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px 10px;border:1px solid #f0d0d6;border-radius:8px;background:#fff;color:#b52f46;font-size:10px}
 .wallet-flow-primary:disabled{opacity:.45;cursor:not-allowed}
 .wallet-server-view .wallet-live-pill{padding:6px 9px;border-radius:20px;background:#fff0f2;color:#b72e46;font-size:8px}
 .wallet-server-view .wallet-live-pill.active{background:#e9f8ef;color:#218653}
