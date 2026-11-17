@@ -651,7 +651,9 @@ type BetSettlementFixtureRow={id:string;kickoff:string;status_short:string;resul
 function settledSelectionResult(outcomeKey:string,fixture:BetSettlementFixtureRow):"won"|"lost"|"void"|null{
   const status=fixture.status_short;
   if(status==="CANC")return "void";
-  if(status==="ABD"){const kickoff=Date.parse(fixture.kickoff);return Number.isFinite(kickoff)&&Date.now()-kickoff>=24*60*60*1000?"void":null;}
+  const kickoff=Date.parse(fixture.kickoff),age=Number.isFinite(kickoff)?Date.now()-kickoff:-1;
+  if(status==="ABD")return age>=24*60*60*1000?"void":null;
+  if(["PST","SUSP","INT"].includes(status))return age>=48*60*60*1000?"void":null;
   if(!["FT","AET","PEN","AWD","WO"].includes(status))return null;
   const home=fixture.result_home_score,away=fixture.result_away_score;
   if(home===null||away===null){
