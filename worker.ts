@@ -696,7 +696,7 @@ async function settleStoredTicket(env:Env,ticketId:string,checkedAt:string):Prom
   }
   if(statements.length)await env.DB.batch(statements);
   if(finalStatus==="won"||finalStatus==="lost")await recordReferralQualification(env,ticket.user_id,"first_bet",ticketId);
-  if(finalStatus==="won")await awardReferralCommissions(env,ticketId);
+  if(finalStatus==="won"||ticket.status==="won")await awardReferralCommissions(env,ticketId);
   return {selectionUpdates,ticketStatus:finalStatus};
 }
 async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:number;selectionUpdates:number;ticketsSettled:number}>{
@@ -905,13 +905,14 @@ async function awardReferralCommissions(env:Env,ticketId:string):Promise<void>{
 async function handleReferralMe(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);if(!session)return json({ok:false,error:"Authentication required"},401);
   await env.DB.prepare("INSERT OR IGNORE INTO referral_accounts(user_id,referral_code) VALUES(?,?)").bind(session.user.id,newReferralCode()).run();
-  const [account,counts,earnings,history]=await Promise.all([
+  const [account,counts,earnings,history,settings]=await Promise.all([
     env.DB.prepare("SELECT referral_code FROM referral_accounts WHERE user_id=?").bind(session.user.id).first<{referral_code:string}>(),
     env.DB.prepare("SELECT COUNT(*) AS registrations,SUM(CASE WHEN q.referred_user_id IS NOT NULL THEN 1 ELSE 0 END) AS qualified FROM referral_accounts r LEFT JOIN referral_qualifications q ON q.referred_user_id=r.user_id WHERE r.referred_by_user_id=?").bind(session.user.id).first<any>(),
     env.DB.prepare("SELECT COALESCE(SUM(amount_units),0) AS total_units,COUNT(*) AS awards FROM wallet_referral_credits WHERE user_id=?").bind(session.user.id).first<any>(),
-    env.DB.prepare("SELECT c.id,c.amount_units,c.profit_units,c.referral_level,c.rate_bps,c.created_at,c.source_ticket_id,u.display_name AS referred_name FROM wallet_referral_credits c LEFT JOIN users u ON u.id=c.referred_user_id WHERE c.user_id=? ORDER BY c.created_at DESC LIMIT 50").bind(session.user.id).all<any>()
+    env.DB.prepare("SELECT c.id,c.amount_units,c.profit_units,c.referral_level,c.rate_bps,c.created_at,c.source_ticket_id,u.display_name AS referred_name FROM wallet_referral_credits c LEFT JOIN users u ON u.id=c.referred_user_id WHERE c.user_id=? ORDER BY c.created_at DESC LIMIT 50").bind(session.user.id).all<any>(),
+    env.DB.prepare("SELECT commission_enabled FROM referral_program_settings WHERE id=1").first<any>()
   ]);
-  return json({ok:true,referralCode:account?.referral_code||("u"+session.user.id),stats:{registrations:Number(counts?.registrations||0),qualified:Number(counts?.qualified||0)},qualificationRule:"first_verified_deposit_or_first_settled_bet",commissionRates:{level1:10,level2:5,level3:3},rewardsEnabled:true,earnings:{totalUnits:Number(earnings?.total_units||0),awards:Number(earnings?.awards||0)},history:history.results||[]});
+  return json({ok:true,referralCode:account?.referral_code||("u"+session.user.id),stats:{registrations:Number(counts?.registrations||0),qualified:Number(counts?.qualified||0)},qualificationRule:"first_verified_deposit_or_first_settled_bet",commissionRates:{level1:10,level2:5,level3:3},commissionEnabled:Number(settings?.commission_enabled||0)===1,earnings:{totalUnits:Number(earnings?.total_units||0),awards:Number(earnings?.awards||0)},history:history.results||[]});
 }
 async function handleAdminReferrals(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);if(!session||session.user.role!=="admin")return json({ok:false,error:"Administrator access required"},403);
@@ -926,11 +927,11 @@ async function handleAdminReferrals(request:Request,env:Env):Promise<Response>{
   }
   const [settings,totals,rows,awards]=await Promise.all([
     env.DB.prepare("SELECT tracking_enabled,commission_enabled,level1_rate_bps,level2_rate_bps,level3_rate_bps,updated_at FROM referral_program_settings WHERE id=1").first<any>(),
-    env.DB.prepare("SELECT COUNT(*) AS registrations,SUM(CASE WHEN q.referred_user_id IS NOT NULL THEN 1 ELSE 0 END) AS qualified,COUNT(DISTINCT r.referred_by_user_id) AS active_referrers FROM referral_accounts r LEFT JOIN referral_qualifications q ON q.referred_user_id=r.user_id WHERE r.referred_by_user_id IS NOT NULL").first<any>(),
+    env.DB.prepare("SELECT COUNT(*) AS registrations,SUM(CASE WHEN q.referred_user_id IS NOT NULL THEN 1 ELSE 0 END) AS qualified,COUNT(DISTINCT r.referred_by_user_id) AS active_referrers,(SELECT COUNT(*) FROM wallet_referral_credits) AS commission_count,(SELECT COALESCE(SUM(amount_units),0) FROM wallet_referral_credits) AS commission_units FROM referral_accounts r LEFT JOIN referral_qualifications q ON q.referred_user_id=r.user_id WHERE r.referred_by_user_id IS NOT NULL").first<any>(),
     env.DB.prepare("SELECT r.referral_code,r.referred_by_user_id AS referrer_id,ref.display_name AS referrer_name,r.user_id AS referred_user_id,u.display_name AS referred_name,r.attributed_at,q.qualifying_action,q.qualified_at FROM referral_accounts r JOIN users u ON u.id=r.user_id LEFT JOIN users ref ON ref.id=r.referred_by_user_id LEFT JOIN referral_qualifications q ON q.referred_user_id=r.user_id WHERE r.referred_by_user_id IS NOT NULL ORDER BY r.attributed_at DESC LIMIT 100").all<any>(),
     env.DB.prepare("SELECT c.id,c.user_id,c.referred_user_id,c.source_ticket_id,c.referral_level,c.rate_bps,c.profit_units,c.amount_units,c.created_at,u.display_name AS beneficiary_name FROM wallet_referral_credits c LEFT JOIN users u ON u.id=c.user_id ORDER BY c.created_at DESC LIMIT 100").all<any>()
   ]);
-  return json({ok:true,settings,totals:{registrations:Number(totals?.registrations||0),qualified:Number(totals?.qualified||0),activeReferrers:Number(totals?.active_referrers||0)},referrals:rows.results||[],awards:awards.results||[]});
+  return json({ok:true,settings,totals:{registrations:Number(totals?.registrations||0),qualified:Number(totals?.qualified||0),activeReferrers:Number(totals?.active_referrers||0),commissionCount:Number(totals?.commission_count||0),commissionUnits:Number(totals?.commission_units||0)},referrals:rows.results||[],awards:awards.results||[]});
 }
 async function handleWalletGet(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
