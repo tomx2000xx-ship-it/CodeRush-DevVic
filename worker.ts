@@ -477,7 +477,10 @@ export default {
     if (url.pathname === "/api/auth/session" && request.method === "GET") return handleAuthSession(request, env);
     if (url.pathname === "/api/auth/logout" && request.method === "POST") return handleLogout(request, env);
     if (url.pathname === "/api/admin/setup-status" && request.method === "GET") return json({ok:true,setupRequired:(await adminCount(env))===0});
-    if (url.pathname === "/api/admin/setup" && request.method === "POST") return adminSetup(request,env);\n    if (url.pathname === "/api/admin/login" && request.method === "POST") return adminLogin(request,env);\n    if (url.pathname === "/api/admin/users" && (request.method === "GET" || request.method === "POST")) return adminUsers(request,env);\n    if (url.pathname === "/api/admin/session" && request.method === "GET") return handleAdminSession(request, env);
+    if (url.pathname === "/api/admin/setup" && request.method === "POST") return adminSetup(request,env);
+    if (url.pathname === "/api/admin/login" && request.method === "POST") return adminLogin(request,env);
+    if (url.pathname === "/api/admin/users" && (request.method === "GET" || request.method === "POST")) return adminUsers(request,env);
+    if (url.pathname === "/api/admin/session" && request.method === "GET") return handleAdminSession(request, env);
     if (url.pathname === "/api/profile" && request.method === "POST") return handleProfileUpdate(request, env);
     if (url.pathname === "/api/sports/fixtures" && request.method === "GET") return handleSportsFixtures(request, env);
     if (url.pathname === "/api/sports/sync" && request.method === "POST") return handleSportsSync(request, env);
