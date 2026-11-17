@@ -347,7 +347,19 @@ async function apiFootball<T>(env: Env, path: string): Promise<{ response: T[]; 
   if (!response.ok) throw new Error("API-Football " + endpoint.pathname + " returned HTTP " + response.status);
   const payload = await response.json() as { response?: T[]; errors?: unknown; paging?: { current: number; total: number } };
   if (payload.errors && (Array.isArray(payload.errors) ? payload.errors.length : Object.keys(payload.errors as object).length)) {
-    throw new Error("API-Football " + endpoint.pathname + " rejected the request: " + JSON.stringify(payload.errors).slice(0, 300));
+    const providerError = JSON.stringify(payload.errors);
+    if (/rate.?limit|too many requests|exceeded the limit/i.test(providerError)) {
+      // Honor the provider's rolling per-minute window after a 429-style response.
+      // This cooldown is shared by all Worker instances through D1.
+      await env.DB.prepare(`
+        INSERT INTO api_football_rate_limit(id,next_allowed_at)
+        VALUES (1,unixepoch()+65)
+        ON CONFLICT(id) DO UPDATE SET
+          next_allowed_at=MAX(api_football_rate_limit.next_allowed_at,unixepoch()+65)
+      `).run();
+      throw new Error("API-Football rate limit reached. CodeRush has paused provider requests for 65 seconds. Do not press Sync again until the cooldown has elapsed.");
+    }
+    throw new Error("API-Football " + endpoint.pathname + " rejected the request: " + providerError.slice(0, 300));
   }
   return { response: payload.response || [], paging: payload.paging };
 }
