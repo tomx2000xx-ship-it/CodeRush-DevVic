@@ -8,8 +8,8 @@ ALTER TABLE wallet_transactions ADD COLUMN chain_error TEXT;
 ALTER TABLE wallet_transactions ADD COLUMN monitor_attempts INTEGER NOT NULL DEFAULT 0;
 
 ALTER TABLE wallet_networks ADD COLUMN monitor_enabled INTEGER NOT NULL DEFAULT 1 CHECK(monitor_enabled IN (0,1));
--- BNB-Pegged USDT is not listed on Tether's current official supported-protocols page.
--- Keep it out of automatic crediting until the operator verifies and explicitly approves the asset contract.
+-- Tether lists BNB Smart Chain among supported protocols but its current page does not provide a USDt contract address there.
+-- Keep BEP20 transfers disabled until the exact supported USDt contract is independently confirmed.
 UPDATE wallet_networks SET monitor_enabled=0 WHERE network_code='USDT_BEP20';
 
 CREATE TABLE IF NOT EXISTS wallet_monitor_state (
