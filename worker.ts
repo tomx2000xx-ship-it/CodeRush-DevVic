@@ -99,7 +99,7 @@ async function saveSubscriber(message: TelegramMessage, payload: string, env: En
       last_name=excluded.last_name, referred_by=COALESCE(telegram_subscribers.referred_by, excluded.referred_by),
       start_payload=excluded.start_payload, status='active', opted_out=0,
       last_seen_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'), last_error=NULL
-  `).bind(String(chatId), String(user.id), user.username || null, user.first_name || null, user.last_name || null, ownCode, referrer && referrer !== ownCode ? referrer : null, payload || null).run();
+  `).bind(String(chatId), String(user.id), user.username || null, user.first_name || null, user.last_name || null, ownCode, referrer && referrer !== ownCode ? referrer : null, payload || null).run();  await env.DB.prepare("INSERT INTO notification_preferences(user_id,in_app_enabled,telegram_enabled,updated_at) VALUES(?,1,1,?) ON CONFLICT(user_id) DO UPDATE SET telegram_enabled=1,updated_at=excluded.updated_at").bind(String(user.id),isoNow()).run();
 }
 
 async function processUpdate(update: { message?: TelegramMessage }, env: Env) {
@@ -113,6 +113,7 @@ async function processUpdate(update: { message?: TelegramMessage }, env: Env) {
     await sendWelcome(chatId, env);
   } else if (/^\/(stop|unsubscribe)(?:@\w+)?$/.test(text)) {
     await env.DB.prepare("UPDATE telegram_subscribers SET opted_out=1, last_seen_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE chat_id=?").bind(String(chatId)).run();
+    await env.DB.prepare("INSERT INTO notification_preferences(user_id,in_app_enabled,telegram_enabled,updated_at) VALUES(?,1,0,?) ON CONFLICT(user_id) DO UPDATE SET telegram_enabled=0,updated_at=excluded.updated_at").bind(String(message.from?.id||""),isoNow()).run();
     await telegram(env, "sendMessage", { chat_id: chatId, text: "تم إيقاف رسائل CodeRush. أرسل /start للاشتراك مجدداً." });
   }
 }
