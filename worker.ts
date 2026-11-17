@@ -271,18 +271,20 @@ async function handleTelegramAuth(request: Request, env: Env): Promise<Response>
   }
   if (!existingUser && user.role === "user") {
     const subscriber = await env.DB.prepare("SELECT referred_by FROM telegram_subscribers WHERE telegram_user_id=? AND referred_by IS NOT NULL ORDER BY first_seen_at ASC LIMIT 1").bind(userId).first<{referred_by:string}>();
-    const match = /^u([0-9]+)$/.exec(String(subscriber?.referred_by || ""));
-    if (match && match[1] !== userId) {
-      const referrerId = match[1];
-      const referrer = await env.DB.prepare("SELECT id FROM users WHERE id=? AND role='user' AND status='active'").bind(referrerId).first<{id:string}>();
-      if (referrer) {
-        await env.DB.prepare("INSERT OR IGNORE INTO referral_accounts(user_id,referral_code) VALUES(?,?)").bind(referrerId,"u"+referrerId).run();
-        await env.DB.prepare("INSERT OR IGNORE INTO referral_accounts(user_id,referral_code,referred_by_user_id,attributed_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM referral_program_settings WHERE id=1 AND tracking_enabled=1)").bind(userId,"u"+userId,referrerId,isoNow()).run();
-        await env.DB.prepare("INSERT INTO referral_audit_events(id,actor_user_id,event_type,subject_user_id,details_json) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM referral_accounts WHERE user_id=? AND referred_by_user_id=?)").bind(crypto.randomUUID(),referrerId,"referral_attributed",userId,JSON.stringify({source:"telegram_start_payload"}),userId,referrerId).run();
-      }
+    const suppliedCode = String(subscriber?.referred_by || "").trim();
+    let referrer = await env.DB.prepare("SELECT r.user_id AS id FROM referral_accounts r JOIN users u ON u.id=r.user_id WHERE r.referral_code=? AND u.role='user' AND u.status='active'").bind(suppliedCode).first<{id:string}>();
+    if (!referrer) {
+      const legacy = /^u([0-9]+)$/.exec(suppliedCode);
+      if (legacy) referrer = await env.DB.prepare("SELECT id FROM users WHERE id=? AND role='user' AND status='active'").bind(legacy[1]).first<{id:string}>();
+    }
+    if (referrer && referrer.id !== userId) {
+      const existingReferrerAccount = await env.DB.prepare("SELECT user_id FROM referral_accounts WHERE user_id=?").bind(referrer.id).first();
+      if (!existingReferrerAccount) await env.DB.prepare("INSERT OR IGNORE INTO referral_accounts(user_id,referral_code) VALUES(?,?)").bind(referrer.id,newReferralCode()).run();
+      await env.DB.prepare("INSERT OR IGNORE INTO referral_accounts(user_id,referral_code,referred_by_user_id,attributed_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM referral_program_settings WHERE id=1 AND tracking_enabled=1)").bind(userId,newReferralCode(),referrer.id,isoNow()).run();
+      await env.DB.prepare("INSERT INTO referral_audit_events(id,actor_user_id,event_type,subject_user_id,details_json) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM referral_accounts WHERE user_id=? AND referred_by_user_id=?)").bind(crypto.randomUUID(),referrer.id,"referral_attributed",userId,JSON.stringify({source:"telegram_start_payload"}),userId,referrer.id).run();
     }
   }
-  await env.DB.prepare("INSERT OR IGNORE INTO referral_accounts(user_id,referral_code) VALUES(?,?)").bind(userId,"u"+userId).run();
+  await env.DB.prepare("INSERT OR IGNORE INTO referral_accounts(user_id,referral_code) VALUES(?,?)").bind(userId,newReferralCode()).run();
   const tokenBytes = crypto.getRandomValues(new Uint8Array(32));
   const token = hex(tokenBytes.buffer);
   const tokenHash = await sha256(token);
@@ -866,6 +868,7 @@ async function monitorPendingWalletDeposits(env:Env):Promise<void>{
  }
 }
 
+function newReferralCode():string{return 'CR'+hex(crypto.getRandomValues(new Uint8Array(8)).buffer).toUpperCase();}
 async function recordReferralQualification(env:Env,referredUserId:string,action:"first_deposit"|"first_bet",sourceId:string):Promise<void>{
   const source=action==="first_deposit"
     ? await env.DB.prepare("SELECT t.id FROM wallet_transactions t JOIN wallet_ledger_entries l ON l.transaction_id=t.id AND l.entry_type='deposit_credit' WHERE t.id=? AND t.user_id=? AND t.type='deposit' AND t.status='completed'").bind(sourceId,referredUserId).first<{id:string}>()
@@ -877,7 +880,7 @@ async function recordReferralQualification(env:Env,referredUserId:string,action:
 }
 async function handleReferralMe(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);if(!session)return json({ok:false,error:"Authentication required"},401);
-  await env.DB.prepare("INSERT OR IGNORE INTO referral_accounts(user_id,referral_code) VALUES(?,?)").bind(session.user.id,"u"+session.user.id).run();
+  await env.DB.prepare("INSERT OR IGNORE INTO referral_accounts(user_id,referral_code) VALUES(?,?)").bind(session.user.id,newReferralCode()).run();
   const [account,counts]=await Promise.all([env.DB.prepare("SELECT referral_code FROM referral_accounts WHERE user_id=?").bind(session.user.id).first<{referral_code:string}>(),env.DB.prepare("SELECT COUNT(*) AS registrations,SUM(CASE WHEN q.referred_user_id IS NOT NULL THEN 1 ELSE 0 END) AS qualified FROM referral_accounts r LEFT JOIN referral_qualifications q ON q.referred_user_id=r.user_id WHERE r.referred_by_user_id=?").bind(session.user.id).first<any>()]);
   return json({ok:true,referralCode:account?.referral_code||("u"+session.user.id),stats:{registrations:Number(counts?.registrations||0),qualified:Number(counts?.qualified||0)},qualificationRule:"first_verified_deposit_or_first_settled_bet",rewardsEnabled:false});
 }
