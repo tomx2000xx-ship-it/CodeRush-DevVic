@@ -107,14 +107,20 @@ export function StageFourBets({onBrowse}:{onBrowse:()=>void}){
  useEffect(()=>{
   let active=true;
   const refresh=async()=>{
-   try{const response=await fetch('/api/bets?limit=50',{credentials:'same-origin',cache:'no-store'});const body=await response.json();if(!response.ok||!body?.ok)throw new Error(body?.error||'Unable to load ticket history');if(active){setBets(Array.isArray(body.bets)?body.bets:[]);setSummary(body.summary||null);}}
-   catch{if(active){setBets([]);setSummary(null);}}
-   setSlip(readSelections());
+   try{
+    const response=await fetch('/api/bets?limit=50',{credentials:'same-origin',cache:'no-store'});
+    const body=await response.json();
+    if(!response.ok||!body?.ok)throw new Error(body?.error||'Unable to load ticket history');
+    if(active){setBets(Array.isArray(body.bets)?body.bets:[]);setSummary(body.summary||null);}
+   }catch{if(active){setBets([]);setSummary(null);}}
+   if(active)setSlip(readSelections());
   };
   refresh();window.addEventListener('focus',refresh);window.addEventListener('coderush:bets-updated',refresh);
   return()=>{active=false;window.removeEventListener('focus',refresh);window.removeEventListener('coderush:bets-updated',refresh)};
  },[]);
- const labels=isArabic?{profit:'صافي نتيجة تجريبية',return:'العائد المحتمل',accuracy:'نسبة الفوز',streak:'سلسلة الفوز',best:'أفضل عائد',open:'مفتوحة',wins:'الفوز',active:'قيد اللعب',settled:'المُخلّصة',none:'لا رهانات مفتوحة',hint:'اختر مباراة وتوقّع نتيجتها قبل انطلاقها.',browse:'تصفّح المباريات',settledNone:'لا رهانات مُخلّصة',settledHint:'ستظهر رهاناتك المُخلّصة هنا بعد اكتمالها.',recorded:'رهانات تجريبية مسجّلة',stake:'قيمة الرهان',potential:'العائد المحتمل',settledReturn:'العائد التجريبي',won:'فوز',lost:'خسارة',void:'ملغاة',pending:'بانتظار النتيجة',demo:'تجريبي'}:{profit:'DEMO NET RESULT',return:'POTENTIAL RETURN',accuracy:'win accuracy',streak:'Win streak',best:'Best settled return',open:'Open',wins:'Wins',active:'Active',settled:'Settled',none:'No open bets',hint:'Choose a match and predict its result before it starts.',browse:'Browse matches',settledNone:'No settled bets',settledHint:'Your settled bets will appear here when completed.',recorded:'Recorded demo tickets',stake:'Stake (USD)',potential:'Potential return',settledReturn:'Demo return',won:'WON',lost:'LOST',void:'VOID',pending:'PENDING RESULT',demo:'DEMO'};
+ const labels=isArabic
+  ?{profit:'صافي نتيجة تجريبية',accuracy:'نسبة الفوز',streak:'سلسلة الفوز',best:'أفضل عائد',open:'مفتوحة',wins:'الفوز',active:'قيد اللعب',settled:'المُخلّصة',none:'لا رهانات مفتوحة',hint:'اختر مباراة وتوقّع نتيجتها قبل انطلاقها.',browse:'تصفّح المباريات',settledNone:'لا رهانات مُخلّصة',settledHint:'ستظهر رهاناتك المُخلّصة هنا بعد اكتمالها.',recorded:'رهانات تجريبية مسجّلة',stake:'قيمة الرهان',potential:'العائد المحتمل',settledReturn:'العائد التجريبي',won:'فوز',lost:'خسارة',void:'ملغاة',pending:'بانتظار النتيجة'}
+  :{profit:'DEMO NET RESULT',accuracy:'win accuracy',streak:'Win streak',best:'Best settled return',open:'Open',wins:'Wins',active:'Active',settled:'Settled',none:'No open bets',hint:'Choose a match and predict its result before it starts.',browse:'Browse matches',settledNone:'No settled bets',settledHint:'Your settled bets will appear here when completed.',recorded:'Recorded demo tickets',stake:'Stake (USD)',potential:'Potential return',settledReturn:'Demo return',won:'WON',lost:'LOST',void:'VOID',pending:'PENDING RESULT'};
  const activeBets=bets.filter(b=>!b.status||b.status==='open');
  const settledBets=bets.filter(b=>b.status==='won'||b.status==='lost'||b.status==='void');
  const displayedBets=view==='Active'?activeBets:settledBets;
@@ -125,45 +131,42 @@ export function StageFourBets({onBrowse}:{onBrowse:()=>void}){
  const demoNetResult=summary?.netResult??settledBets.reduce((sum,b)=>sum+(b.settledReturn??(b.status==='lost'?0:b.stake))-b.stake,0);
  const bestSettledReturn=summary?.bestReturn??settledBets.reduce((best,b)=>Math.max(best,b.settledReturn??0),0);
  const recentSettled=[...settledBets].sort((a,b)=>Date.parse(b.settledAt||b.createdAt)-Date.parse(a.settledAt||a.createdAt));
- let winStreak=summary?.winStreak??0;if(!summary)for(const bet of recentSettled){if(bet.status!=='won')break;winStreak++;}
+ let winStreak=summary?.winStreak??0;
+ if(!summary){for(const bet of recentSettled){if(bet.status!=='won')break;winStreak++;}}
  const activeCount=summary?.openCount??activeBets.length;
+ const settledCount=summary?.settledCount??settledBets.length;
  const shownBets=showMoreBets?displayedBets:displayedBets.slice(0,3);
+ const resultLabel=(status:Selection['resultStatus'])=>status==='won'?labels.won:status==='lost'?labels.lost:status==='void'?labels.void:labels.pending;
+ const ticketLabel=(status:Bet['status'])=>status==='won'?labels.won:status==='lost'?labels.lost:status==='void'?labels.void:labels.pending;
  return <div className="mybets-page" dir={isArabic?'rtl':'ltr'}>
-  <section className="mybets-performance"><div className="mybets-performance-main"><div className="mybets-profit-copy"><small>{labels.profit}</small><b>{demoNetResult>=0?'+':'−'}${Math.abs(demoNetResult).toFixed(2)}</b><em>{wins} {labels.wins} · {losses} {labels.lost.toLowerCase()} · {voids} {labels.void.toLowerCase()}</em></div><div className="mybets-accuracy"><b>{accuracy}%</b><small>{labels.accuracy}</small></div></div><div className="mybets-progress"><span style={{width:accuracy+'%'}}/><i/></div><div className="mybets-stats"><div><small>{labels.wins}</small><b>{wins}/{wins+losses}</b></div><div><small>{labels.open}</small><b>{activeCount}</b></div><div><small>{labels.best}</small><b>{bestSettledReturn?'</section>
-  <div className="mybets-tabs"><button className={view==='Active'?'active':''} onClick={()=>setView('Active')}><Activity size={16}/><span>{labels.active}</span><b>{activeCount}</b></button><button className={view==='Settled'?'active':''} onClick={()=>setView('Settled')}><TicketPercent size={16}/><span>{labels.settled}</span><b>{summary?.settledCount??settledBets.length}</b></button></div>
-  {displayedBets.length>0?<><div className="mybets-history-heading"><h3>{labels.recorded}</h3><span>{displayedBets.length}</span></div>{shownBets.map(b=><article className="demo-bet-card mybets-recorded-card" key={b.id}><div className="demo-bet-top"><span>{b.id}</span><span className="demo-open">{b.status==='won'?labels.won:b.status==='lost'?labels.lost:b.status==='void'?labels.void:labels.pending} · DEMO</span></div>{b.selections.map(p=><div className="history-pick" key={p.id}><b>{p.fixture}</b><small>{p.outcome} · {p.odd.toFixed(2)}{p.resultStatus&&p.resultStatus!=='pending'?' · '+(p.resultStatus==='won'?labels.won:p.resultStatus==='lost'?labels.lost:labels.void)+(p.resultScore?' · '+p.resultScore:''):''}</small></div>)}<div className="history-bottom"><span>{labels.stake} <b>{'<small className="detail-disclaimer">{new Date(b.createdAt).toLocaleString(isArabic?'ar':'en-US')}</small></article>)}{displayedBets.length>3&&<button className="match-view-more mybets-view-more" onClick={()=>setShowMoreBets(v=>!v)}>{showMoreBets?(isArabic?'عرض أقل':'Show fewer bets'):(isArabic?'عرض المزيد من الرهانات':'View more bets')} <ChevronRight size={17}/></button>}</>:view==='Active'&&displayedBets.length===0&&<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{labels.none}</h2><p>{labels.hint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
-  {view==='Settled'&&displayedBets.length===0&&<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{labels.settledNone}</h2><p>{labels.settledHint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
-  <p className="detail-disclaimer">Demo only · Tickets are stored for tracking; no wallet balance is debited. Potential returns are illustrative and are not paid.</p>
- </div>;
-}
-+bestSettledReturn.toFixed(2):'—'}</b></div><div><small>{labels.streak}</small><b>{winStreak}</b></div></div></section>
-  <div className="mybets-tabs"><button className={view==='Active'?'active':''} onClick={()=>setView('Active')}><Activity size={16}/><span>{labels.active}</span><b>{activeCount}</b></button><button className={view==='Settled'?'active':''} onClick={()=>setView('Settled')}><TicketPercent size={16}/><span>{labels.settled}</span><b>0</b></button></div>
-  {displayedBets.length>0?<><div className="mybets-history-heading"><h3>{labels.recorded}</h3><span>{displayedBets.length}</span></div>{shownBets.map(b=><article className="demo-bet-card mybets-recorded-card" key={b.id}><div className="demo-bet-top"><span>{b.id}</span><span className="demo-open">RECORDED · DEMO</span></div>{b.selections.map(p=><div className="history-pick" key={p.id}><b>{p.fixture}</b><small>{p.outcome} · {p.odd.toFixed(2)}</small></div>)}<div className="history-bottom"><span>{labels.stake} <b>{'$'+b.stake.toFixed(2)}</b></span><span>{labels.potential} <b>{'$'+b.potential.toFixed(2)}</b></span></div><small className="detail-disclaimer">{new Date(b.createdAt).toLocaleString(isArabic?'ar':'en-US')}</small></article>)}{displayedBets.length>3&&<button className="match-view-more mybets-view-more" onClick={()=>setShowMoreBets(v=>!v)}>{showMoreBets?(isArabic?'عرض أقل':'Show fewer bets'):(isArabic?'عرض المزيد من الرهانات':'View more bets')} <ChevronRight size={17}/></button>}</>:view==='Active'&&displayedBets.length===0&&<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{labels.none}</h2><p>{labels.hint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
-  {view==='Settled'&&displayedBets.length===0&&<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{labels.settledNone}</h2><p>{labels.settledHint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
-  <p className="detail-disclaimer">Demo only · Tickets are stored for tracking; no wallet balance is debited. Potential returns are illustrative and are not paid.</p>
- </div>;
-}
-+b.stake.toFixed(2)}</b></span><span>{b.status==='open'?labels.potential:labels.settledReturn} <b>{'<small className="detail-disclaimer">{new Date(b.createdAt).toLocaleString(isArabic?'ar':'en-US')}</small></article>)}{displayedBets.length>3&&<button className="match-view-more mybets-view-more" onClick={()=>setShowMoreBets(v=>!v)}>{showMoreBets?(isArabic?'عرض أقل':'Show fewer bets'):(isArabic?'عرض المزيد من الرهانات':'View more bets')} <ChevronRight size={17}/></button>}</>:view==='Active'&&displayedBets.length===0&&<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{labels.none}</h2><p>{labels.hint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
-  {view==='Settled'&&displayedBets.length===0&&<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{labels.settledNone}</h2><p>{labels.settledHint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
-  <p className="detail-disclaimer">Demo only · Tickets are stored for tracking; no wallet balance is debited. Potential returns are illustrative and are not paid.</p>
- </div>;
-}
-+bestSettledReturn.toFixed(2):'—'}</b></div><div><small>{labels.streak}</small><b>{winStreak}</b></div></div></section>
-  <div className="mybets-tabs"><button className={view==='Active'?'active':''} onClick={()=>setView('Active')}><Activity size={16}/><span>{labels.active}</span><b>{activeCount}</b></button><button className={view==='Settled'?'active':''} onClick={()=>setView('Settled')}><TicketPercent size={16}/><span>{labels.settled}</span><b>0</b></button></div>
-  {displayedBets.length>0?<><div className="mybets-history-heading"><h3>{labels.recorded}</h3><span>{displayedBets.length}</span></div>{shownBets.map(b=><article className="demo-bet-card mybets-recorded-card" key={b.id}><div className="demo-bet-top"><span>{b.id}</span><span className="demo-open">RECORDED · DEMO</span></div>{b.selections.map(p=><div className="history-pick" key={p.id}><b>{p.fixture}</b><small>{p.outcome} · {p.odd.toFixed(2)}</small></div>)}<div className="history-bottom"><span>{labels.stake} <b>{'$'+b.stake.toFixed(2)}</b></span><span>{labels.potential} <b>{'$'+b.potential.toFixed(2)}</b></span></div><small className="detail-disclaimer">{new Date(b.createdAt).toLocaleString(isArabic?'ar':'en-US')}</small></article>)}{displayedBets.length>3&&<button className="match-view-more mybets-view-more" onClick={()=>setShowMoreBets(v=>!v)}>{showMoreBets?(isArabic?'عرض أقل':'Show fewer bets'):(isArabic?'عرض المزيد من الرهانات':'View more bets')} <ChevronRight size={17}/></button>}</>:view==='Active'&&displayedBets.length===0&&<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{labels.none}</h2><p>{labels.hint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
-  {view==='Settled'&&displayedBets.length===0&&<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{labels.settledNone}</h2><p>{labels.settledHint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
-  <p className="detail-disclaimer">Demo only · Tickets are stored for tracking; no wallet balance is debited. Potential returns are illustrative and are not paid.</p>
- </div>;
-}
-+(b.status==='open'?b.potential:(b.settledReturn??0)).toFixed(2)}</b></span></div><small className="detail-disclaimer">{new Date(b.createdAt).toLocaleString(isArabic?'ar':'en-US')}</small></article>)}{displayedBets.length>3&&<button className="match-view-more mybets-view-more" onClick={()=>setShowMoreBets(v=>!v)}>{showMoreBets?(isArabic?'عرض أقل':'Show fewer bets'):(isArabic?'عرض المزيد من الرهانات':'View more bets')} <ChevronRight size={17}/></button>}</>:view==='Active'&&displayedBets.length===0&&<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{labels.none}</h2><p>{labels.hint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
-  {view==='Settled'&&displayedBets.length===0&&<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{labels.settledNone}</h2><p>{labels.settledHint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
-  <p className="detail-disclaimer">Demo only · Tickets are stored for tracking; no wallet balance is debited. Potential returns are illustrative and are not paid.</p>
- </div>;
-}
-+bestSettledReturn.toFixed(2):'—'}</b></div><div><small>{labels.streak}</small><b>{winStreak}</b></div></div></section>
-  <div className="mybets-tabs"><button className={view==='Active'?'active':''} onClick={()=>setView('Active')}><Activity size={16}/><span>{labels.active}</span><b>{activeCount}</b></button><button className={view==='Settled'?'active':''} onClick={()=>setView('Settled')}><TicketPercent size={16}/><span>{labels.settled}</span><b>0</b></button></div>
-  {displayedBets.length>0?<><div className="mybets-history-heading"><h3>{labels.recorded}</h3><span>{displayedBets.length}</span></div>{shownBets.map(b=><article className="demo-bet-card mybets-recorded-card" key={b.id}><div className="demo-bet-top"><span>{b.id}</span><span className="demo-open">RECORDED · DEMO</span></div>{b.selections.map(p=><div className="history-pick" key={p.id}><b>{p.fixture}</b><small>{p.outcome} · {p.odd.toFixed(2)}</small></div>)}<div className="history-bottom"><span>{labels.stake} <b>{'$'+b.stake.toFixed(2)}</b></span><span>{labels.potential} <b>{'$'+b.potential.toFixed(2)}</b></span></div><small className="detail-disclaimer">{new Date(b.createdAt).toLocaleString(isArabic?'ar':'en-US')}</small></article>)}{displayedBets.length>3&&<button className="match-view-more mybets-view-more" onClick={()=>setShowMoreBets(v=>!v)}>{showMoreBets?(isArabic?'عرض أقل':'Show fewer bets'):(isArabic?'عرض المزيد من الرهانات':'View more bets')} <ChevronRight size={17}/></button>}</>:view==='Active'&&displayedBets.length===0&&<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{labels.none}</h2><p>{labels.hint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
-  {view==='Settled'&&displayedBets.length===0&&<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{labels.settledNone}</h2><p>{labels.settledHint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
+  <section className="mybets-performance">
+   <div className="mybets-performance-main">
+    <div className="mybets-profit-copy"><small>{labels.profit}</small><b>{demoNetResult>=0?'+':'−'}${Math.abs(demoNetResult).toFixed(2)}</b><em>{wins} {labels.wins} · {losses} {labels.lost.toLowerCase()} · {voids} {labels.void.toLowerCase()}</em></div>
+    <div className="mybets-accuracy"><b>{accuracy}%</b><small>{labels.accuracy}</small></div>
+   </div>
+   <div className="mybets-progress"><span style={{width:accuracy+'%'}}/><i/></div>
+   <div className="mybets-stats">
+    <div><small>{labels.wins}</small><b>{wins}/{wins+losses}</b></div>
+    <div><small>{labels.open}</small><b>{activeCount}</b></div>
+    <div><small>{labels.best}</small><b>{bestSettledReturn?'$'+bestSettledReturn.toFixed(2):'—'}</b></div>
+    <div><small>{labels.streak}</small><b>{winStreak}</b></div>
+   </div>
+  </section>
+  <div className="mybets-tabs">
+   <button className={view==='Active'?'active':''} onClick={()=>setView('Active')}><Activity size={16}/><span>{labels.active}</span><b>{activeCount}</b></button>
+   <button className={view==='Settled'?'active':''} onClick={()=>setView('Settled')}><TicketPercent size={16}/><span>{labels.settled}</span><b>{settledCount}</b></button>
+  </div>
+  {displayedBets.length>0
+   ?<><div className="mybets-history-heading"><h3>{labels.recorded}</h3><span>{view==='Active'?activeCount:settledCount}</span></div>
+    {shownBets.map(b=><article className="demo-bet-card mybets-recorded-card" key={b.id}>
+     <div className="demo-bet-top"><span>{b.id}</span><span className="demo-open">{ticketLabel(b.status)} · DEMO</span></div>
+     {b.selections.map(p=><div className="history-pick" key={p.id}><b>{p.fixture}</b><small>{p.outcome} · {p.odd.toFixed(2)}{p.resultStatus==='pending'?' · '+labels.pending:p.resultStatus?' · '+resultLabel(p.resultStatus)+(p.resultScore?' · '+p.resultScore:''):''}</small></div>)}
+     <div className="history-bottom"><span>{labels.stake} <b>{'$'+b.stake.toFixed(2)}</b></span><span>{b.status==='open'?labels.potential:labels.settledReturn} <b>{'$'+(b.status==='open'?b.potential:(b.settledReturn??0)).toFixed(2)}</b></span></div>
+     <small className="detail-disclaimer">{new Date(b.createdAt).toLocaleString(isArabic?'ar':'en-US')}</small>
+    </article>)}
+    {displayedBets.length>3&&<button className="match-view-more mybets-view-more" onClick={()=>setShowMoreBets(v=>!v)}>{showMoreBets?(isArabic?'عرض أقل':'Show fewer bets'):(isArabic?'عرض المزيد من الرهانات':'View more bets')} <ChevronRight size={17}/></button>}
+   </>
+   :<section className="mybets-empty"><div className="mybets-ticket-art"><TicketPercent size={65} strokeWidth={1.45}/></div><h2>{view==='Active'?labels.none:labels.settledNone}</h2><p>{view==='Active'?labels.hint:labels.settledHint}</p><button className="mybets-browse" onClick={onBrowse}>{labels.browse}<ChevronRight size={18}/></button></section>}
   <p className="detail-disclaimer">Demo only · Tickets are stored for tracking; no wallet balance is debited. Potential returns are illustrative and are not paid.</p>
  </div>;
 }
