@@ -27,7 +27,8 @@ export function StageFourMatches(){
  const [stake,setStake]=useState('10'),[walletBalance,setWalletBalance]=useState(()=>{const raw=localStorage.getItem('coderush-stage6-demo-balance');if(raw===null)return 125;const n=Number(raw);return Number.isFinite(n)&&n>=0?n:125});
  const [ticketOpen,setTicketOpen]=useState(false);
  const [ticketQuote,setTicketQuote]=useState<{combinedOdds:number;expiresAt:string;selections:Array<{fixtureId:string;outcomeKey:string;odd:number}>}|null>(null);
- const [quoteLoading,setQuoteLoading]=useState(false),[quoteError,setQuoteError]=useState('');\n const [submittingTicket,setSubmittingTicket]=useState(false),[submitTicketError,setSubmitTicketError]=useState('');
+ const [quoteLoading,setQuoteLoading]=useState(false),[quoteError,setQuoteError]=useState('');
+ const [submittingTicket,setSubmittingTicket]=useState(false),[submitTicketError,setSubmitTicketError]=useState('');
  const [providerConfigured,setProviderConfigured]=useState(false),[feedLoading,setFeedLoading]=useState(true),[feedMessage,setFeedMessage]=useState('');
  const isArabic=document.documentElement.lang==='ar'||document.documentElement.dir==='rtl';
  const words=(en:string,ar:string)=>isArabic?ar:en;
@@ -111,8 +112,11 @@ export function StageFourBets({onBrowse}:{onBrowse:()=>void}){
   return()=>{active=false;window.removeEventListener('focus',refresh);window.removeEventListener('coderush:bets-updated',refresh)};
  },[]);
  const labels=isArabic?{profit:'صافي الأرباح',return:'العائد المحتمل',accuracy:'الدقة',streak:'سلسلة الفوز',best:'أفضل عائد',open:'مفتوحة',wins:'الفوز',active:'قيد اللعب',settled:'المُخلّصة',none:'لا رهانات مفتوحة',hint:'اختر مباراة وتوقّع نتيجتها قبل انطلاقها.',browse:'تصفّح المباريات',settledNone:'لا رهانات مُخلّصة',settledHint:'ستظهر رهاناتك المُخلّصة هنا بعد اكتمالها.',recorded:'رهانات تجريبية مسجّلة',stake:'قيمة الرهان',potential:'العائد المحتمل',demo:'تجريبي'}:{profit:'NET PROFIT',return:'POTENTIAL RETURN',accuracy:'accuracy',streak:'Win streak',best:'Best return',open:'Open',wins:'Wins',active:'Active',settled:'Settled',none:'No open bets',hint:'Choose a match and predict its result before it starts.',browse:'Browse matches',settledNone:'No settled bets',settledHint:'Your settled bets will appear here when completed.',recorded:'Recorded demo bets',stake:'Stake (USD)',potential:'Potential return',demo:'DEMO'};
- const activeCount=bets.length;
- const shownBets=showMoreBets?bets:bets.slice(0,3);
+ const activeBets=bets.filter(b=>!b.status||b.status==='open');
+ const settledBets=bets.filter(b=>b.status==='won'||b.status==='lost'||b.status==='void');
+ const displayedBets=view==='Active'?activeBets:settledBets;
+ const activeCount=activeBets.length;
+ const shownBets=showMoreBets?displayedBets:displayedBets.slice(0,3);
  return <div className="mybets-page" dir={isArabic?'rtl':'ltr'}>
   <section className="mybets-performance"><div className="mybets-performance-main"><div className="mybets-profit-copy"><small>{labels.profit}</small><b>+$0.00</b><em>↗ +0.0% {labels.return}</em></div><div className="mybets-accuracy"><b>0%</b><small>{labels.accuracy}</small></div></div><div className="mybets-progress"><span/><i/></div><div className="mybets-stats"><div><small>{labels.wins}</small><b>0/0</b></div><div><small>{labels.open}</small><b>{activeCount}</b></div><div><small>{labels.best}</small><b>—</b></div><div><small>{labels.streak}</small><b>0</b></div></div></section>
   <div className="mybets-tabs"><button className={view==='Active'?'active':''} onClick={()=>setView('Active')}><Activity size={16}/><span>{labels.active}</span><b>{activeCount}</b></button><button className={view==='Settled'?'active':''} onClick={()=>setView('Settled')}><TicketPercent size={16}/><span>{labels.settled}</span><b>0</b></button></div>
