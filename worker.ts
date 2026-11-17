@@ -266,6 +266,12 @@ async function handleAuthSession(request: Request, env: Env): Promise<Response> 
   await env.DB.prepare("UPDATE user_sessions SET last_seen_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE token_hash=?").bind(session.tokenHash).run();
   return json({ ok: true, authenticated: true, user: session.user });
 }
+async function handleAdminSession(request: Request, env: Env): Promise<Response> {
+  const session = await currentSession(request, env);
+  if (!session) return json({ ok: false, error: "Authentication required" }, 401);
+  if (session.user.role !== "admin") return json({ ok: false, error: "Administrator access required" }, 403);
+  return json({ ok: true, admin: { id: session.user.id, displayName: session.user.display_name, role: session.user.role } });
+}
 async function handleLogout(request: Request, env: Env): Promise<Response> {
   const session = await currentSession(request, env);
   if (session) {
@@ -295,6 +301,7 @@ export default {
     if (url.pathname === "/api/auth/telegram" && request.method === "POST") return handleTelegramAuth(request, env);
     if (url.pathname === "/api/auth/session" && request.method === "GET") return handleAuthSession(request, env);
     if (url.pathname === "/api/auth/logout" && request.method === "POST") return handleLogout(request, env);
+    if (url.pathname === "/api/admin/session" && request.method === "GET") return handleAdminSession(request, env);
     if (url.pathname === "/api/profile" && request.method === "POST") return handleProfileUpdate(request, env);
 
     if (url.pathname === "/api/health" && request.method === "GET") {
