@@ -23,6 +23,16 @@ const json = (body: Record<string, unknown>, status = 200) =>
   });
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+function withSecurityHeaders(response:Response):Response{
+ const headers=new Headers(response.headers);
+ headers.set("x-content-type-options","nosniff");
+ headers.set("x-frame-options","DENY");
+ headers.set("referrer-policy","no-referrer");
+ headers.set("permissions-policy","camera=(), microphone=(), geolocation=(), payment=()");
+ headers.set("content-security-policy","frame-ancestors 'none'; base-uri 'self'; object-src 'none'");
+ headers.set("strict-transport-security","max-age=31536000");
+ return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+}
 
 async function webhookSecret(token: string): Promise<string> {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(token), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -176,10 +186,31 @@ async function adminPasswordHash(p:string,s:string):Promise<string>{const salt=n
 const validAdminEmail=(e:string)=>e.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const validAdminPassword=(p:string)=>p.length>=12&&p.length<=128&&/[A-Za-z]/.test(p)&&/[0-9]/.test(p);
 async function adminCount(env:Env):Promise<number>{const r=await env.DB.prepare("SELECT COUNT(*) AS n FROM admin_accounts").first<{n:number}>();return Number(r?.n||0)}
-function sameOrigin(request:Request):boolean{const o=request.headers.get("origin");return !o||o===new URL(request.url).origin}
+function sameOrigin(request:Request):boolean{const origin=request.headers.get("origin");if(!origin)return false;try{return new URL(origin).origin===new URL(request.url).origin}catch{return false}}
 async function newAdminSession(request:Request,env:Env,id:string):Promise<Response>{const token=hex(crypto.getRandomValues(new Uint8Array(32)).buffer),hash=await sha256(token),expires=new Date(Date.now()+43200000).toISOString();await env.DB.prepare("INSERT INTO user_sessions(token_hash,user_id,expires_at,user_agent) VALUES(?,?,?,?)").bind(hash,id,expires,(request.headers.get("user-agent")||"").slice(0,300)||null).run();return new Response(JSON.stringify({ok:true}),{headers:{"content-type":"application/json","cache-control":"no-store","set-cookie":sessionCookie(token)}})}
 async function adminSetup(request:Request,env:Env):Promise<Response>{if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);if(await adminCount(env))return json({ok:false,error:"Initial setup is already complete. Sign in instead."},409);let b:{email?:string;password?:string;name?:string};try{b=await request.json()}catch{return json({ok:false,error:"Invalid request"},400)}const email=(b.email||"").trim().toLowerCase(),pass=b.password||"",name=(b.name||"Super Administrator").trim().slice(0,60);if(!validAdminEmail(email))return json({ok:false,error:"Enter a valid email."},400);if(!validAdminPassword(pass))return json({ok:false,error:"Password must be at least 12 characters and include letters and numbers."},400);const id="admin_"+crypto.randomUUID(),salt=hex(crypto.getRandomValues(new Uint8Array(16)).buffer),hash=await adminPasswordHash(pass,salt);try{await env.DB.batch([env.DB.prepare("INSERT INTO users(id,display_name,role,status) VALUES(?,?,'admin','active')").bind(id,name||"Super Administrator"),env.DB.prepare("INSERT INTO admin_accounts(user_id,email,password_hash,password_salt,is_super_admin) SELECT ?,?,?,?,1 WHERE NOT EXISTS(SELECT 1 FROM admin_accounts)").bind(id,email,hash,salt)])}catch{return json({ok:false,error:"Setup has already been claimed or the email is already registered. Please sign in."},409)}const row=await env.DB.prepare("SELECT user_id FROM admin_accounts WHERE user_id=? AND is_super_admin=1").bind(id).first();if(!row){await env.DB.prepare("DELETE FROM users WHERE id=?").bind(id).run();return json({ok:false,error:"Another administrator completed setup first. Please sign in."},409)}await recordAuthEvent(env,id,"admin_super_setup",request);return newAdminSession(request,env,id)}
-async function adminLogin(request:Request,env:Env):Promise<Response>{if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);let b:{email?:string;password?:string};try{b=await request.json()}catch{return json({ok:false,error:"Invalid request"},400)}const email=(b.email||"").trim().toLowerCase(),pass=b.password||"";if(!validAdminEmail(email)||pass.length>128)return json({ok:false,error:"Invalid email or password."},401);const n=await env.DB.prepare("SELECT COUNT(*) n FROM admin_login_attempts WHERE email=? AND success=0 AND created_at>datetime('now','-15 minutes')").bind(email).first<{n:number}>();if(Number(n?.n||0)>=5)return json({ok:false,error:"Too many attempts. Wait 15 minutes."},429);const a=await env.DB.prepare("SELECT a.user_id,a.password_hash,a.password_salt,u.status FROM admin_accounts a JOIN users u ON u.id=a.user_id WHERE a.email=? COLLATE NOCASE").bind(email).first<{user_id:string;password_hash:string;password_salt:string;status:string}>();const computed=a?await adminPasswordHash(pass,a.password_salt):await adminPasswordHash(pass||"invalid-password","00112233445566778899aabbccddeeff");const valid=!!a&&a.status==="active"&&constantTimeEqual(computed,a.password_hash);await env.DB.prepare("INSERT INTO admin_login_attempts(id,email,success) VALUES(?,?,?)").bind(crypto.randomUUID(),email,valid?1:0).run();if(!valid){await recordAuthEvent(env,a?.user_id||null,"admin_login_rejected",request);return json({ok:false,error:"Invalid email or password."},401)}await env.DB.prepare("DELETE FROM admin_login_attempts WHERE email=? AND success=0").bind(email).run();await recordAuthEvent(env,a!.user_id,"admin_login_success",request);return newAdminSession(request,env,a!.user_id)}
+async function adminLogin(request:Request,env:Env):Promise<Response>{
+ if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);
+ if(!(request.headers.get("content-type")||"").toLowerCase().includes("application/json"))return json({ok:false,error:"Content-Type must be application/json."},415);
+ let body:{email?:string;password?:string};try{body=await request.json() as typeof body}catch{return json({ok:false,error:"Invalid request"},400)}
+ const email=(body.email||"").trim().toLowerCase(),pass=body.password||"";
+ if(!validAdminEmail(email)||pass.length>128)return json({ok:false,error:"Invalid email or password."},401);
+ const clientKeyHash=await sha256("CodeRush admin login rate key:"+String(request.headers.get("CF-Connecting-IP")||"unknown"));
+ const [emailAttempts,ipAttempts]=await Promise.all([
+  env.DB.prepare("SELECT COUNT(*) AS n FROM admin_login_attempts WHERE email=? AND success=0 AND created_at>datetime('now','-15 minutes')").bind(email).first<any>(),
+  env.DB.prepare("SELECT COUNT(*) AS n FROM admin_login_attempts WHERE client_key_hash=? AND success=0 AND created_at>datetime('now','-15 minutes')").bind(clientKeyHash).first<any>()
+ ]);
+ if(Number(emailAttempts?.n||0)>=5||Number(ipAttempts?.n||0)>=15)return json({ok:false,error:"Too many sign-in attempts. Please wait 15 minutes before trying again."},429);
+ const account=await env.DB.prepare("SELECT a.user_id,a.password_hash,a.password_salt,u.status FROM admin_accounts a JOIN users u ON u.id=a.user_id WHERE a.email=? COLLATE NOCASE").bind(email).first<any>();
+ const computed=account?await adminPasswordHash(pass,account.password_salt):await adminPasswordHash(pass||"invalid-password","00112233445566778899aabbccddeeff");
+ const valid=!!account&&account.status==="active"&&constantTimeEqual(computed,account.password_hash);
+ await env.DB.prepare("INSERT INTO admin_login_attempts(id,email,success,client_key_hash) VALUES(?,?,?,?)").bind(crypto.randomUUID(),email,valid?1:0,clientKeyHash).run();
+ await env.DB.prepare("DELETE FROM admin_login_attempts WHERE created_at<datetime('now','-30 days')").run();
+ if(!valid){await recordAuthEvent(env,account?.user_id||null,"admin_login_rejected",request);return json({ok:false,error:"Invalid email or password."},401)}
+ await env.DB.prepare("DELETE FROM admin_login_attempts WHERE email=? AND success=0").bind(email).run();
+ await recordAuthEvent(env,account!.user_id,"admin_login_success",request);
+ return newAdminSession(request,env,account!.user_id);
+}
 async function adminUsers(request:Request,env:Env):Promise<Response>{const s=await currentSession(request,env);if(!s||s.user.role!=="admin")return json({ok:false,error:"Administrator login required"},401);const actor=await env.DB.prepare("SELECT is_super_admin FROM admin_accounts WHERE user_id=?").bind(s.user.id).first();if(!actor)return json({ok:false,error:"Administrator login required"},401);if(request.method==="GET"){const r=await env.DB.prepare("SELECT a.email,a.is_super_admin,a.created_at,u.display_name FROM admin_accounts a JOIN users u ON u.id=a.user_id ORDER BY a.is_super_admin DESC,a.created_at").all();return json({ok:true,admins:r.results||[]})}if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);let b:{email?:string;password?:string;name?:string};try{b=await request.json()}catch{return json({ok:false,error:"Invalid request"},400)}const email=(b.email||"").trim().toLowerCase(),pass=b.password||"",name=(b.name||"Administrator").trim().slice(0,60);if(!validAdminEmail(email))return json({ok:false,error:"Enter a valid email."},400);if(!validAdminPassword(pass))return json({ok:false,error:"Password must be at least 12 characters and include letters and numbers."},400);const id="admin_"+crypto.randomUUID(),salt=hex(crypto.getRandomValues(new Uint8Array(16)).buffer),hash=await adminPasswordHash(pass,salt);try{await env.DB.batch([env.DB.prepare("INSERT INTO users(id,display_name,role,status) VALUES(?,?,'admin','active')").bind(id,name||"Administrator"),env.DB.prepare("INSERT INTO admin_accounts(user_id,email,password_hash,password_salt,is_super_admin) VALUES(?,?,?, ?,0)").bind(id,email,hash,salt),env.DB.prepare("INSERT INTO admin_audit_logs(id,admin_user_id,action,target_type,target_id,metadata_json) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),s.user.id,"admin_created","admin",id,JSON.stringify({email}))])}catch{return json({ok:false,error:"Could not create account. That email may already be in use."},409)}return json({ok:true},201)}
 async function adminNotificationsHtml():Response{
  const html=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CodeRush · Telegram notifications</title><style>*{box-sizing:border-box}body{margin:0;background:#141619;color:#f7f7f5;font:15px system-ui;padding:24px}.wrap{max-width:900px;margin:auto}.card{background:#20252b;border:1px solid #343b44;border-radius:14px;padding:20px;margin:16px 0}.muted{color:#aeb6c0}textarea{width:100%;min-height:130px;background:#141619;color:white;border:1px solid #48515c;border-radius:9px;padding:12px;font:inherit}button,a{display:inline-block;border:0;border-radius:8px;padding:12px 18px;background:#b92332;color:white;font-weight:700;text-decoration:none;cursor:pointer;margin-top:10px}.stats{display:flex;gap:12px;flex-wrap:wrap}.stat{background:#141619;padding:14px;border-radius:9px;min-width:130px}.row{padding:12px 0;border-bottom:1px solid #343b44}.ok{color:#32b879}.err{color:#ff8790}</style><main class="wrap"><h1>CodeRush · Telegram notifications</h1><p class="muted">Super Admin broadcast centre. Messages are queued and delivered in small batches; you can leave this page while delivery continues.</p><a href="/admin">← Admin dashboard</a><section class="card"><h2>Audience</h2><div id="stats" class="stats">Loading subscriber totals…</div></section><section class="card"><h2>New broadcast</h2><p class="muted">Send a text message to all active subscribers who have not opted out. Maximum 4,096 characters.</p><textarea id="message" maxlength="4096" placeholder="Write your CodeRush update…"></textarea><button id="send">Queue broadcast</button><p id="status" class="muted"></p></section><section class="card"><h2>Broadcast history</h2><div id="history" class="muted">Loading…</div></section></main><script>async function api(method,body){const r=await fetch('/api/admin/telegram',{method:method,credentials:'same-origin',headers:{'content-type':'application/json'},body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');return d}function esc(v){return String(v||'').replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]})}async function refresh(){try{const d=await api('GET');document.getElementById('stats').innerHTML=[['Total',d.subscribers.total],['Reachable',d.subscribers.reachable],['Opted out',d.subscribers.optedOut],['Blocked',d.subscribers.blocked]].map(x=>'<div class="stat"><b>'+x[1]+'</b><br><small>'+x[0]+'</small></div>').join('');document.getElementById('history').innerHTML=(d.jobs||[]).map(j=>'<div class="row"><b>'+esc(j.status.toUpperCase())+'</b> · '+j.sent_count+'/'+j.total_count+' sent · '+j.failed_count+' failed · '+esc(j.created_at)+'<br><small>'+esc(j.message.slice(0,220))+'</small></div>').join('')||'No broadcasts yet.'}catch(e){document.getElementById('status').textContent=e.message}}document.getElementById('send').onclick=async function(){const text=document.getElementById('message').value.trim();if(!text)return;this.disabled=true;try{const d=await api('POST',{text:text});document.getElementById('status').textContent='Broadcast queued: '+d.totalQueued+' subscribers.';document.getElementById('message').value='';await refresh()}catch(e){document.getElementById('status').textContent=e.message}finally{this.disabled=false}};refresh();setInterval(refresh,5000);</script></html>`;
@@ -1210,7 +1241,14 @@ async function handleWalletAdminTransactions(request:Request,env:Env):Promise<Re
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const response = await (async (): Promise<Response> => {
     const url = new URL(request.url);
+    const unsafeMethod=["POST","PUT","PATCH","DELETE"].includes(request.method.toUpperCase());
+    const originExempt=url.pathname==="/api/telegram/webhook"||url.pathname==="/api/telegram/broadcast";
+    if(unsafeMethod&&!originExempt&&!sameOrigin(request))return json({ok:false,error:"Invalid or missing request origin"},403);
+    if(unsafeMethod&&!(request.headers.get("content-type")||"").toLowerCase().includes("application/json"))return json({ok:false,error:"Content-Type must be application/json."},415);
+    const declaredLength=Number(request.headers.get("content-length")||0),bodyLimit=url.pathname==="/api/telegram/webhook"?1048576:65536;
+    if(declaredLength>bodyLimit)return json({ok:false,error:"Request body is too large."},413);
 
     if (url.pathname === "/admin" && request.method === "GET") return adminHtml(env);
     if (url.pathname === "/admin/notifications" && request.method === "GET") return adminNotificationsHtml();
@@ -1310,6 +1348,8 @@ export default {
 
     if (url.pathname.startsWith("/api/")) return json({ ok: false, error: "API route not found" }, 404);
     return env.ASSETS.fetch(request);
+    })().catch(error=>{console.error("Unhandled CodeRush request failure",error);return json({ok:false,error:"Internal server error"},500)});
+    return withSecurityHeaders(response);
   },
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     if (controller.cron === "* * * * *") { await deliverTelegramNotificationOutbox(env); await deliverTelegramBroadcastJobs(env); return; }
@@ -1324,6 +1364,8 @@ export default {
       } else if (controller.cron === "0 */2 * * *") {
         await refreshAndSettleBetResults(env);
       } else if (controller.cron === "15 0 * * *") {
+        await env.DB.prepare("DELETE FROM user_sessions WHERE expires_at<datetime('now','-7 days') OR revoked_at<datetime('now','-30 days')").run();
+        await env.DB.prepare("DELETE FROM admin_login_attempts WHERE created_at<datetime('now','-30 days')").run();
         await syncFootballRange(env, dayString(new Date()), dayString(new Date()));
       }
     } catch (error) {
