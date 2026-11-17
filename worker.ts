@@ -921,8 +921,8 @@ async function handleAdminReferrals(request:Request,env:Env):Promise<Response>{
     if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);
     let body:{trackingEnabled?:unknown;commissionEnabled?:unknown};try{body=await request.json() as typeof body}catch{return json({ok:false,error:"Invalid request"},400)}
     if(typeof body.trackingEnabled!=="boolean"||typeof body.commissionEnabled!=="boolean")return json({ok:false,error:"Both referral settings must be boolean values."},400);
-    await env.DB.prepare("UPDATE referral_program_settings SET tracking_enabled=?,commission_enabled=?,updated_by=?,updated_at=? WHERE id=1").bind(body.trackingEnabled?1:0,body.rewardsEnabled?1:0,session.user.id,isoNow()).run();
-    await env.DB.prepare("INSERT INTO referral_audit_events(id,actor_user_id,event_type,subject_user_id,details_json) VALUES(?,?,'referral_program_settings_changed',NULL,?)").bind(crypto.randomUUID(),session.user.id,JSON.stringify({trackingEnabled:body.trackingEnabled,rewardsEnabled:body.rewardsEnabled,rates:{level1:10,level2:5,level3:3}})).run();
+    await env.DB.prepare("UPDATE referral_program_settings SET tracking_enabled=?,commission_enabled=?,updated_by=?,updated_at=? WHERE id=1").bind(body.trackingEnabled?1:0,body.commissionEnabled?1:0,session.user.id,isoNow()).run();
+    await env.DB.prepare("INSERT INTO referral_audit_events(id,actor_user_id,event_type,subject_user_id,details_json) VALUES(?,?,'referral_program_settings_changed',NULL,?)").bind(crypto.randomUUID(),session.user.id,JSON.stringify({trackingEnabled:body.trackingEnabled,commissionEnabled:body.commissionEnabled,rates:{level1:10,level2:5,level3:3}})).run();
   }
   const [settings,totals,rows,awards]=await Promise.all([
     env.DB.prepare("SELECT tracking_enabled,commission_enabled,level1_rate_bps,level2_rate_bps,level3_rate_bps,updated_at FROM referral_program_settings WHERE id=1").first<any>(),
