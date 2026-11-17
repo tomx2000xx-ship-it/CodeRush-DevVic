@@ -78,3 +78,21 @@ A successful build/deployment confirms the Worker bundle was published; it does 
 - Per-selection result snapshots and immutable settlement events are stored in D1. `GET /api/admin/bet-settlements` exposes protected settlement diagnostics to authenticated administrators.
 - My Bets displays each leg's score/result and server-calculated lifetime demo performance. This phase remains demo-only: no wallet debit, cash payout, or real-money wager is performed.
 - Provider result refresh runs every two hours, while live-score refresh remains every 30 minutes. The additional schedule keeps the planned API-Football request volume within the existing 75-request daily safety ceiling under normal scheduled operation.
+
+## Phase 5 — USDT wallet foundation and controlled crypto operations
+
+Migration: `migrations/0008_wallet_ledger.sql`
+
+- Introduces a separate server-authoritative USDT wallet account for each authenticated user. The Phase 3 demo ticket reference balance remains separate and cannot be withdrawn.
+- Stores balances as integer micro-USDT units (six decimal places), deriving available and reserved balances from an append-only D1 ledger. Ledger rows are protected against update and deletion.
+- Supports USDT on TRON/TRC20, Ethereum/ERC20 and BNB Smart Chain/BEP20. Each network has independent deposit-address and deposit/withdrawal enablement.
+- User endpoints: `GET /api/wallet`, `POST /api/wallet/deposits`, and `POST /api/wallet/withdrawals`.
+- Admin endpoints: `GET/POST /api/admin/wallet-settings`, `GET /api/admin/wallet-transactions`, and `POST /api/admin/wallet-transactions/:id`.
+- The administrator dashboard provides network address configuration, global wallet enablement, deposit review, withdrawal approval/rejection and payout-hash recording.
+- Deposits are pending until an administrator verifies the submitted transaction hash on the selected blockchain and approves the credit. The client cannot credit itself.
+- Withdrawal requests reserve the available balance immediately. Administrators approve or reject them; a withdrawal is completed only after an administrator records the externally broadcast payout transaction hash.
+- All operations are idempotent and recorded in a transaction audit trail. A network transaction hash cannot be submitted twice for deposits, and ledger entries cannot be edited or deleted.
+
+### Phase 5 activation and operational boundary
+
+The global wallet switch and all network switches are **OFF by default**. No deposit address is preconfigured, no payment processor or blockchain RPC service is connected, and no funds are collected or transferred automatically. The project owner/operator must configure official wallet deposit addresses, verify each chain manually, and complete the applicable legal, compliance, custody and operational reviews before enabling live operations. Never enable a network until its address and withdrawal process have been independently checked. This implementation is a controlled manual crypto workflow, not an integrated hosted payment gateway or automated blockchain monitor.
