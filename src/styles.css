@@ -1432,3 +1432,9 @@ html[dir="rtl"] .app :where(.nav-item,.quick-actions button,.daily-reward>button
 .wallet-server-view .wallet-live-pill.active{background:#e9f8ef;color:#218653}
 .wallet-server-view .stage6-tx-copy small{overflow-wrap:anywhere}
 @media(max-width:370px){.wallet-server-balance{padding:15px}.wallet-server-balance strong{font-size:25px}.wallet-server-actions button{font-size:10px}}
+
+/* Make the 1X2 market labels and prices easier to scan on mobile. */
+.sb-market-row button small,.sb-live-feature-markets button small{font-size:11px;font-weight:850;color:#b83e55;letter-spacing:.2px}
+.sb-market-row button b,.sb-live-feature-markets button b{font-size:14px;font-weight:900;color:#43252c}
+.sb-market-row button,.sb-live-feature-markets button{background:#fff8f9;border-color:#edcbd2;color:#43252c}
+.sb-market-row button.selected,.sb-live-feature-markets button.selected{background:#fde8ed;border-color:#d94f69;color:#a92e48}
