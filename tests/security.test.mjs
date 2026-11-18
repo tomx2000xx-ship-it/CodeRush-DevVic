@@ -31,7 +31,7 @@ test("admin login is not blocked by origin checks or login-attempt throttling", 
   const login = worker.slice(worker.indexOf("async function adminLogin"), worker.indexOf("async function adminUsers"));
   assert.doesNotMatch(login, /requestIsSameOrigin|Too many sign-in attempts|emailAttempts|ipAttempts/);
   assert.match(worker, /originExempt=loginRoute/);
-  assert.match(login, /newAdminSession\\(request,env,account!\\.user_id\\)/);
+  assert.match(login, /newAdminSession\(request,env,account!\.user_id\)/);
 });
 
 test("Telegram webhook validates its secret token and has a bounded payload", () => {
