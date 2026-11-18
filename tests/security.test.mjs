@@ -87,22 +87,26 @@ test("runtime rejects state-changing requests with no Origin header", async () =
 });
 
 
-test("native admin form accepts same-origin Fetch Metadata when Origin and Referer are absent", async () => {
+test("native admin form requires and accepts a same-site CSRF token without Origin or Referer", async () => {
   const base = "https://coderush-devvic.tomx2000xx.workers.dev";
+  const page = await workerEntry.fetch(new Request(base + "/admin"), testEnv);
+  const cookie = page.headers.get("set-cookie") || "";
+  const token = page.text ? await page.text().then(html => html.match(/name="_csrf" value="([a-f0-9]{64})"/)?.[1]) : undefined;
+  const cookieToken = cookie.match(/cr_admin_csrf=([a-f0-9]{64})/)?.[1];
+  assert.ok(token && cookieToken && token === cookieToken, "admin form must receive matching CSRF cookie and hidden token");
   const allowed = await workerEntry.fetch(new Request(base + "/api/admin/login", {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", "sec-fetch-site": "same-origin" },
-    body: "email=admin%40example.com&password=not-a-real-password"
+    headers: { "content-type": "application/x-www-form-urlencoded", cookie: "cr_admin_csrf=" + cookieToken },
+    body: "_csrf=" + token + "&email=admin%40example.com&password=not-a-real-password"
   }), testEnv);
-  assert.notEqual(allowed.status, 403, "same-origin native form must pass the origin middleware");
-  const crossSite = await workerEntry.fetch(new Request(base + "/api/admin/login", {
+  assert.notEqual(allowed.status, 403, "valid same-site form token must pass the origin middleware");
+  const rejected = await workerEntry.fetch(new Request(base + "/api/admin/login", {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", "sec-fetch-site": "cross-site" },
-    body: "email=admin%40example.com&password=not-a-real-password"
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: "_csrf=" + token + "&email=admin%40example.com&password=not-a-real-password"
   }), testEnv);
-  assert.equal(crossSite.status, 403);
+  assert.equal(rejected.status, 403, "a form token without its same-site cookie must be rejected");
 });
-
 test("runtime rejects cross-origin state changes and non-JSON bodies", async () => {
   const base = "https://coderush-devvic.tomx2000xx.workers.dev";
   const crossOrigin = await workerEntry.fetch(new Request(base + "/api/auth/logout", {
