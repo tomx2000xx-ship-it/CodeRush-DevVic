@@ -1458,10 +1458,14 @@ export default {
       return;
     }
     if (controller.cron === "*/30 * * * *") {
-      await maybeRunScheduledFiveDollarFootballProbe(env);
       if (env.FIVE_DOLLAR_FOOTBALL_API_KEY) {
-        try { await syncFootballLive(env); }
-        catch (error) { console.error("Scheduled 5DollarFootballAPI live sync failed", error instanceof Error ? error.message : String(error)); }
+        try {
+          await syncFootballRange(env, dayString(new Date()), dayString(new Date()));
+          await syncFootballLive(env);
+        } catch (error) {
+          console.error("Scheduled 5DollarFootballAPI fixture/live/odds sync failed", error instanceof Error ? error.message : String(error));
+          await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('5dollar-football-api',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind((error instanceof Error?error.message:"Scheduled sync failed").slice(0,500),isoNow()).run();
+        }
       }
       return;
     }
