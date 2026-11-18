@@ -669,7 +669,7 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
       json_extract(f.raw_json,'$.teams.home.logo') AS home_logo,json_extract(f.raw_json,'$.teams.away.logo') AS away_logo,json_extract(f.raw_json,'$.league.logo') AS league_logo,
       f.home_score,f.away_score,o.bookmaker_name,o.outcome_key,o.odd,o.suspended,o.updated_at AS odds_updated_at
     FROM sports_fixtures f LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1
-    WHERE substr(f.kickoff,1,10)>=? AND substr(f.kickoff,1,10)<=?
+    WHERE datetime(f.kickoff)>=datetime(?,'-1 day') AND datetime(f.kickoff)<datetime(?,'+2 day')
     ORDER BY f.kickoff ASC
   `).bind(from,to).all<Record<string,unknown>>();
   const map=new Map<string,Record<string,unknown>>();
