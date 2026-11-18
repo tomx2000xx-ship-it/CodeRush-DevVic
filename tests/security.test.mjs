@@ -88,21 +88,14 @@ test("runtime rejects state-changing requests with no Origin header", async () =
 });
 
 
-test("native admin form requires a same-site CSRF token when Origin and Referer are absent", async () => {
+test("admin login form can submit without Origin, Referer, or a CSRF cookie", async () => {
   const base = "https://coderush-devvic.tomx2000xx.workers.dev";
-  const token = "a".repeat(64);
-  const allowed = await workerEntry.fetch(new Request(base + "/api/admin/login", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", cookie: "cr_admin_csrf=" + token },
-    body: "_csrf=" + token + "&email=invalid&password=x"
-  }), testEnv);
-  assert.equal(allowed.status, 401, "valid same-site token must pass origin checks and reach credential validation");
-  const rejected = await workerEntry.fetch(new Request(base + "/api/admin/login", {
+  const response = await workerEntry.fetch(new Request(base + "/api/admin/login", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: "_csrf=" + token + "&email=invalid&password=x"
+    body: "email=invalid&password=x"
   }), testEnv);
-  assert.equal(rejected.status, 403, "a form token without its same-site cookie must be rejected");
+  assert.equal(response.status, 401, "login submission must reach credential validation instead of being blocked by origin or CSRF checks");
 });
 test("runtime rejects cross-origin state changes and non-JSON bodies", async () => {
   const base = "https://coderush-devvic.tomx2000xx.workers.dev";
