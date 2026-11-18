@@ -1328,7 +1328,7 @@ export default {
     const url = new URL(request.url);
     const unsafeMethod=["POST","PUT","PATCH","DELETE"].includes(request.method.toUpperCase());
     const originExempt=url.pathname==="/api/telegram/webhook"||url.pathname==="/api/telegram/broadcast";
-    if(unsafeMethod&&!originExempt&&!requestIsSameOrigin(request))return json({ok:false,error:"Invalid or missing request origin"},403);
+    const adminFormFallback=(url.pathname==="/api/admin/login"||url.pathname==="/api/admin/setup")&&(request.headers.get("content-type")||"").toLowerCase().includes("application/x-www-form-urlencoded")&&requestIsSameOrigin(request);if(unsafeMethod&&!originExempt&&!sameOrigin(request)&&!adminFormFallback)return json({ok:false,error:"Invalid or missing request origin"},403);
     const contentType=(request.headers.get("content-type")||"").toLowerCase();const formAuth=(url.pathname==="/api/admin/login"||url.pathname==="/api/admin/setup")&&contentType.includes("application/x-www-form-urlencoded");if(unsafeMethod&&!contentType.includes("application/json")&&!formAuth)return json({ok:false,error:"Content-Type must be application/json."},415);
     const declaredLength=Number(request.headers.get("content-length")||0),bodyLimit=url.pathname==="/api/telegram/webhook"?1048576:65536;
     if(declaredLength>bodyLimit)return json({ok:false,error:"Request body is too large."},413);
