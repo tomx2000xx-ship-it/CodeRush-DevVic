@@ -572,6 +572,11 @@ async function runFiveDollarFootballProbe(env:Env):Promise<Record<string,unknown
   const h=dayResult.headers;
   return {ok:true,provider:"5DollarFootballAPI",probeOnly:true,requestsUsed:3+oddsChecks.length+(live?.id?1:0),coverage:{popularLeagueCount:leagues.length,hasMore:!!leagueResult.pagination?.has_more,leagues:leagues.map((item:any)=>({id:String(item.id),name:item.name,country:item.country?.name||item.country?.code||null}))},live:{matchCount:liveFixtures.length,sample:liveFixtures.slice(0,8).map((item:any)=>({id:String(item.id),league:item.league?.name||null,home:item.teams?.home?.name||null,away:item.teams?.away?.name||null,status:item.status,statusCode:item.status_code,score:item.goals||null,kickoff:item.kickoff_utc||null,teamLogosAvailable:!!(item.teams?.home?.logo||item.teams?.away?.logo),leagueLogoAvailable:!!item.league?.logo}))},next24Hours:{fixtureCount:dayFixtures.length,sample:dayFixtures.slice(0,8).map((item:any)=>({id:String(item.id),league:item.league?.name||null,home:item.teams?.home?.name||null,away:item.teams?.away?.name||null,status:item.status,kickoff:item.kickoff_utc||null,teamLogosAvailable:!!(item.teams?.home?.logo||item.teams?.away?.logo),leagueLogoAvailable:!!item.league?.logo}))},odds:oddsChecks,liveDetails:liveDetail,limitations:{teamAndLeagueLogos:"Not supplied by this provider API; a separate source or existing cached assets would be required.",aetAndPenalties:"Provider documents no AET/PEN statuses; full-time is its confirmed 90-minute result.",liveOdds:"Per-fixture odds include an inplay field; actual availability is shown above. Bulk odds_full requires Business plan."},rateLimit:{limit:h.get("x-ratelimit-limit"),remaining:h.get("x-ratelimit-remaining"),reset:h.get("x-ratelimit-reset"),requestsLimit:h.get("x-ratelimit-requests-limit"),requestsRemaining:h.get("x-ratelimit-requests-remaining")}};
 }
+async function maybeRunScheduledFiveDollarFootballProbe(env:Env):Promise<void>{
+  const latest=await env.DB.prepare("SELECT completed_at FROM sports_provider_probe_runs WHERE provider=? ORDER BY completed_at DESC LIMIT 1").bind("5DollarFootballAPI").first<{completed_at:string}>();
+  if(latest?.completed_at&&Date.now()-new Date(latest.completed_at).getTime()<6*60*60*1000)return;
+  await persistFiveDollarFootballProbe(env);
+}
 async function persistFiveDollarFootballProbe(env:Env):Promise<void>{
   const id=crypto.randomUUID(),started=isoNow();
   try{
@@ -1484,15 +1489,17 @@ export default {
       await monitorPendingWalletDeposits(env);
       return;
     }
-    if (controller.cron === "0 */6 * * *") {
-      await persistFiveDollarFootballProbe(env);
+    if (controller.cron === "*/30 * * * *") {
+      await maybeRunScheduledFiveDollarFootballProbe(env);
+      if (env.API_FOOTBALL_KEY) {
+        try { await syncFootballLive(env); }
+        catch (error) { console.error("Scheduled API-Football live sync failed", error instanceof Error ? error.message : String(error)); }
+      }
       return;
     }
     if (!env.API_FOOTBALL_KEY) return;
     try {
-      if (controller.cron === "*/30 * * * *") {
-        await syncFootballLive(env);
-      } else if (controller.cron === "0 */2 * * *") {
+      if (controller.cron === "0 */2 * * *") {
         await refreshAndSettleBetResults(env);
       } else if (controller.cron === "15 0 * * *") {
         await env.DB.prepare("DELETE FROM user_sessions WHERE expires_at<datetime('now','-7 days') OR revoked_at<datetime('now','-30 days')").run();
