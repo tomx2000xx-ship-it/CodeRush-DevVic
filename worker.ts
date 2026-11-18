@@ -772,7 +772,7 @@ async function handleBetCreate(request:Request,env:Env):Promise<Response>{
   const prior=await env.DB.prepare("SELECT id,status,stake FROM bet_tickets WHERE user_id=? AND idempotency_key=?").bind(session.user.id,key).first<any>();
   if(prior)return json({ok:true,duplicate:true,ticket:{id:prior.id,status:prior.status,stake:Number(prior.stake),currency:"USD"}});
   const stakeText=String(body.stake??"").trim();
-  if(!/^\\d{1,4}(?:\\.\\d{1,2})?$/.test(stakeText))return json({ok:false,error:"Enter a stake in USD with no more than two decimal places."},400);
+  if(!/^\d{1,4}(?:\.\d{1,2})?$/.test(stakeText))return json({ok:false,error:"Enter a stake in USD with no more than two decimal places."},400);
   const stake=Number(stakeText),stakeUnits=Math.round(stake*USDT_SCALE);
   if(!Number.isFinite(stake)||stake<1||stake>5000||!Number.isSafeInteger(stakeUnits))return json({ok:false,error:"The minimum stake is $1.00 and the maximum is $5,000.00."},400);
   const quoteAt=Date.parse(String(body.quoteValidatedAt||""));
