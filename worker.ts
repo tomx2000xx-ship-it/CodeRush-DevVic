@@ -1198,7 +1198,7 @@ async function handleWalletWithdrawal(request:Request,env:Env):Promise<Response>
   let body:{amount?:unknown;networkCode?:unknown;destinationAddress?:unknown;idempotencyKey?:unknown};
   try{body=await request.json() as typeof body}catch{return json({ok:false,error:"Invalid withdrawal request."},400)}
   const units=parseUsdtUnits(body.amount),networkCode=String(body.networkCode||"") as WalletNetworkCode,address=String(body.destinationAddress||"").trim(),key=String(body.idempotencyKey||"");
-  if(!units||!WALLET_NETWORKS.includes(networkCode)||!walletAddressValid(networkCode,address)||!/^[A-Za-z0-9_-]{16,80}$/.test(key))return json({ok:false,error:"Enter a valid USDT amount, supported network, destination address and request key."},400);
+  if(!units||!WALLET_NETWORKS.includes(networkCode)||!walletAddressValid(networkCode,address)||!/^[A-Za-z0-9_-]{16,80}$/.test(key))return json({ok:false,error:"Enter a valid USD withdrawal amount, supported network, destination address and request key."},400);
   const settings=await walletSettings(env),network=await env.DB.prepare("SELECT * FROM wallet_networks WHERE network_code=?").bind(networkCode).first<any>();
   if(!settings?.enabled||!network?.withdrawals_enabled)return json({ok:false,error:"Crypto withdrawals are not enabled for this network yet."},503);
   if(units<Number(settings.min_withdrawal_units)||units>Number(settings.max_withdrawal_units))return json({ok:false,error:"Withdrawal amount is outside the configured limits."},400);
@@ -1291,7 +1291,7 @@ async function handleWalletAdminTransactions(request:Request,env:Env):Promise<Re
   if(tx.type==="deposit"&&updated?.status==="rejected"&&tx.status!=="rejected")await createUserNotification(env,tx.user_id,"deposit-rejected:"+id,"wallet","Deposit requires attention","Your submitted deposit could not be verified. Please review the transaction details or contact support.","الإيداع يحتاج إلى مراجعة","تعذر التحقق من الإيداع المرسل. يرجى مراجعة بيانات المعاملة أو التواصل مع الدعم.","/wallet");
   if(tx.type==="withdrawal"&&updated?.status!==tx.status){
     const state=updated.status==="processing"?"approved":updated.status==="rejected"?"rejected":updated.status==="completed"?"paid":String(updated.status),amount=(Number(tx.amount_units)/USDT_SCALE).toFixed(2);
-    await createUserNotification(env,tx.user_id,"withdrawal-status:"+id+":"+updated.status,"wallet","Withdrawal "+state,"Your "+amount+" USDT withdrawal request is now "+state+". "+(updated.status==="completed"?"The manual payout has been recorded.":updated.status==="rejected"?"The request was rejected and reserved funds were released.":"An administrator approved the request; payout remains manual."),"تحديث حالة السحب","تم تحديث طلب السحب بقيمة "+amount+" USDT إلى الحالة: "+state+".","/wallet");
+    await createUserNotification(env,tx.user_id,"withdrawal-status:"+id+":"+updated.status,"wallet","Withdrawal "+state, " + "Your $"+amount+" withdrawal request is now "+state+". +(updated.status==="completed"?"The manual payout has been recorded.":updated.status==="rejected"?"The request was rejected and reserved funds were released.":"An administrator approved the request; payout remains manual."),"تحديث حالة السحب","تم تحديث طلب السحب بقيمة "+amount+" USDT إلى الحالة: "+state+".","/wallet");
   }
   return json({ok:true,transaction:updated});
 }
