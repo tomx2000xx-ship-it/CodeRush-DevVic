@@ -11,7 +11,7 @@ const testEnv = { DB: { prepare() { throw new Error("Database should not be touc
 test("unsafe browser requests require an exact same-origin Origin header", () => {
   assert.match(worker, /function sameOrigin\(request:Request\):boolean\{const origin=request\.headers\.get\("origin"\);if\(!origin\)return false;/);
   assert.match(worker, /unsafeMethod&&!originExempt&&!sameOrigin\(request\)/);
-  assert.match(worker, /originExempt=url\.pathname==="\/api\/telegram\/webhook"\|\|url\.pathname==="\/api\/telegram\/broadcast"/);
+  assert.match(worker, /originExempt=loginRoute\|\|url\.pathname==="\/api\/telegram\/webhook"\|\|url\.pathname==="\/api\/telegram\/broadcast"/);
 });
 
 test("API request bodies have declared size limits and JSON content types", () => {
@@ -27,11 +27,11 @@ test("all Worker responses receive baseline security headers", () => {
   assert.match(worker, /return withSecurityHeaders\(response\)/);
 });
 
-test("admin login is throttled by normalized email and hashed client address", () => {
-  assert.match(worker, /CodeRush admin login rate key:/);
-  assert.match(worker, /client_key_hash=\?/);
-  assert.match(worker, /emailAttempts\?\.n\|\|0\)>=5\|\|Number\(ipAttempts\?\.n\|\|0\)>=15/);
-  assert.match(worker, /INSERT INTO admin_login_attempts\(id,email,success,client_key_hash\)/);
+test("admin login is not blocked by origin checks or login-attempt throttling", () => {
+  const login = worker.slice(worker.indexOf("async function adminLogin"), worker.indexOf("async function adminUsers"));
+  assert.doesNotMatch(login, /requestIsSameOrigin|Too many sign-in attempts|emailAttempts|ipAttempts/);
+  assert.match(worker, /originExempt=loginRoute/);
+  assert.match(login, /newAdminSession\\(request,env,account!\\.user_id\\)/);
 });
 
 test("Telegram webhook validates its secret token and has a bounded payload", () => {
