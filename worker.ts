@@ -1536,10 +1536,10 @@ export default {
     try {
       if (controller.cron === "0 */2 * * *") {
         await refreshAndSettleBetResults(env);
-      } else if (controller.cron === "0 */3 * * *") {
-        // The Free plan allows 100 requests/day. Rotate one future match date every
-        // three hours so all seven upcoming dates are refreshed without exhausting quota.
-        const rotation=Math.floor(Date.now()/(3*60*60*1000))%7;
+        // Reuse the existing two-hour trigger: one date-specific odds request per run.
+        // This keeps the account at its five-trigger Free-plan limit and stays below
+        // the 100-request/day provider quota alongside the 30-minute live-score feed.
+        const rotation=Math.floor(Date.now()/(2*60*60*1000))%7;
         const oddsDate=addCalendarDays(lagosDayString(new Date()),1+rotation);
         const result=await syncFootballOdds(env,oddsDate);
         if(result.oddsWarning) console.warn("Scheduled API-Football odds sync:",result.oddsWarning);
