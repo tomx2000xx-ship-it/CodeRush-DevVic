@@ -7,6 +7,7 @@ interface Env {
   TELEGRAM_GROUP_URL?: string;
   CODERUSH_ADMIN_TELEGRAM_IDS?: string;
   API_FOOTBALL_KEY?: string;
+  FIVE_DOLLAR_FOOTBALL_API_KEY?: string;
   API_FOOTBALL_BOOKMAKER_ID?: string;
   TRONGRID_API_KEY?: string;
   ETHEREUM_RPC_URL?: string;
@@ -526,6 +527,66 @@ async function apiFootball<T>(env: Env, path: string): Promise<{ response: T[]; 
     throw new Error("API-Football " + endpoint.pathname + " rejected the request: " + (providerError || "").slice(0, 300));
   }
   return { response: payload.response || [], paging: payload.paging };
+}
+async function fiveDollarFootballGet(env:Env,path:string):Promise<{data:any;headers:Headers}>{
+  if(!env.FIVE_DOLLAR_FOOTBALL_API_KEY)throw new Error("FIVE_DOLLAR_FOOTBALL_API_KEY is not configured in Cloudflare.");
+  const response=await fetch(new URL(path,"https://api.5dollarfootballapi.com/v1/"),{
+    method:"GET",
+    headers:{authorization:"Bearer "+env.FIVE_DOLLAR_FOOTBALL_API_KEY,accept:"application/json"},
+    signal:AbortSignal.timeout(10000),
+    cf:{cacheTtl:0,cacheEverything:false}
+  });
+  let payload:any;
+  try{payload=await response.json()}catch{throw new Error("5DollarFootballAPI returned a non-JSON response (HTTP "+response.status+").");}
+  if(!response.ok||payload?.success!==1){
+    const detail=String(payload?.error?.message||payload?.message||"Provider request failed").slice(0,250);
+    throw new Error("5DollarFootballAPI "+path+" failed (HTTP "+response.status+"): "+detail);
+  }
+  return {data:payload.data,headers:response.headers};
+}
+async function handleSportsProviderProbe(request:Request,env:Env):Promise<Response>{
+  const session=await currentSession(request,env);
+  if(!session)return json({ok:false,error:"Authentication required"},401);
+  if(session.user.role!=="admin")return json({ok:false,error:"Administrator access required"},403);
+  if(!env.FIVE_DOLLAR_FOOTBALL_API_KEY)return json({ok:false,configured:false,error:"Add the FIVE_DOLLAR_FOOTBALL_API_KEY secret to the coderush-devvic Worker before running this test."},503);
+  try{
+    const [statusResult,leagueResult,liveResult,dayResult]=await Promise.all([
+      fiveDollarFootballGet(env,"status"),
+      fiveDollarFootballGet(env,"leagues?popular=1&per_page=50"),
+      fiveDollarFootballGet(env,"fixtures?status=live&per_page=500"),
+      fiveDollarFootballGet(env,(()=>{const now=new Date();const start=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()));return "fixtures?start_time="+Math.floor(start.getTime()/1000)+"&end_time="+Math.floor(start.getTime()/1000+86400)+"&per_page=100";})())
+    ]);
+    const leagues=Array.isArray(leagueResult.data)?leagueResult.data:[];
+    const liveFixtures=Array.isArray(liveResult.data)?liveResult.data:[];
+    const dayFixtures=Array.isArray(dayResult.data)?dayResult.data:[];
+    const oddsTarget=liveFixtures[0]||dayFixtures.find((item:any)=>item?.status==="scheduled"||item?.status==="in_play")||dayFixtures[0];
+    let oddsCheck:any={tested:false,reason:"No fixture was returned in the live or current UTC-day fixture lists."};
+    if(oddsTarget?.id){
+      const oddsResult=await fiveDollarFootballGet(env,"fixtures/"+encodeURIComponent(String(oddsTarget.id))+"/odds");
+      const books=Array.isArray(oddsResult.data?.bookmakers)?oddsResult.data.bookmakers:[];
+      const bet365=books.find((item:any)=>String(item.slug||"").toLowerCase()==="bet365")||books[0];
+      const oneXtwo=bet365?.odds?.["1x2"]||null;
+      oddsCheck={
+        tested:true,fixtureId:String(oddsTarget.id),bookmaker:bet365?.name||null,
+        marketAvailable:!!oneXtwo,
+        opening:oneXtwo?.opening||null,closing:oneXtwo?.closing||null,inplay:oneXtwo?.inplay||null,
+        bookmakerCount:books.length
+      };
+    }
+    const headers=dayResult.headers;
+    return json({
+      ok:true,provider:"5DollarFootballAPI",probeOnly:true,
+      account:{plan:statusResult.data?.plan||null,limits:statusResult.data?.limits||null,usage:statusResult.data?.usage||null},
+      coverage:{popularLeagueCount:leagues.length,hasMore:!!leagueResult.data?.pagination?.has_more,leagues:leagues.map((item:any)=>({id:String(item.id),name:item.name,country:item.country?.name||null}))},
+      live:{matchCount:liveFixtures.length,sample:liveFixtures.slice(0,5).map((item:any)=>({id:String(item.id),league:item.league?.name||null,home:item.teams?.home?.name||null,away:item.teams?.away?.name||null,status:item.status,statusCode:item.status_code,score:item.goals||null,kickoff:item.kickoff_utc||null}))},
+      currentUtcDay:{fixtureCount:dayFixtures.length},
+      odds:oddsCheck,
+      rateLimit:{limit:headers.get("x-ratelimit-limit"),remaining:headers.get("x-ratelimit-remaining"),reset:headers.get("x-ratelimit-reset"),requestsLimit:headers.get("x-ratelimit-requests-limit"),requestsRemaining:headers.get("x-ratelimit-requests-remaining")}
+    });
+  }catch(error){
+    const message=error instanceof Error?error.message:"5DollarFootballAPI probe failed";
+    return json({ok:false,provider:"5DollarFootballAPI",probeOnly:true,error:message},502);
+  }
 }
 async function createUserNotification(env:Env,userId:string,eventKey:string,category:"bet"|"wallet"|"referral"|"system",titleEn:string,bodyEn:string,titleAr:string,bodyAr:string,deepLink:string):Promise<void>{
  const user=await env.DB.prepare("SELECT language FROM users WHERE id=? AND status='active'").bind(userId).first<{language:string}>();if(!user)return;
@@ -1355,6 +1416,7 @@ export default {
     if (url.pathname === "/api/bets" && request.method === "GET") return handleBetList(request, env);
     if (url.pathname === "/api/admin/bet-settlements" && request.method === "GET") return handleBetSettlementDiagnostics(request, env);
     if (url.pathname === "/api/profile" && request.method === "POST") return handleProfileUpdate(request, env);
+    if (url.pathname === "/api/admin/sports-provider-probe" && request.method === "POST") return handleSportsProviderProbe(request,env);
     if (url.pathname === "/api/sports/fixtures" && request.method === "GET") return handleSportsFixtures(request, env);
     if (url.pathname === "/api/sports/sync" && request.method === "POST") return handleSportsSync(request, env);
 
