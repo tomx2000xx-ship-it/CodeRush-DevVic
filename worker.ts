@@ -709,6 +709,18 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
   const state=await env.DB.prepare("SELECT last_fixtures_sync,last_live_sync,last_odds_sync,last_error FROM sports_sync_state WHERE provider='5dollar-football-api'").first<Record<string,unknown>>();
   return new Response(JSON.stringify({ok:true,configured:true,provider:"5DollarFootballAPI",fixtures:Array.from(map.values()),sync:state}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
 }
+async function handleSportsFixtureDetails(request:Request,env:Env):Promise<Response>{
+  const session=await currentSession(request,env);
+  if(!session)return json({ok:false,error:"Authentication required"},401);
+  if(!env.FIVE_DOLLAR_FOOTBALL_API_KEY)return json({ok:false,error:"5DollarFootballAPI is not configured"},503);
+  const id=new URL(request.url).searchParams.get("id")||"";
+  if(!/^5d-\d{1,20}$/.test(id))return json({ok:false,error:"Invalid 5DollarFootballAPI fixture id"},400);
+  try{
+    const result=await fiveDollarFootballGet(env,"fixtures/"+encodeURIComponent(id.slice(3))+"?include=events,stats");
+    const data=result.data||{};
+    return json({ok:true,provider:"5DollarFootballAPI",fixtureId:id,statistics:data.statistics||data.stats||null,events:Array.isArray(data.events)?data.events:[],goals:data.goals||null,status:data.status||null});
+  }catch(error){return json({ok:false,error:error instanceof Error?error.message:"Unable to load match details"},502);}
+}
 async function handleSportsSync(request: Request, env: Env): Promise<Response> {
   const session=await currentSession(request,env);
   if(!session) return json({ok:false,error:"Authentication required"},401);
@@ -1386,6 +1398,7 @@ export default {
     if (url.pathname === "/api/admin/sports-provider-probe" && request.method === "POST") return handleSportsProviderProbe(request,env);
     if (url.pathname === "/api/admin/sports-provider-probe-status" && request.method === "GET") return handleSportsProviderProbeStatus(request,env);
     if (url.pathname === "/api/sports/fixtures" && request.method === "GET") return handleSportsFixtures(request, env);
+    if (url.pathname === "/api/sports/fixture-details" && request.method === "GET") return handleSportsFixtureDetails(request, env);
     if (url.pathname === "/api/sports/sync" && request.method === "POST") return handleSportsSync(request, env);
 
     if (url.pathname === "/api/health" && request.method === "GET") {
