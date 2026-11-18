@@ -666,14 +666,24 @@ async function storeFootballOdds(env: Env, entries: ApiFootballOdds[]): Promise<
   return count;
 }
 async function syncFootballRange(env: Env, _from: string, _to: string): Promise<{fixtures:number;odds:number}> {
-  // One request retrieves the next 100 fixtures instead of one request per day.
   const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?next=100");
   const fixtures=await storeFootballFixtures(env,fixtureData.response);
-  // Only today's first odds page is fetched; no 10-page-per-day loops.
   const today=dayString(new Date());
-  const oddsData=await apiFootball<ApiFootballOdds>(env,"odds?date="+today+"&bet=1&page=1");
-  const odds=await storeFootballOdds(env,oddsData.response);
-  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_fixtures_sync,last_odds_sync,last_error,updated_at) VALUES ('5dollar-football-api',?,?,NULL,?) ON CONFLICT(provider) DO UPDATE SET last_fixtures_sync=excluded.last_fixtures_sync,last_odds_sync=excluded.last_odds_sync,last_error=NULL,updated_at=excluded.updated_at").bind(isoNow(),isoNow(),isoNow()).run();
+  let odds=0,oddsError:string|null=null;
+  try{
+    const first=await apiFootball<ApiFootballOdds>(env,"odds?date="+today+"&bet=1&page=1");
+    const entries=[...first.response];
+    const pages=Math.min(10,Math.max(1,Number(first.paging?.total)||1));
+    for(let page=2;page<=pages;page++){
+      const next=await apiFootball<ApiFootballOdds>(env,"odds?date="+today+"&bet=1&page="+page);
+      entries.push(...next.response);
+    }
+    odds=await storeFootballOdds(env,entries);
+  }catch(error){
+    oddsError=(error instanceof Error?error.message:"5DollarFootballAPI odds sync failed").slice(0,500);
+  }
+  const now=isoNow();
+  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_fixtures_sync,last_odds_sync,last_error,updated_at) VALUES ('5dollar-football-api',?,?,?,?) ON CONFLICT(provider) DO UPDATE SET last_fixtures_sync=excluded.last_fixtures_sync,last_odds_sync=CASE WHEN excluded.last_error IS NULL THEN excluded.last_odds_sync ELSE sports_sync_state.last_odds_sync END,last_error=excluded.last_error,updated_at=excluded.updated_at").bind(now,oddsError?null:now,oddsError,now).run();
   return {fixtures,odds};
 }
 async function syncFootballLive(env: Env): Promise<{fixtures:number;odds:number}> {
