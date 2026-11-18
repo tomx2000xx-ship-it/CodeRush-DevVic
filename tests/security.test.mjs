@@ -11,7 +11,7 @@ const testEnv = { DB: { prepare() { throw new Error("Database should not be touc
 test("unsafe browser requests require an exact same-origin Origin header", () => {
   assert.match(worker, /function sameOrigin\(request:Request\):boolean\{const origin=request\.headers\.get\("origin"\);if\(!origin\)return false;/);
   assert.match(worker, /unsafeMethod&&!originExempt&&!sameOrigin\(request\)/);
-  assert.match(worker, /originExempt=loginRoute\|\|url\.pathname==="\/api\/telegram\/webhook"\|\|url\.pathname==="\/api\/telegram\/broadcast"/);
+  assert.ok(worker.includes('originExempt=loginRoute||routePath==="/api/telegram/webhook"||routePath==="/api/telegram/broadcast"'));
 });
 
 test("API request bodies have declared size limits and JSON content types", () => {
