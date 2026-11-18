@@ -804,16 +804,18 @@ async function validateBetSelections(env:Env, inputs:BetQuoteSelectionInput[]):P
     const fixtureId=typeof input.fixtureId==="string"?input.fixtureId.trim():"";
     const outcome=typeof input.outcome==="string"?input.outcome.trim():"";
     const outcomeKey=BET_OUTCOME_KEYS[outcome.toLowerCase()];
-    if(!/^5d-\d{1,20}$/.test(fixtureId)||!outcomeKey)return {ok:false,error:"One or more ticket selections are invalid.",status:400};
-    if(seenFixtures.has(fixtureId))return {ok:false,error:"A ticket can contain only one outcome per match.",status:400};
-    seenFixtures.add(fixtureId);
+    if(!/^(?:5d-)?\d{1,20}$/.test(fixtureId)||!outcomeKey)return {ok:false,error:"One or more ticket selections are invalid.",status:400};
+    // API-Football fixture IDs are numeric; accept them directly (and normalize legacy 5d- IDs).
+    const databaseFixtureId=fixtureId.replace(/^5d-/,"");
+    if(seenFixtures.has(databaseFixtureId))return {ok:false,error:"A ticket can contain only one outcome per match.",status:400};
+    seenFixtures.add(databaseFixtureId);
     const row=await env.DB.prepare(`
       SELECT f.id,f.home_team,f.away_team,f.league_name,f.kickoff,f.status_short,
              o.outcome_name,o.odd,o.suspended,o.updated_at AS odds_updated_at
       FROM sports_fixtures f
       LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1 AND o.outcome_key=?
       WHERE f.id=? LIMIT 1
-    `).bind(outcomeKey,fixtureId).first<{
+    `).bind(outcomeKey,databaseFixtureId).first<{
       id:string;home_team:string;away_team:string;league_name:string;kickoff:string;status_short:string;
       outcome_name:string|null;odd:number|null;suspended:number|null;odds_updated_at:string|null
     }>();
