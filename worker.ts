@@ -204,16 +204,11 @@ async function newAdminSession(request:Request,env:Env,id:string):Promise<Respon
 async function adminSetup(request:Request,env:Env):Promise<Response>{const formAuth=(request.headers.get("content-type")||"").toLowerCase().includes("application/x-www-form-urlencoded");if(!(await requestIsSameOrigin(request)))return json({ok:false,error:"Invalid origin"},403);if(await adminCount(env))return json({ok:false,error:"Initial setup is already complete. Sign in instead."},409);let b:{email?:string;password?:string;name?:string};try{b=formAuth?Object.fromEntries(await request.formData()) as any:await request.json()}catch{return json({ok:false,error:"Invalid request"},400)}const email=(b.email||"").trim().toLowerCase(),pass=b.password||"",name=(b.name||"Super Administrator").trim().slice(0,60);if(!validAdminEmail(email))return json({ok:false,error:"Enter a valid email."},400);if(!validAdminPassword(pass))return json({ok:false,error:"Password must be at least 12 characters and include letters and numbers."},400);const id="admin_"+crypto.randomUUID(),salt=hex(crypto.getRandomValues(new Uint8Array(16)).buffer),hash=await adminPasswordHash(pass,salt);try{await env.DB.batch([env.DB.prepare("INSERT INTO users(id,display_name,role,status) VALUES(?,?,'admin','active')").bind(id,name||"Super Administrator"),env.DB.prepare("INSERT INTO admin_accounts(user_id,email,password_hash,password_salt,is_super_admin) SELECT ?,?,?,?,1 WHERE NOT EXISTS(SELECT 1 FROM admin_accounts)").bind(id,email,hash,salt)])}catch{return json({ok:false,error:"Setup has already been claimed or the email is already registered. Please sign in."},409)}const row=await env.DB.prepare("SELECT user_id FROM admin_accounts WHERE user_id=? AND is_super_admin=1").bind(id).first();if(!row){await env.DB.prepare("DELETE FROM users WHERE id=?").bind(id).run();return json({ok:false,error:"Another administrator completed setup first. Please sign in."},409)}await recordAuthEvent(env,id,"admin_super_setup",request);const session=await newAdminSession(request,env,id);if(formAuth){const headers=new Headers(session.headers);headers.set("location","/admin/dashboard");return new Response(null,{status:303,headers})}return session}
 async function adminLogin(request:Request,env:Env):Promise<Response>{
  const formAuth=(request.headers.get("content-type")||"").toLowerCase().includes("application/x-www-form-urlencoded");
- if(!(await requestIsSameOrigin(request)))return json({ok:false,error:"Invalid origin"},403);
+
  let body:{email?:string;password?:string};try{body=formAuth?Object.fromEntries(await request.formData()) as any:await request.json() as typeof body}catch{return json({ok:false,error:"Invalid request"},400)}
  const email=(body.email||"").trim().toLowerCase(),pass=body.password||"";
  if(!validAdminEmail(email)||pass.length>128)return json({ok:false,error:"Invalid email or password."},401);
- const clientKeyHash=await sha256("CodeRush admin login rate key:"+String(request.headers.get("CF-Connecting-IP")||"unknown"));
- const [emailAttempts,ipAttempts]=await Promise.all([
-  env.DB.prepare("SELECT COUNT(*) AS n FROM admin_login_attempts WHERE email=? AND success=0 AND created_at>datetime('now','-15 minutes')").bind(email).first<any>(),
-  env.DB.prepare("SELECT COUNT(*) AS n FROM admin_login_attempts WHERE client_key_hash=? AND success=0 AND created_at>datetime('now','-15 minutes')").bind(clientKeyHash).first<any>()
- ]);
- if(Number(emailAttempts?.n||0)>=5||Number(ipAttempts?.n||0)>=15)return json({ok:false,error:"Too many sign-in attempts. Please wait 15 minutes before trying again."},429);
+ const clientKeyHash=await sha256("CodeRush admin login:"+String(request.headers.get("CF-Connecting-IP")||"unknown"));
  const account=await env.DB.prepare("SELECT a.user_id,a.password_hash,a.password_salt,u.status FROM admin_accounts a JOIN users u ON u.id=a.user_id WHERE a.email=? COLLATE NOCASE").bind(email).first<any>();
  const computed=account?await adminPasswordHash(pass,account.password_salt):await adminPasswordHash(pass||"invalid-password","00112233445566778899aabbccddeeff");
  const valid=!!account&&account.status==="active"&&constantTimeEqual(computed,account.password_hash);
@@ -1375,7 +1370,8 @@ export default {
     const response = await (async (): Promise<Response> => {
     const url = new URL(request.url);
     const unsafeMethod=["POST","PUT","PATCH","DELETE"].includes(request.method.toUpperCase());
-    const originExempt=url.pathname==="/api/telegram/webhook"||url.pathname==="/api/telegram/broadcast";
+    const loginRoute=url.pathname==="/admin/login"||url.pathname==="/api/admin/login";
+    const originExempt=loginRoute||url.pathname==="/api/telegram/webhook"||url.pathname==="/api/telegram/broadcast";
     const adminFormFallback=(url.pathname==="/api/admin/login"||url.pathname==="/admin/login"||url.pathname==="/api/admin/setup")&&(request.headers.get("content-type")||"").toLowerCase().includes("application/x-www-form-urlencoded")&&await requestIsSameOrigin(request);if(unsafeMethod&&!originExempt&&!sameOrigin(request)&&!adminFormFallback)return json({ok:false,error:"Invalid or missing request origin"},403);
     const contentType=(request.headers.get("content-type")||"").toLowerCase();const formAuth=(url.pathname==="/api/admin/login"||url.pathname==="/admin/login"||url.pathname==="/api/admin/setup")&&contentType.includes("application/x-www-form-urlencoded");if(unsafeMethod&&!contentType.includes("application/json")&&!formAuth)return json({ok:false,error:"Content-Type must be application/json."},415);
     const declaredLength=Number(request.headers.get("content-length")||0),bodyLimit=url.pathname==="/api/telegram/webhook"?1048576:65536;
