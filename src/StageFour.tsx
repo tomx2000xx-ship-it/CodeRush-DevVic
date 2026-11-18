@@ -67,7 +67,7 @@ export function StageFourMatches(){
  const list=visible.filter(f=>!f.live);
  const grouped=Array.from(new Set(list.map(f=>f.league))).map(league=>({league,matches:list.filter(f=>f.league===league)}));
  const add=(f:Fixture,index:number)=>{const odd=f.odds[index];if(odd===null||odd===undefined)return;const pick:Selection={id:f.id+'-'+index,fixtureId:f.id,fixture:f.home+' vs '+f.away,league:f.league,outcome:outcomes[index],odd};setSlip(old=>old.some(p=>p.id===pick.id)?old.filter(x=>x.id!==pick.id):[...old.filter(x=>x.fixtureId!==f.id),pick]);};
- const localCombined=slip.reduce((n,p)=>n*p.odd,1),combined=ticketQuote?.combinedOdds??localCombined,amount=Number(stake),valid=Number.isFinite(amount)&&amount>=1&&amount<=5000&&/^\\d{1,4}(?:\\.\\d{1,2})?$/.test(stake.trim());
+ const localCombined=slip.reduce((n,p)=>n*p.odd,1),combined=ticketQuote?.combinedOdds??localCombined,amount=Number(stake),valid=Number.isFinite(amount)&&amount>=1&&amount<=5000&&/^\d{1,4}(?:\.\d{1,2})?$/.test(stake.trim());
  const record=async()=>{
   if(!slip.length||!valid||!ticketQuote||submittingTicket)return;
   setSubmittingTicket(true);setSubmitTicketError('');
