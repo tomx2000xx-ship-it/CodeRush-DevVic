@@ -60,7 +60,7 @@ export function StageFourMatches(){
  const todayKey=localDateKey(Date.now()),tomorrowKey=localDateKey(Date.now()+86400000);
  const status=(f:Fixture)=>f.live?'Live':f.completed?'Finished':localDateKey(f.kickoff)===todayKey?'Today':localDateKey(f.kickoff)===tomorrowKey?'Tomorrow':'Upcoming';
  const topLeagues=Array.from(new Set(fixtures.map(f=>f.league))).slice(0,5);
- const filtered=fixtures.filter(f=>(filter==='All'||status(f)===filter||(filter==='Today'&&f.live))&&(!favoritesOnly||favorites.includes(f.id))&&(!query||(f.home+' '+f.away+' '+f.league).toLowerCase().includes(query.toLowerCase()))&&(competition==='TOP LEAGUES'?topLeagues.includes(f.league):competition==='INTERNATIONAL'||competition==='INTERNATIONAL CLUBS'?f.league===competition:f.league===competition));
+ const filtered=fixtures.filter(f=>(filter==='All'||(filter==='Today'&&localDateKey(f.kickoff)===todayKey)||(filter==='Tomorrow'&&localDateKey(f.kickoff)===tomorrowKey)||(filter==='Live'&&f.live)||(filter==='Finished'&&f.completed))&&(!favoritesOnly||favorites.includes(f.id))&&(!query||(f.home+' '+f.away+' '+f.league).toLowerCase().includes(query.toLowerCase()))&&(competition==='TOP LEAGUES'?topLeagues.includes(f.league):competition==='INTERNATIONAL'||competition==='INTERNATIONAL CLUBS'?f.league===competition:f.league===competition));
  const visible=[...filtered].sort((a,b)=>sort==='league'?a.league.localeCompare(b.league):Number(b.live)-Number(a.live)||a.time.localeCompare(b.time));
  const live=visible.find(f=>f.live);
  const liveMinute=live?.minute??0;
