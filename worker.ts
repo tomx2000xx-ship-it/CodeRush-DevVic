@@ -1217,7 +1217,7 @@ async function handleWalletWithdrawal(request:Request,env:Env):Promise<Response>
     .bind(crypto.randomUUID(),account.id,session.user.id,id,-units,units,account.id,account.id,account.id,units).run();
   if(Number(reserve.meta?.changes||0)!==1){
     await env.DB.prepare("DELETE FROM wallet_transactions WHERE id=? AND status='pending_review'").bind(id).run();
-    return json({ok:false,error:"Insufficient available USDT balance."},409);
+    return json({ok:false,error:"Insufficient available USD balance."},409);
   }
   await env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) VALUES(?,?,?,'withdrawal_submitted',?)").bind(crypto.randomUUID(),id,session.user.id,JSON.stringify({networkCode,amountUnits:units})).run();
   await createUserNotification(env,session.user.id,"withdrawal-submitted:"+id,"wallet","Withdrawal request received","Your $"+(units/USDT_SCALE).toFixed(2)+" withdrawal request is awaiting manual review. The owner will send the equivalent USDT manually after approval.","تم استلام طلب السحب","طلب السحب بقيمة $"+(units/USDT_SCALE).toFixed(2)+" بانتظار المراجعة اليدوية، وسيُرسل المالك ما يعادلها من USDT يدوياً بعد الموافقة.","/wallet");
