@@ -1531,7 +1531,30 @@ export default {
     return withSecurityHeaders(response);
   },
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
-    if (controller.cron === "* * * * *") { await deliverTelegramNotificationOutbox(env); await deliverTelegramBroadcastJobs(env); return; }
+    if (controller.cron === "* * * * *") {
+      await deliverTelegramNotificationOutbox(env);
+      await deliverTelegramBroadcastJobs(env);
+      // One-time first-run bootstrap: populate the upcoming fixture window and
+      // tomorrow's 1X2 prices after the integration is deployed, without requiring
+      // an administrator to be signed in to press the manual sync button.
+      if(env.API_FOOTBALL_KEY) {
+        const state=await env.DB.prepare("SELECT last_fixtures_sync,updated_at FROM sports_sync_state WHERE provider='api-football'").first<{last_fixtures_sync:string|null;updated_at:string}>();
+        const lastAttempt=state?.updated_at?Date.parse(state.updated_at):0;
+        if(!state?.last_fixtures_sync&&(!lastAttempt||Date.now()-lastAttempt>15*60*1000)) {
+          try {
+            const today=lagosDayString(new Date());
+            const result=await syncFootballRange(env,today,addCalendarDays(today,7));
+            await syncFootballLive(env);
+            console.log("Initial API-Football sync completed",JSON.stringify({fixtures:result.fixtures,odds:result.odds,oddsWarning:result.oddsWarning||null}));
+          } catch(error) {
+            const message=error instanceof Error?error.message:"Initial API-Football sync failed";
+            await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('api-football',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind(message.slice(0,500),isoNow()).run();
+            console.error("Initial API-Football sync failed",message);
+          }
+        }
+      }
+      return;
+    }
     if (controller.cron === "*/5 * * * *") {
       await monitorPendingWalletDeposits(env);
       return;
