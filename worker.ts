@@ -751,7 +751,7 @@ async function validateBetSelections(env:Env, inputs:BetQuoteSelectionInput[]):P
   if(!Number.isFinite(combinedOdds)||combinedOdds>1000000)return {ok:false,error:"The combined odds exceed the ticket limit.",status:422};
   return {ok:true,selections:normalized,combinedOdds,validatedAt:new Date(now).toISOString()};
 }
-function publicTicket(row:any,selections:any[]){return {id:row.id,status:row.status,ticketType:row.ticket_type,stake:Number(row.stake),combinedOdds:Number(row.combined_odds),potential:Number(row.potential_return),settledOdds:row.settled_odds===null||row.settled_odds===undefined?null:Number(row.settled_odds),settledReturn:row.settled_return===null||row.settled_return===undefined?null:Number(row.settled_return),settledAt:row.settled_at||null,createdAt:row.created_at,selections:selections.map(s=>({id:s.id,fixtureId:s.fixture_id,fixture:s.home_team+" vs "+s.away_team,league:s.league_name,outcome:s.outcome_name,odd:Number(s.odd),resultStatus:s.result_status||"pending",resultScore:s.result_home_score===null||s.result_home_score===undefined||s.result_away_score===null||s.result_away_score===undefined?null:String(s.result_home_score)+" - "+String(s.result_away_score),resultFixtureStatus:s.result_fixture_status||null}))};}
+function publicTicket(row:any,selections:any[]){return {id:row.id,status:row.status,ticketType:"balance",fundingSource:row.funding_source||"virtual_usd_balance",currency:"USD",stake:Number(row.stake),combinedOdds:Number(row.combined_odds),potential:Number(row.potential_return),settledOdds:row.settled_odds===null||row.settled_odds===undefined?null:Number(row.settled_odds),settledReturn:row.settled_return===null||row.settled_return===undefined?null:Number(row.settled_return),settledAt:row.settled_at||null,createdAt:row.created_at,selections:selections.map(s=>({id:s.id,fixtureId:s.fixture_id,fixture:s.home_team+" vs "+s.away_team,league:s.league_name,outcome:s.outcome_name,odd:Number(s.odd),resultStatus:s.result_status||"pending",resultScore:s.result_home_score===null||s.result_home_score===undefined||s.result_away_score===null||s.result_away_score===undefined?null:String(s.result_home_score)+" - "+String(s.result_away_score),resultFixtureStatus:s.result_fixture_status||null}))};}
 async function handleBetQuote(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
   if(!session)return json({ok:false,error:"Sign in through Telegram before validating a betting ticket."},401);
@@ -765,7 +765,53 @@ async function handleBetCreate(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
   if(!session)return json({ok:false,error:"Authentication required"},401);
   if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);
-  return json({ok:false,error:"Bet placement is temporarily unavailable. Live USDT wallet staking and payout settlement must be completed before real-money tickets can be accepted."},503);
+  let body:{selections?:BetQuoteSelectionInput[];stake?:unknown;idempotencyKey?:unknown;quoteValidatedAt?:unknown;quotedOdds?:Array<{fixtureId?:unknown;outcomeKey?:unknown;odd?:unknown}>};
+  try{body=await request.json() as typeof body}catch{return json({ok:false,error:"Invalid bet ticket request."},400);}
+  const key=String(body.idempotencyKey||"");
+  if(!/^[A-Za-z0-9_-]{16,80}$/.test(key))return json({ok:false,error:"A valid ticket request key is required."},400);
+  const prior=await env.DB.prepare("SELECT id,status,stake FROM bet_tickets WHERE user_id=? AND idempotency_key=?").bind(session.user.id,key).first<any>();
+  if(prior)return json({ok:true,duplicate:true,ticket:{id:prior.id,status:prior.status,stake:Number(prior.stake),currency:"USD"}});
+  const stakeText=String(body.stake??"").trim();
+  if(!/^\\d{1,4}(?:\\.\\d{1,2})?$/.test(stakeText))return json({ok:false,error:"Enter a stake in USD with no more than two decimal places."},400);
+  const stake=Number(stakeText),stakeUnits=Math.round(stake*USDT_SCALE);
+  if(!Number.isFinite(stake)||stake<1||stake>5000||!Number.isSafeInteger(stakeUnits))return json({ok:false,error:"The minimum stake is $1.00 and the maximum is $5,000.00."},400);
+  const quoteAt=Date.parse(String(body.quoteValidatedAt||""));
+  if(!Number.isFinite(quoteAt)||Date.now()-quoteAt>30000||quoteAt>Date.now()+60000)return json({ok:false,error:"Your odds quote has expired. Please refresh the ticket."},409);
+  const validation=await validateBetSelections(env,body.selections||[]);
+  if(!validation.ok)return json({ok:false,error:validation.error},validation.status);
+  const quoted=Array.isArray(body.quotedOdds)?body.quotedOdds:[];
+  if(quoted.length!==validation.selections.length)return json({ok:false,error:"The price snapshot is missing. Refresh your ticket."},409);
+  for(const selection of validation.selections){
+    const snapshot=quoted.find(item=>String(item.fixtureId)===selection.fixtureId&&String(item.outcomeKey)===selection.outcomeKey);
+    if(!snapshot||!Number.isFinite(Number(snapshot.odd))||Math.abs(Number(snapshot.odd)-selection.odd)>0.000001)return json({ok:false,error:"Odds have changed. Review the updated prices before placing the bet."},409);
+  }
+  const account=await walletAccount(env,session.user.id),balance=await walletBalanceSnapshot(env,account.id);
+  if(balance.available_units<stakeUnits)return json({ok:false,error:"Insufficient USD balance. Deposit funds or reduce your stake."},409);
+  const now=isoNow(),ticketId=crypto.randomUUID(),potential=Number((stake*validation.combinedOdds).toFixed(2));
+  const statements:D1PreparedStatement[]=[
+    env.DB.prepare("INSERT INTO bet_tickets(id,user_id,ticket_type,status,stake,combined_odds,potential_return,currency,selection_count,idempotency_key,quoted_at,created_at,updated_at) SELECT ?,?,'demo','open',?,?,?,'USD',?,?,?,?,? WHERE (COALESCE((SELECT SUM(available_delta_units) FROM wallet_ledger_entries WHERE account_id=?),0)+COALESCE((SELECT SUM(available_delta_units) FROM wallet_balance_entries WHERE account_id=?),0)+COALESCE((SELECT SUM(amount_units) FROM wallet_referral_credits WHERE account_id=?),0))>=? AND NOT EXISTS(SELECT 1 FROM bet_tickets WHERE user_id=? AND idempotency_key=?)")
+      .bind(ticketId,session.user.id,stake,validation.combinedOdds,potential,validation.selections.length,key,new Date(quoteAt).toISOString(),now,now,account.id,account.id,account.id,stakeUnits,session.user.id,key)
+  ];
+  for(let index=0;index<validation.selections.length;index++){
+    const pick=validation.selections[index];
+    statements.push(env.DB.prepare("INSERT INTO bet_ticket_selections(id,ticket_id,selection_index,fixture_id,home_team,away_team,league_name,outcome_key,outcome_name,odd,odds_updated_at) SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM bet_tickets WHERE id=?)")
+      .bind(crypto.randomUUID(),ticketId,index,pick.fixtureId,pick.homeTeam,pick.awayTeam,pick.league,pick.outcomeKey,pick.outcome,pick.odd,pick.oddsUpdatedAt,ticketId));
+  }
+  statements.push(env.DB.prepare("INSERT OR IGNORE INTO wallet_balance_entries(id,account_id,user_id,entry_type,source_id,event_key,available_delta_units,reserved_delta_units) SELECT ?,?,?, 'bet_stake',?,?,?,0 WHERE EXISTS(SELECT 1 FROM bet_tickets WHERE id=? AND status='open')")
+    .bind(crypto.randomUUID(),account.id,session.user.id,ticketId,"bet_stake:"+ticketId,-stakeUnits,ticketId));
+  try{await env.DB.batch(statements);}catch(error){
+    const duplicate=await env.DB.prepare("SELECT id,status,stake FROM bet_tickets WHERE user_id=? AND idempotency_key=?").bind(session.user.id,key).first<any>();
+    if(duplicate)return json({ok:true,duplicate:true,ticket:{id:duplicate.id,status:duplicate.status,stake:Number(duplicate.stake),currency:"USD"}});
+    console.error("Bet placement transaction failed",error);
+    return json({ok:false,error:"The bet could not be placed. Your USD balance has not been charged."},409);
+  }
+  const ticket=await env.DB.prepare("SELECT * FROM bet_tickets WHERE id=? AND user_id=?").bind(ticketId,session.user.id).first<any>();
+  if(!ticket){
+    const latest=await walletBalanceSnapshot(env,account.id);
+    return json({ok:false,error:latest.available_units<stakeUnits?"Insufficient USD balance. Deposit funds or reduce your stake.":"The ticket could not be created. Please refresh and try again."},409);
+  }
+  await createUserNotification(env,session.user.id,"bet-placed:"+ticketId,"bet","Bet placed","Your $"+stake.toFixed(2)+" bet has been placed from your USD balance.","تم وضع الرهان","تم وضع رهان بقيمة $"+stake.toFixed(2)+" من رصيدك بالدولار.","/bets");
+  return json({ok:true,ticket:{id:ticketId,status:"open",ticketType:"balance",fundingSource:"virtual_usd_balance",currency:"USD",stake,combinedOdds:validation.combinedOdds,potential,selections:validation.selections.map(p=>({id:"",fixtureId:p.fixtureId,fixture:p.fixture,league:p.league,outcome:p.outcome,odd:p.odd,resultStatus:"pending"}))}},201);
 }
 async function handleBetList(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
@@ -846,6 +892,12 @@ async function settleStoredTicket(env:Env,ticketId:string,checkedAt:string):Prom
       const settledOdds=Number(picks.filter((p:any,i:number)=>(outcomes[i]||p.result_status)==="won").reduce((product:number,p:any)=>product*Number(p.odd),1).toFixed(6));
       const settledReturn=finalStatus==="won"?Number((Number(ticket.stake)*settledOdds).toFixed(2)):finalStatus==="void"?Number(ticket.stake):0;
       statements.push(env.DB.prepare("UPDATE bet_tickets SET status=?,settled_odds=?,settled_return=?,settled_at=?,updated_at=? WHERE id=? AND status='open'").bind(finalStatus,settledOdds,settledReturn,now,now,ticketId));
+      if(finalStatus==="won"||finalStatus==="void"){
+        const account=await walletAccount(env,ticket.user_id);
+        const creditUnits=Math.round(settledReturn*USDT_SCALE);
+        statements.push(env.DB.prepare("INSERT OR IGNORE INTO wallet_balance_entries(id,account_id,user_id,entry_type,source_id,event_key,available_delta_units,reserved_delta_units) SELECT ?,?,?,?, ?,?,?,0 WHERE EXISTS(SELECT 1 FROM bet_tickets WHERE id=? AND status=?)")
+          .bind(crypto.randomUUID(),account.id,ticket.user_id,finalStatus==="won"?"bet_win":"bet_void_refund",ticketId,"bet_settlement:"+ticketId,creditUnits,ticketId,finalStatus));
+      }
       statements.push(env.DB.prepare("INSERT OR IGNORE INTO bet_settlement_events(id,event_key,ticket_id,selection_id,event_type,previous_status,new_status,details_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),"ticket:"+ticketId,ticketId,null,"ticket_settled","open",finalStatus,JSON.stringify({stake:Number(ticket.stake),settledOdds,settledReturn,selectionResults:outcomes}),now));
     }
   }
@@ -855,7 +907,7 @@ async function settleStoredTicket(env:Env,ticketId:string,checkedAt:string):Prom
   if(finalStatus){
     const settled=await env.DB.prepare("SELECT stake,settled_return FROM bet_tickets WHERE id=?").bind(ticketId).first<any>();
     const profit=Math.max(0,Number(settled?.settled_return||0)-Number(settled?.stake||0));
-    await createUserNotification(env,ticket.user_id,"bet-settled:"+ticketId,"bet","Bet settled: "+finalStatus.toUpperCase(),"Ticket "+ticketId+" has settled. "+(finalStatus==="won"?"Profit: "+profit.toFixed(2)+" USDT.":finalStatus==="lost"?"The ticket was settled as a loss.":"The ticket was voided and stake returned."),"تمت تسوية الرهان","تمت تسوية التذكرة "+ticketId+". "+(finalStatus==="won"?"الربح: "+profit.toFixed(2)+" USDT.":finalStatus==="lost"?"تمت تسوية الرهان كخسارة.":"تم إلغاء الرهان وإرجاع قيمة المشاركة."),"/bets");
+    await createUserNotification(env,ticket.user_id,"bet-settled:"+ticketId,"bet","Bet settled: "+finalStatus.toUpperCase(),"Ticket "+ticketId+" has settled. "+(finalStatus==="won"?"Profit: $"+profit.toFixed(2)+".":finalStatus==="lost"?"The ticket was settled as a loss.":"The ticket was voided and stake returned."),"تمت تسوية الرهان","تمت تسوية التذكرة "+ticketId+". "+(finalStatus==="won"?"الربح: $"+profit.toFixed(2)+".":finalStatus==="lost"?"تمت تسوية الرهان كخسارة.":"تم إلغاء الرهان وإرجاع قيمة المشاركة."),"/bets");
   }
   return {selectionUpdates,ticketStatus:finalStatus};
 }
@@ -1017,7 +1069,7 @@ async function monitorPendingWalletDeposits(env:Env):Promise<void>{
       env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) SELECT ?,?,NULL,'deposit_auto_credited',? WHERE EXISTS(SELECT 1 FROM wallet_ledger_entries WHERE transaction_id=? AND entry_type='deposit_credit') AND NOT EXISTS(SELECT 1 FROM wallet_audit_events WHERE transaction_id=? AND event_type='deposit_auto_credited')").bind(crypto.randomUUID(),tx.id,JSON.stringify({networkCode:tx.network_code,blockNumber:check.blockNumber,confirmations:check.confirmations,amountUnits:check.amountUnits,fromAddress:check.fromAddress}),tx.id,tx.id)
      ]);
      await recordReferralQualification(env,tx.user_id,"first_deposit",tx.id);
-     await createUserNotification(env,tx.user_id,"deposit-credited:"+tx.id,"wallet","Deposit confirmed","Your "+(Number(tx.amount_units)/USDT_SCALE).toFixed(2)+" USDT deposit has been verified and credited.","تم تأكيد الإيداع","تم التحقق من إيداعك بقيمة "+(Number(tx.amount_units)/USDT_SCALE).toFixed(2)+" USDT وإضافته إلى محفظتك.","/wallet");
+     await createUserNotification(env,tx.user_id,"deposit-credited:"+tx.id,"wallet","Deposit confirmed","Your "+(Number(tx.amount_units)/USDT_SCALE).toFixed(2)+" USDT deposit has been verified and credited to your USD balance.","تم تأكيد الإيداع","تم التحقق من إيداعك بقيمة "+(Number(tx.amount_units)/USDT_SCALE).toFixed(2)+" USDT وإضافته إلى محفظتك.","/wallet");
     }
    }else if(check.state==="failed"){
     await env.DB.prepare("UPDATE wallet_transactions SET status='rejected',chain_block_number=?,chain_confirmations=?,chain_error=?,monitor_attempts=monitor_attempts+1,updated_at=? WHERE id=? AND status IN ('pending_review','processing')").bind(check.blockNumber,check.confirmations,check.error||"Blockchain transaction failed",checkedAt,tx.id).run();
@@ -1168,8 +1220,8 @@ async function handleWalletWithdrawal(request:Request,env:Env):Promise<Response>
     return json({ok:false,error:"Insufficient available USDT balance."},409);
   }
   await env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) VALUES(?,?,?,'withdrawal_submitted',?)").bind(crypto.randomUUID(),id,session.user.id,JSON.stringify({networkCode,amountUnits:units})).run();
-  await createUserNotification(env,session.user.id,"withdrawal-submitted:"+id,"wallet","Withdrawal request received","Your "+(units/USDT_SCALE).toFixed(2)+" USDT withdrawal request is awaiting manual review.","تم استلام طلب السحب","طلب السحب بقيمة "+(units/USDT_SCALE).toFixed(2)+" USDT بانتظار المراجعة اليدوية.","/wallet");
-  return json({ok:true,transaction:{id,type:"withdrawal",status:"pending_review",amount_units:units,asset:"USDT",network_code:networkCode,destination_address:address},notice:"Withdrawal request received. The amount is reserved while an administrator reviews it; no payout has been sent yet."},201);
+  await createUserNotification(env,session.user.id,"withdrawal-submitted:"+id,"wallet","Withdrawal request received","Your $"+(units/USDT_SCALE).toFixed(2)+" withdrawal request is awaiting manual review. The owner will send the equivalent USDT manually after approval.","تم استلام طلب السحب","طلب السحب بقيمة $"+(units/USDT_SCALE).toFixed(2)+" بانتظار المراجعة اليدوية، وسيُرسل المالك ما يعادلها من USDT يدوياً بعد الموافقة.","/wallet");
+  return json({ok:true,transaction:{id,type:"withdrawal",status:"pending_review",amount_units:units,asset:"USDT",network_code:networkCode,destination_address:address},notice:"Withdrawal request received in USD. The amount is reserved while an administrator reviews it; the owner sends the equivalent USDT manually after approval."},201);
 }
 async function walletAdminSession(request:Request,env:Env):Promise<{id:string}|null>{
   const session=await currentSession(request,env);
