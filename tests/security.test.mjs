@@ -86,6 +86,23 @@ test("runtime rejects state-changing requests with no Origin header", async () =
   assert.equal(response.headers.get("x-frame-options"), "DENY");
 });
 
+
+test("native admin form accepts same-origin Fetch Metadata when Origin and Referer are absent", async () => {
+  const base = "https://coderush-devvic.tomx2000xx.workers.dev";
+  const allowed = await workerEntry.fetch(new Request(base + "/api/admin/login", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", "sec-fetch-site": "same-origin" },
+    body: "email=admin%40example.com&password=not-a-real-password"
+  }), testEnv);
+  assert.notEqual(allowed.status, 403, "same-origin native form must pass the origin middleware");
+  const crossSite = await workerEntry.fetch(new Request(base + "/api/admin/login", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", "sec-fetch-site": "cross-site" },
+    body: "email=admin%40example.com&password=not-a-real-password"
+  }), testEnv);
+  assert.equal(crossSite.status, 403);
+});
+
 test("runtime rejects cross-origin state changes and non-JSON bodies", async () => {
   const base = "https://coderush-devvic.tomx2000xx.workers.dev";
   const crossOrigin = await workerEntry.fetch(new Request(base + "/api/auth/logout", {
