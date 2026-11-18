@@ -319,7 +319,7 @@ async function validateTelegramInitData(initData: string, botToken: string): Pro
     .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
     .map(([key, value]) => key + "=" + value)
     .join("\n");
-  const secretKey = await hmacSha256(new TextEncoder().encode(botToken), "WebAppData");
+  const secretKey = await hmacSha256(new TextEncoder().encode("WebAppData"), botToken);
   const expected = await hmacSha256(new Uint8Array(secretKey.match(/.{2}/g)!.map(pair => parseInt(pair, 16))), dataCheckString);
   if (!constantTimeEqual(expected.toLowerCase(), suppliedHash.toLowerCase())) return { ok: false, reason: "signature" };
   try {
