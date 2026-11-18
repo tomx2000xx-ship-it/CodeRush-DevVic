@@ -666,7 +666,7 @@ async function storeFootballOdds(env: Env, entries: ApiFootballOdds[]): Promise<
   return count;
 }
 async function syncFootballRange(env: Env, _from: string, _to: string): Promise<{fixtures:number;odds:number}> {
-  const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?next=100");
+  const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?next=99");
   const fixtures=await storeFootballFixtures(env,fixtureData.response);
   const today=dayString(new Date());
   let odds=0,oddsError:string|null=null;
