@@ -94,7 +94,10 @@ test("admin login form can submit without Origin, Referer, or a CSRF cookie", as
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: "email=invalid&password=x"
-  }), testEnv);
+  }), {
+    ...testEnv,
+    DB: { prepare() { return { bind() { return { first: async () => null, run: async () => ({ success: true }) }; } }; } }
+  });
   assert.equal(response.status, 401, "login submission must reach credential validation instead of being blocked by origin or CSRF checks");
 });
 test("runtime rejects cross-origin state changes and non-JSON bodies", async () => {
