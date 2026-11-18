@@ -39,8 +39,30 @@ test("Telegram webhook validates its secret token and has a bounded payload", ()
   assert.match(worker, /1048576/);
 });
 
-test("bet placement remains safely blocked until real-money ledger and settlement are ready", () => {
-  assert.match(worker, /Bet placement is temporarily unavailable\. Live USDT wallet staking and payout settlement must be completed/);
+test("bet placement debits the shared internal USD balance and settlement credits it", () => {
+  assert.doesNotMatch(worker, /Bet placement is temporarily unavailable/);
+  assert.match(worker, /async function walletBalanceSnapshot/);
+  assert.match(worker, /entry_type,source_id,event_key,available_delta_units/);
+  assert.match(worker, /'bet_stake'/);
+  assert.match(worker, /"bet_win":"bet_void_refund"/);
+  assert.match(worker, /fundingSource:"virtual_usd_balance"/);
+  assert.match(worker, /currency:"USD"/);
+  assert.match(worker, /wallet_balance_entries WHERE account_id/);
+  assert.match(worker, /Your USD balance has not been charged/);
+});
+test("deposits credit the USD balance 1:1 and withdrawals reserve the same balance for manual payout", () => {
+  assert.match(worker, /'deposit_credit'/);
+  assert.match(worker, /walletBalanceSnapshot\(env,account\.id\)/);
+  assert.match(worker, /withdrawal_reserve/);
+  assert.match(worker, /action==="paid"/);
+  assert.match(worker, /manual payout has been recorded/i);
+  assert.doesNotMatch(worker, /eth_sendRawTransaction|wallet_sendTransaction|privateKey.*signTransaction/i);
+});
+test("match feed exposes provider team and league badges and status-based completion", () => {
+  assert.match(worker, /json_extract\(f\.raw_json,'\$\.teams\.home\.logo'\) AS home_logo/);
+  assert.match(worker, /json_extract\(f\.raw_json,'\$\.teams\.away\.logo'\) AS away_logo/);
+  assert.match(worker, /json_extract\(f\.raw_json,'\$\.league\.logo'\) AS league_logo/);
+  assert.match(worker, /completed:\["FT","AET","PEN","AWD","WO","CANC"\]/);
 });
 
 test("withdrawals remain manually reviewed and manually paid", () => {
