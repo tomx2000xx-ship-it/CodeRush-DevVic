@@ -698,10 +698,26 @@ async function storeFootballOdds(env: Env, entries: ApiFootballOdds[]): Promise<
 async function syncFootballOddsForDate(env:Env, date:string):Promise<{odds:number;oddsWarning?:string}> {
   const params=new URLSearchParams({date,timezone:APP_TIME_ZONE,bet:"1",page:"1"});
   const first=await apiFootball<ApiFootballOdds>(env,"odds?"+params.toString());
-  const odds=await storeFootballOdds(env,first.response);
+  let odds=await storeFootballOdds(env,first.response);
+  let oddsWarning:string|undefined;
+  // API-Football returns only ten fixtures per page. Fetch page two when available,
+  // while keeping the application-wide 75-request safety budget intact.
+  if(first.paging&&first.paging.total>1) {
+    const budget=await env.DB.prepare("SELECT CASE WHEN utc_day=date('now') THEN MAX(0,75-used) ELSE 75 END AS remaining FROM api_football_request_budget WHERE id=1").first<{remaining:number}>();
+    if((budget?.remaining??75)>0) {
+      try {
+        params.set("page","2");
+        const second=await apiFootball<ApiFootballOdds>(env,"odds?"+params.toString());
+        odds+=await storeFootballOdds(env,second.response);
+      } catch(error) {
+        oddsWarning="First odds page was saved; page two could not be refreshed: "+(error instanceof Error?error.message:"provider error");
+      }
+    }
+  }
+  if(odds===0&&!oddsWarning) oddsWarning="API-Football returned no 1X2 bookmaker prices for "+date+". Odds availability varies by league, fixture and bookmaker.";
   const now=isoNow();
-  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_odds_sync,last_error,updated_at) VALUES ('api-football',?,NULL,?) ON CONFLICT(provider) DO UPDATE SET last_odds_sync=excluded.last_odds_sync,updated_at=excluded.updated_at").bind(now,now).run();
-  return {odds,...(odds===0?{oddsWarning:"API-Football returned no 1X2 bookmaker prices for "+date+". Odds availability varies by league, fixture and bookmaker."}:{})};
+  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_odds_sync,last_error,updated_at) VALUES (?,?,?,?) ON CONFLICT(provider) DO UPDATE SET last_odds_sync=excluded.last_odds_sync,last_error=excluded.last_error,updated_at=excluded.updated_at").bind(now,oddsWarning||null,now).run();
+  return {odds,...(oddsWarning?{oddsWarning}:{})};
 }
 async function syncFootballOdds(env:Env, date=addCalendarDays(lagosDayString(new Date()),1)):Promise<{odds:number;oddsWarning?:string}> {
   try {
@@ -728,7 +744,7 @@ async function syncFootballRange(env: Env, from: string, to: string, options:{in
     oddsWarning=result.oddsWarning;
   }
   const now=isoNow();
-  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_fixtures_sync,last_error,updated_at) VALUES (?,?,?,?) ON CONFLICT(provider) DO UPDATE SET last_fixtures_sync=excluded.last_fixtures_sync,last_error=COALESCE(excluded.last_error,sports_sync_state.last_error),updated_at=excluded.updated_at").bind(now,now,oddsWarning||null,now).run();
+  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_fixtures_sync,last_error,updated_at) VALUES (?,?,?,?) ON CONFLICT(provider) DO UPDATE SET last_fixtures_sync=excluded.last_fixtures_sync,last_error=excluded.last_error,updated_at=excluded.updated_at").bind(now,now,oddsWarning||null,now).run();
   return {fixtures,odds,...(oddsWarning?{oddsWarning}:{})};
 }
 async function syncFootballLive(env: Env): Promise<{fixtures:number;odds:number}> {
