@@ -89,7 +89,13 @@ async function sendWelcome(chatId: number, env: Env) {
   const keyboard: Array<Array<Record<string, unknown>>> = [[{ text: "⚽ افتح CodeRush وابدأ الاستكشاف", web_app: { url: APP_URL } }]];
   if (env.TELEGRAM_CHANNEL_URL) keyboard.push([{ text: "💎 اشترك في قناتنا", url: env.TELEGRAM_CHANNEL_URL }]);
   if (env.TELEGRAM_GROUP_URL) keyboard.push([{ text: "👥 انضم إلى مجموعتنا", url: env.TELEGRAM_GROUP_URL }]);
-  await telegram(env, "sendMessage", { chat_id: chatId, text: welcomeText, reply_markup: { inline_keyboard: keyboard }, disable_web_page_preview: true });
+  try {
+    await telegram(env, "sendMessage", { chat_id: chatId, text: welcomeText, reply_markup: { inline_keyboard: keyboard }, disable_web_page_preview: true });
+  } catch (error) {
+    // A keyboard/markup rejection must not suppress the actual welcome message.
+    console.error("Telegram welcome-with-keyboard failed; retrying plain text", error instanceof Error ? error.message : "unknown error");
+    await telegram(env, "sendMessage", { chat_id: chatId, text: welcomeText, disable_web_page_preview: true });
+  }
 }
 
 type TelegramMessage = {
@@ -123,7 +129,13 @@ async function processUpdate(update: { message?: TelegramMessage }, env: Env) {
   if (!message || !chatId) return;
   if (/^\/start(?:@\w+)?(?:\s+(.+))?$/.test(text)) {
     const payload = text.match(/^\/start(?:@\w+)?(?:\s+(.+))?$/)?.[1] || "";
-    await saveSubscriber(message, payload, env);
+    // Deliver the welcome independently of subscriber-preference persistence.
+    // A database-side preference error must never prevent the /start reply.
+    try {
+      await saveSubscriber(message, payload, env);
+    } catch (error) {
+      console.error("Telegram subscriber persistence failed during /start", error instanceof Error ? error.message : "unknown error");
+    }
     await sendWelcome(chatId, env);
   } else if (/^\/(stop|unsubscribe)(?:@\w+)?$/.test(text)) {
     await env.DB.prepare("UPDATE telegram_subscribers SET opted_out=1, last_seen_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE chat_id=?").bind(String(chatId)).run();
