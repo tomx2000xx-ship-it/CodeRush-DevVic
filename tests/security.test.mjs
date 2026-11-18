@@ -93,13 +93,13 @@ test("native admin form requires a same-site CSRF token when Origin and Referer 
   const allowed = await workerEntry.fetch(new Request(base + "/api/admin/login", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded", cookie: "cr_admin_csrf=" + token },
-    body: "_csrf=" + token + "&email=admin%40example.com&password=not-a-real-password"
+    body: "_csrf=" + token + "&email=invalid&password=x"
   }), testEnv);
-  assert.notEqual(allowed.status, 403, "valid same-site form token must pass the origin middleware");
+  assert.equal(allowed.status, 401, "valid same-site token must pass origin checks and reach credential validation");
   const rejected = await workerEntry.fetch(new Request(base + "/api/admin/login", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: "_csrf=" + token + "&email=admin%40example.com&password=not-a-real-password"
+    body: "_csrf=" + token + "&email=invalid&password=x"
   }), testEnv);
   assert.equal(rejected.status, 403, "a form token without its same-site cookie must be rejected");
 });
