@@ -1500,9 +1500,8 @@ export default {
     try {
       if (controller.cron === "0 */2 * * *") {
         await refreshAndSettleBetResults(env);
-      } else if (controller.cron === "0 */4 * * *") {
-        // Refresh the first available 1X2 odds page every four hours, not on every live-score poll.
-        await syncFootballOdds(env);
+        // Reuse the existing two-hour cron: refresh odds only on every second run (four-hourly).
+        if (new Date().getUTCHours() % 4 === 0) await syncFootballOdds(env);
       } else if (controller.cron === "15 0 * * *") {
         await env.DB.prepare("DELETE FROM user_sessions WHERE expires_at<datetime('now','-7 days') OR revoked_at<datetime('now','-30 days')").run();
         await env.DB.prepare("DELETE FROM admin_login_attempts WHERE created_at<datetime('now','-30 days')").run();
