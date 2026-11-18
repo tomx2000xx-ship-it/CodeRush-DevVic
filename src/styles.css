@@ -702,7 +702,7 @@ body{background:radial-gradient(ellipse at 15% 0%,#fcdfe4 0,transparent 34%),lin
 .sb-live-feature-teams>strong small{font-size:10px;color:#f48b9d;margin-top:4px}
 .sb-league-group{margin-bottom:12px;border:1px solid #4a272d;background:#211215;border-radius:12px;overflow:hidden}
 .sb-league-heading{height:40px;width:100%;display:flex;align-items:center;gap:8px;padding:0 11px;border:0;border-bottom:1px solid #4c2a30;background:#321b1f;color:#f8e7ea;text-align:start}
-.sb-league-icon{font-size:14px}
+.sb-league-icon{font-size:14px}.sb-league-icon img{display:block;width:20px;height:20px;object-fit:contain}.place-bet-enabled:not(:disabled){cursor:pointer}.place-bet-enabled:disabled{cursor:not-allowed}
 .sb-league-heading>b{font-size:10px;letter-spacing:.25px;flex:1}
 .sb-league-heading>small{font-size:9px;color:#dd7d8d;background:#4c262c;padding:3px 7px;border-radius:10px}
 .sb-league-heading>svg{color:#d2586c}
