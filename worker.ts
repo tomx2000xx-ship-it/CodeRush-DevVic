@@ -227,7 +227,7 @@ async function handleAdminUserManagement(request:Request,env:Env):Promise<Respon
   const term=(new URL(request.url).searchParams.get("q")||"").trim().slice(0,80);
   const pattern="%"+term.replace(/[\\%_]/g,"\\async function handleAdminOverview(request:Request,env:Env):Promise<Response>{")+"%";
   const rows=await env.DB.prepare(`SELECT u.id,u.display_name,u.telegram_username,u.first_name,u.last_name,u.status,u.created_at,u.last_login_at,
-    COALESCE((SELECT SUM(l.available_delta_units) FROM wallet_ledger_entries l WHERE l.user_id=u.id),0)+COALESCE((SELECT SUM(c.amount_units) FROM wallet_referral_credits c WHERE c.user_id=u.id),0) AS available_units,
+    COALESCE((SELECT SUM(l.available_delta_units) FROM wallet_ledger_entries l WHERE l.user_id=u.id),0)+COALESCE((SELECT SUM(b.available_delta_units) FROM wallet_balance_entries b WHERE b.user_id=u.id),0)+COALESCE((SELECT SUM(c.amount_units) FROM wallet_referral_credits c WHERE c.user_id=u.id),0) AS available_units,
     COALESCE((SELECT SUM(l.reserved_delta_units) FROM wallet_ledger_entries l WHERE l.user_id=u.id),0) AS reserved_units,
     (SELECT COUNT(*) FROM bet_tickets b WHERE b.user_id=u.id) AS bet_count,
     (SELECT COUNT(*) FROM wallet_transactions w WHERE w.user_id=u.id) AS wallet_tx_count
@@ -669,7 +669,7 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
       json_extract(f.raw_json,'$.teams.home.logo') AS home_logo,json_extract(f.raw_json,'$.teams.away.logo') AS away_logo,json_extract(f.raw_json,'$.league.logo') AS league_logo,
       f.home_score,f.away_score,o.bookmaker_name,o.outcome_key,o.odd,o.suspended,o.updated_at AS odds_updated_at
     FROM sports_fixtures f LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1
-    WHERE substr(f.kickoff,1,10)>=? AND substr(f.kickoff,1,10)<=?
+    WHERE datetime(f.kickoff)>=datetime(?,'-1 day') AND datetime(f.kickoff)<datetime(?,'+2 day')
     ORDER BY f.kickoff ASC
   `).bind(from,to).all<Record<string,unknown>>();
   const map=new Map<string,Record<string,unknown>>();
@@ -772,7 +772,7 @@ async function handleBetCreate(request:Request,env:Env):Promise<Response>{
   const prior=await env.DB.prepare("SELECT id,status,stake FROM bet_tickets WHERE user_id=? AND idempotency_key=?").bind(session.user.id,key).first<any>();
   if(prior)return json({ok:true,duplicate:true,ticket:{id:prior.id,status:prior.status,stake:Number(prior.stake),currency:"USD"}});
   const stakeText=String(body.stake??"").trim();
-  if(!/^\\d{1,4}(?:\\.\\d{1,2})?$/.test(stakeText))return json({ok:false,error:"Enter a stake in USD with no more than two decimal places."},400);
+  if(!/^\d{1,4}(?:\.\d{1,2})?$/.test(stakeText))return json({ok:false,error:"Enter a stake in USD with no more than two decimal places."},400);
   const stake=Number(stakeText),stakeUnits=Math.round(stake*USDT_SCALE);
   if(!Number.isFinite(stake)||stake<1||stake>5000||!Number.isSafeInteger(stakeUnits))return json({ok:false,error:"The minimum stake is $1.00 and the maximum is $5,000.00."},400);
   const quoteAt=Date.parse(String(body.quoteValidatedAt||""));
@@ -1065,8 +1065,8 @@ async function monitorPendingWalletDeposits(env:Env):Promise<void>{
     }else{
      await env.DB.batch([
       env.DB.prepare("INSERT OR IGNORE INTO wallet_balance_entries(id,account_id,user_id,entry_type,source_id,event_key,available_delta_units,reserved_delta_units) SELECT ?,?,?, 'deposit_credit',?,?,?,0 WHERE EXISTS(SELECT 1 FROM wallet_transactions WHERE id=? AND type='deposit' AND status IN ('pending_review','processing') AND amount_units=?)").bind(crypto.randomUUID(),tx.account_id,tx.user_id,tx.id,"deposit:"+tx.id,check.amountUnits,tx.id,check.amountUnits),
-      env.DB.prepare("UPDATE wallet_transactions SET status='completed',chain_block_number=?,chain_confirmations=?,chain_amount_units=?,chain_from_address=?,chain_verified_at=?,chain_error=NULL,monitor_attempts=monitor_attempts+1,updated_at=? WHERE id=? AND status IN ('pending_review','processing') AND EXISTS(SELECT 1 FROM wallet_ledger_entries WHERE transaction_id=? AND entry_type='deposit_credit')").bind(check.blockNumber,check.confirmations,check.amountUnits,check.fromAddress,checkedAt,checkedAt,tx.id,tx.id),
-      env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) SELECT ?,?,NULL,'deposit_auto_credited',? WHERE EXISTS(SELECT 1 FROM wallet_ledger_entries WHERE transaction_id=? AND entry_type='deposit_credit') AND NOT EXISTS(SELECT 1 FROM wallet_audit_events WHERE transaction_id=? AND event_type='deposit_auto_credited')").bind(crypto.randomUUID(),tx.id,JSON.stringify({networkCode:tx.network_code,blockNumber:check.blockNumber,confirmations:check.confirmations,amountUnits:check.amountUnits,fromAddress:check.fromAddress}),tx.id,tx.id)
+      env.DB.prepare("UPDATE wallet_transactions SET status='completed',chain_block_number=?,chain_confirmations=?,chain_amount_units=?,chain_from_address=?,chain_verified_at=?,chain_error=NULL,monitor_attempts=monitor_attempts+1,updated_at=? WHERE id=? AND status IN ('pending_review','processing') AND EXISTS(SELECT 1 FROM wallet_balance_entries WHERE source_id=? AND entry_type='deposit_credit')").bind(check.blockNumber,check.confirmations,check.amountUnits,check.fromAddress,checkedAt,checkedAt,tx.id,tx.id),
+      env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) SELECT ?,?,NULL,'deposit_auto_credited',? WHERE EXISTS(SELECT 1 FROM wallet_balance_entries WHERE source_id=? AND entry_type='deposit_credit') AND NOT EXISTS(SELECT 1 FROM wallet_audit_events WHERE transaction_id=? AND event_type='deposit_auto_credited')").bind(crypto.randomUUID(),tx.id,JSON.stringify({networkCode:tx.network_code,blockNumber:check.blockNumber,confirmations:check.confirmations,amountUnits:check.amountUnits,fromAddress:check.fromAddress}),tx.id,tx.id)
      ]);
      await recordReferralQualification(env,tx.user_id,"first_deposit",tx.id);
      await createUserNotification(env,tx.user_id,"deposit-credited:"+tx.id,"wallet","Deposit confirmed","Your "+(Number(tx.amount_units)/USDT_SCALE).toFixed(2)+" USDT deposit has been verified and credited to your USD balance.","تم تأكيد الإيداع","تم التحقق من إيداعك بقيمة "+(Number(tx.amount_units)/USDT_SCALE).toFixed(2)+" USDT وإضافته إلى محفظتك.","/wallet");
@@ -1117,7 +1117,7 @@ async function awardReferralCommissions(env:Env,ticketId:string):Promise<void>{
       AND EXISTS(SELECT 1 FROM referral_program_settings WHERE id=1 AND commission_enabled=1)`)
       .bind(crypto.randomUUID(),account.id,ancestor,ticket.id,ticket.user_id,level,rate,profitUnits,amount,ticket.id).run();
     if(Number(inserted.meta?.changes||0)===1)await env.DB.prepare("INSERT INTO referral_audit_events(id,actor_user_id,event_type,subject_user_id,details_json) VALUES(?,NULL,'referral_commission_credited',?,?)").bind(crypto.randomUUID(),ancestor,JSON.stringify({ticketId:ticket.id,referredUserId:ticket.user_id,level,rateBps:rate,profitUnits,amountUnits:amount})).run();
-      await createUserNotification(env,ancestor,"referral-commission:"+ticket.id+":"+level,"referral","Referral commission credited","You received "+(amount/USDT_SCALE).toFixed(6)+" USDT from a Level "+level+" referral.","تمت إضافة عمولة إحالة","تمت إضافة "+(amount/USDT_SCALE).toFixed(6)+" USDT من إحالة المستوى "+level+".","/friends");
+      await createUserNotification(env,ancestor,"referral-commission:"+ticket.id+":"+level,"referral","Referral commission credited","You received $"+(amount/USDT_SCALE).toFixed(2)+" from a Level "+level+" referral.","تمت إضافة عمولة إحالة","تمت إضافة $"+(amount/USDT_SCALE).toFixed(2)+" من إحالة المستوى "+level+".","/friends");
   }
 }
 async function handleReferralMe(request:Request,env:Env):Promise<Response>{
@@ -1217,7 +1217,7 @@ async function handleWalletWithdrawal(request:Request,env:Env):Promise<Response>
     .bind(crypto.randomUUID(),account.id,session.user.id,id,-units,units,account.id,account.id,account.id,units).run();
   if(Number(reserve.meta?.changes||0)!==1){
     await env.DB.prepare("DELETE FROM wallet_transactions WHERE id=? AND status='pending_review'").bind(id).run();
-    return json({ok:false,error:"Insufficient available USDT balance."},409);
+    return json({ok:false,error:"Insufficient available USD balance."},409);
   }
   await env.DB.prepare("INSERT INTO wallet_audit_events(id,transaction_id,actor_user_id,event_type,details_json) VALUES(?,?,?,'withdrawal_submitted',?)").bind(crypto.randomUUID(),id,session.user.id,JSON.stringify({networkCode,amountUnits:units})).run();
   await createUserNotification(env,session.user.id,"withdrawal-submitted:"+id,"wallet","Withdrawal request received","Your $"+(units/USDT_SCALE).toFixed(2)+" withdrawal request is awaiting manual review. The owner will send the equivalent USDT manually after approval.","تم استلام طلب السحب","طلب السحب بقيمة $"+(units/USDT_SCALE).toFixed(2)+" بانتظار المراجعة اليدوية، وسيُرسل المالك ما يعادلها من USDT يدوياً بعد الموافقة.","/wallet");
