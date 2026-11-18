@@ -1484,6 +1484,10 @@ export default {
       await monitorPendingWalletDeposits(env);
       return;
     }
+    if (controller.cron === "0 */6 * * *") {
+      await persistFiveDollarFootballProbe(env);
+      return;
+    }
     if (!env.API_FOOTBALL_KEY) return;
     try {
       if (controller.cron === "*/30 * * * *") {
