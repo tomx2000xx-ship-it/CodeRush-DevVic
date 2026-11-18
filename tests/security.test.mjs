@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createHmac } from "node:crypto";
 
 const worker = readFileSync(new URL("../worker.ts", import.meta.url), "utf8");
 const wrangler = readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
@@ -139,4 +140,53 @@ test("Telegram Mini App initData uses the official two-stage HMAC key/message or
   assert.match(worker, /params\.delete\("hash"\)/);
   assert.match(worker, /\.sort\(\(\[a\], \[b\]\) => a < b \? -1 : a > b \? 1 : 0\)/);
   assert.match(worker, /\.join\("\\n"\)/);
+});
+
+test("Telegram Mini App authentication accepts a correctly signed initData payload", async () => {
+  const token = "123456:CODE_RUSH_TEST_TOKEN";
+  const telegramUser = { id: 123456789, first_name: "Test User", username: "coderush_test" };
+  const params = new URLSearchParams({
+    auth_date: String(Math.floor(Date.now() / 1000)),
+    query_id: "AAEAAAE",
+    user: JSON.stringify(telegramUser)
+  });
+  const dataCheckString = Array.from(params.entries())
+    .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+    .map(([key, value]) => key + "=" + value)
+    .join("\n");
+  const secretKey = createHmac("sha256", "WebAppData").update(token).digest();
+  const hash = createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
+  params.set("hash", hash);
+
+  const userRow = {
+    id: String(telegramUser.id), telegram_username: telegramUser.username,
+    first_name: telegramUser.first_name, last_name: null, display_name: "Test User",
+    language: "EN", role: "user", status: "active",
+    created_at: new Date().toISOString(), last_login_at: null
+  };
+  const db = {
+    prepare(sql) {
+      return {
+        bind() {
+          return {
+            run: async () => ({ success: true }),
+            first: async () => {
+              if (sql.includes("SELECT id FROM users WHERE id=?")) return { id: String(telegramUser.id) };
+              if (sql.includes("SELECT id,telegram_username,first_name")) return userRow;
+              return null;
+            }
+          };
+        }
+      };
+    }
+  };
+  const base = "https://coderush-devvic.tomx2000xx.workers.dev";
+  const response = await workerEntry.fetch(new Request(base + "/api/auth/telegram", {
+    method: "POST",
+    headers: { origin: base, "content-type": "application/json" },
+    body: JSON.stringify({ initData: params.toString() })
+  }), { ...testEnv, DB: db, TELEGRAM_BOT_TOKEN: token });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).ok, true);
+  assert.match(response.headers.get("set-cookie") || "", /^cr_session=/);
 });
