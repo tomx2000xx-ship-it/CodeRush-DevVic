@@ -614,6 +614,16 @@ async function deliverTelegramBroadcastJobs(env:Env):Promise<void>{
 }
 const isoNow = () => new Date().toISOString();
 const dayString = (date: Date) => date.toISOString().slice(0, 10);
+const APP_TIME_ZONE = "Africa/Lagos";
+function lagosDayString(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const part = (type: string) => parts.find(item => item.type === type)?.value || "";
+  return part("year") + "-" + part("month") + "-" + part("day");
+}
+function addCalendarDays(day: string, amount: number): string {
+  const [year, month, date] = day.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, date + amount)).toISOString().slice(0, 10);
+}
 function fixtureIsLive(status: string): boolean {
   return ["1H","HT","2H","ET","BT","P","LIVE"].includes(status);
 }
@@ -653,18 +663,22 @@ async function storeFootballFixtures(env: Env, fixtures: ApiFootballFixture[]): 
 }
 async function storeFootballOdds(env: Env, entries: ApiFootballOdds[]): Promise<number> {
   let count=0;
-  const configuredBookmaker=Number(env.API_FOOTBALL_BOOKMAKER_ID||0); // Optional API-Football bookmaker ID; default to first returned bookmaker.
+  const configuredBookmaker=Number(env.API_FOOTBALL_BOOKMAKER_ID||0);
   const statements: D1PreparedStatement[]=[];
   for (const entry of entries) {
+    // Do not blindly choose the first bookmaker: some bookmakers return other markets
+    // but omit Match Winner (1X2). Select a bookmaker that actually publishes market 1.
     const bookmaker = configuredBookmaker
-      ? entry.bookmakers.find(item=>item.id===configuredBookmaker)
-      : entry.bookmakers[0];
+      ? entry.bookmakers.find(item=>item.id===configuredBookmaker&&item.bets.some(market=>market.id===1))
+      : entry.bookmakers.find(item=>item.bets.some(market=>market.id===1));
     if (!bookmaker) continue;
     for (const market of bookmaker.bets) {
       if (market.id !== 1) continue;
       for (const value of market.values) {
-        const label=value.value.toLowerCase();
-        const key=label.includes("home")? "home" : label.includes("draw")? "draw" : label.includes("away")? "away" : "";
+        const label=value.value.trim().toLowerCase();
+        const key=label.includes("home")||label==="1" ? "home"
+          : label.includes("draw")||label==="x" ? "draw"
+          : label.includes("away")||label==="2" ? "away" : "";
         const odd=Number(value.odd);
         if (!key || !Number.isFinite(odd) || odd<=1) continue;
         statements.push(env.DB.prepare(`
@@ -681,37 +695,41 @@ async function storeFootballOdds(env: Env, entries: ApiFootballOdds[]): Promise<
   for(let i=0;i<statements.length;i+=80) await env.DB.batch(statements.slice(i,i+80));
   return count;
 }
-async function syncFootballRange(env: Env, _from: string, _to: string, options:{includeOdds?:boolean}={}): Promise<{fixtures:number;odds:number;oddsWarning?:string}> {
-  const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?next=99");
-  const fixtures=await storeFootballFixtures(env,fixtureData.response);
-  const today=dayString(new Date());
-  const includeOdds=options.includeOdds!==false;
-  let odds=0,oddsError:string|null=null;
-  if(includeOdds){
-    try{
-      const first=await apiFootball<ApiFootballOdds>(env,"odds?date="+today+"&bet=1&page=1");
-      odds=await storeFootballOdds(env,first.response);
-    }catch(error){
-      oddsError=(error instanceof Error?error.message:"Football provider odds sync failed").slice(0,500);
-    }
-  }
+async function syncFootballOddsForDate(env:Env, date:string):Promise<{odds:number;oddsWarning?:string}> {
+  const params=new URLSearchParams({date,timezone:APP_TIME_ZONE,bet:"1",page:"1"});
+  const first=await apiFootball<ApiFootballOdds>(env,"odds?"+params.toString());
+  const odds=await storeFootballOdds(env,first.response);
   const now=isoNow();
-  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_fixtures_sync,last_odds_sync,last_error,updated_at) VALUES ('api-football',?,?,?,?) ON CONFLICT(provider) DO UPDATE SET last_fixtures_sync=excluded.last_fixtures_sync,last_odds_sync=CASE WHEN excluded.last_odds_sync IS NOT NULL THEN excluded.last_odds_sync ELSE sports_sync_state.last_odds_sync END,last_error=excluded.last_error,updated_at=excluded.updated_at").bind(now,includeOdds&&!oddsError?now:null,oddsError,now).run();
-  return {fixtures,odds,...(oddsError?{oddsWarning:oddsError}:{})};
+  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_odds_sync,last_error,updated_at) VALUES ('api-football',?,NULL,?) ON CONFLICT(provider) DO UPDATE SET last_odds_sync=excluded.last_odds_sync,updated_at=excluded.updated_at").bind(now,now).run();
+  return {odds,...(odds===0?{oddsWarning:"API-Football returned no 1X2 bookmaker prices for "+date+". Odds availability varies by league, fixture and bookmaker."}:{})};
 }
-async function syncFootballOdds(env:Env):Promise<{odds:number;oddsWarning?:string}>{
-  const today=dayString(new Date());
-  try{
-    const first=await apiFootball<ApiFootballOdds>(env,"odds?date="+today+"&bet=1&page=1");
-    const odds=await storeFootballOdds(env,first.response);
-    const now=isoNow();
-    await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_odds_sync,last_error,updated_at) VALUES ('api-football',?,NULL,?) ON CONFLICT(provider) DO UPDATE SET last_odds_sync=excluded.last_odds_sync,last_error=NULL,updated_at=excluded.updated_at").bind(now,now).run();
-    return {odds};
-  }catch(error){
+async function syncFootballOdds(env:Env, date=addCalendarDays(lagosDayString(new Date()),1)):Promise<{odds:number;oddsWarning?:string}> {
+  try {
+    return await syncFootballOddsForDate(env,date);
+  } catch(error) {
     const message=(error instanceof Error?error.message:"Football provider odds sync failed").slice(0,500);
     await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('api-football',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind(message,isoNow()).run();
     return {odds:0,oddsWarning:message};
   }
+}
+async function syncFootballRange(env: Env, from: string, to: string, options:{includeOdds?:boolean}={}): Promise<{fixtures:number;odds:number;oddsWarning?:string}> {
+  const fixtureParams=new URLSearchParams({from,to,timezone:APP_TIME_ZONE});
+  const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?"+fixtureParams.toString());
+  const fixtures=await storeFootballFixtures(env,fixtureData.response);
+  const includeOdds=options.includeOdds!==false;
+  let odds=0,oddsWarning:string|undefined;
+  // Pre-match prices are published 1–14 days before kick-off. Query tomorrow's
+  // fixtures rather than today's, where the provider commonly has no pre-match odds.
+  const tomorrow=addCalendarDays(lagosDayString(new Date()),1);
+  const oddsDate=from>tomorrow?from:tomorrow;
+  if(includeOdds&&oddsDate<=to) {
+    const result=await syncFootballOdds(env,oddsDate);
+    odds=result.odds;
+    oddsWarning=result.oddsWarning;
+  }
+  const now=isoNow();
+  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_fixtures_sync,last_error,updated_at) VALUES (?,?,?,?) ON CONFLICT(provider) DO UPDATE SET last_fixtures_sync=excluded.last_fixtures_sync,last_error=COALESCE(excluded.last_error,sports_sync_state.last_error),updated_at=excluded.updated_at").bind(now,now,oddsWarning||null,now).run();
+  return {fixtures,odds,...(oddsWarning?{oddsWarning}:{})};
 }
 async function syncFootballLive(env: Env): Promise<{fixtures:number;odds:number}> {
   // One request for live scores; live odds are not polled on every refresh.
@@ -1518,13 +1536,19 @@ export default {
     try {
       if (controller.cron === "0 */2 * * *") {
         await refreshAndSettleBetResults(env);
-        // Reuse the existing two-hour cron: refresh odds only on every second run (four-hourly).
-        if (new Date().getUTCHours() % 4 === 0) await syncFootballOdds(env);
+      } else if (controller.cron === "0 */3 * * *") {
+        // The Free plan allows 100 requests/day. Rotate one future match date every
+        // three hours so all seven upcoming dates are refreshed without exhausting quota.
+        const rotation=Math.floor(Date.now()/(3*60*60*1000))%7;
+        const oddsDate=addCalendarDays(lagosDayString(new Date()),1+rotation);
+        const result=await syncFootballOdds(env,oddsDate);
+        if(result.oddsWarning) console.warn("Scheduled API-Football odds sync:",result.oddsWarning);
       } else if (controller.cron === "15 0 * * *") {
         await env.DB.prepare("DELETE FROM user_sessions WHERE expires_at<datetime('now','-7 days') OR revoked_at<datetime('now','-30 days')").run();
         await env.DB.prepare("DELETE FROM admin_login_attempts WHERE created_at<datetime('now','-30 days')").run();
-        // Daily fixture discovery is independent from odds refresh.
-        await syncFootballRange(env, dayString(new Date()), dayString(new Date()), {includeOdds:false});
+        // Refresh the next seven days in Lagos local time.
+        const today=lagosDayString(new Date());
+        await syncFootballRange(env,today,addCalendarDays(today,7),{includeOdds:false});
       }
     } catch (error) {
       const message=error instanceof Error?error.message:"Scheduled sports refresh failed";
