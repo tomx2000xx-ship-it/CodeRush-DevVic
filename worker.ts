@@ -193,7 +193,6 @@ async function adminSetup(request:Request,env:Env):Promise<Response>{const formA
 async function adminLogin(request:Request,env:Env):Promise<Response>{
  const formAuth=(request.headers.get("content-type")||"").toLowerCase().includes("application/x-www-form-urlencoded");
  if(!sameOrigin(request))return json({ok:false,error:"Invalid origin"},403);
- const contentType=(request.headers.get("content-type")||"").toLowerCase();const formAuth=(url.pathname==="/api/admin/login"||url.pathname==="/api/admin/setup")&&contentType.includes("application/x-www-form-urlencoded");if(!contentType.includes("application/json")&&!formAuth)return json({ok:false,error:"Content-Type must be application/json."},415);
  let body:{email?:string;password?:string};try{body=formAuth?Object.fromEntries(await request.formData()) as any:await request.json() as typeof body}catch{return json({ok:false,error:"Invalid request"},400)}
  const email=(body.email||"").trim().toLowerCase(),pass=body.password||"";
  if(!validAdminEmail(email)||pass.length>128)return json({ok:false,error:"Invalid email or password."},401);
@@ -1329,7 +1328,7 @@ export default {
     const unsafeMethod=["POST","PUT","PATCH","DELETE"].includes(request.method.toUpperCase());
     const originExempt=url.pathname==="/api/telegram/webhook"||url.pathname==="/api/telegram/broadcast";
     if(unsafeMethod&&!originExempt&&!sameOrigin(request))return json({ok:false,error:"Invalid or missing request origin"},403);
-    if(unsafeMethod&&!(request.headers.get("content-type")||"").toLowerCase().includes("application/json"))return json({ok:false,error:"Content-Type must be application/json."},415);
+    const contentType=(request.headers.get("content-type")||"").toLowerCase();const formAuth=(url.pathname==="/api/admin/login"||url.pathname==="/api/admin/setup")&&contentType.includes("application/x-www-form-urlencoded");if(unsafeMethod&&!contentType.includes("application/json")&&!formAuth)return json({ok:false,error:"Content-Type must be application/json."},415);
     const declaredLength=Number(request.headers.get("content-length")||0),bodyLimit=url.pathname==="/api/telegram/webhook"?1048576:65536;
     if(declaredLength>bodyLimit)return json({ok:false,error:"Request body is too large."},413);
 
