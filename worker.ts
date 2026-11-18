@@ -1373,7 +1373,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const response = await (async (): Promise<Response> => {
     const url = new URL(request.url);
-    const routePath=url.pathname.replace(/\\/+$/, "")||"/";
+    const routePath=url.pathname.replace(/\/+$/, "")||"/";
     const unsafeMethod=["POST","PUT","PATCH","DELETE"].includes(request.method.toUpperCase());
     const loginRoute=routePath==="/admin/login"||routePath==="/api/admin/login";
     const originExempt=loginRoute||routePath==="/api/telegram/webhook"||routePath==="/api/telegram/broadcast";
