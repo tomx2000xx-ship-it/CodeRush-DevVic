@@ -487,8 +487,13 @@ type ApiFootballOdds = {
   bookmakers: Array<{ id: number; name: string; bets: Array<{ id: number; name: string; values: Array<{ value: string; odd: string; handicap?: string | null; suspended?: boolean }> }> }>;
 };
 async function reserveApiFootballRequestSlot(env: Env): Promise<void> {
+  // Serialize this application's provider traffic to no more than one request every 8 seconds.
+  // This controls our own burst rate; it cannot change Cloudflare's shared outbound IP.
   const slot = await env.DB.prepare("INSERT INTO api_football_rate_limit(id,next_allowed_at) VALUES (1,unixepoch()) ON CONFLICT(id) DO UPDATE SET next_allowed_at=MAX(api_football_rate_limit.next_allowed_at,unixepoch())+8 RETURNING next_allowed_at").first<{next_allowed_at:number}>();
   if (slot?.next_allowed_at) { const waitMs=slot.next_allowed_at*1000-Date.now(); if(waitMs>0) await new Promise(resolve=>setTimeout(resolve,waitMs)); }
+  // Reserve a daily allowance atomically so manual/admin requests cannot silently exhaust the provider quota.
+  const budget = await env.DB.prepare("INSERT INTO api_football_request_budget(id,utc_day,used,updated_at) VALUES (1,date('now'),1,strftime('%Y-%m-%dT%H:%M:%fZ','now')) ON CONFLICT(id) DO UPDATE SET utc_day=CASE WHEN api_football_request_budget.utc_day<>date('now') THEN date('now') ELSE api_football_request_budget.utc_day END,used=CASE WHEN api_football_request_budget.utc_day<>date('now') THEN 1 ELSE api_football_request_budget.used+1 END,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE api_football_request_budget.utc_day<>date('now') OR api_football_request_budget.used<75 RETURNING used").first<{used:number}>();
+  if (!budget) throw new Error("Daily football API safety budget reached (75 requests). Further provider calls are paused until the UTC day resets.");
 }
 async function apiFootball<T>(env: Env, path: string): Promise<{ response: T[]; paging?: { current: number; total: number } }> {
   if (!env.FIVE_DOLLAR_FOOTBALL_API_KEY) throw new Error("FIVE_DOLLAR_FOOTBALL_API_KEY is not configured");
@@ -506,6 +511,7 @@ async function apiFootball<T>(env: Env, path: string): Promise<{ response: T[]; 
 }
 async function fiveDollarFootballGet(env:Env,path:string):Promise<{data:any;headers:Headers;pagination:any}>{
   if(!env.FIVE_DOLLAR_FOOTBALL_API_KEY)throw new Error("FIVE_DOLLAR_FOOTBALL_API_KEY is not configured in Cloudflare.");
+  await reserveApiFootballRequestSlot(env);
   const response=await fetch(new URL(path,"https://api.5dollarfootballapi.com/v1/"),{method:"GET",headers:{authorization:"Bearer "+env.FIVE_DOLLAR_FOOTBALL_API_KEY,accept:"application/json"},signal:AbortSignal.timeout(12000),cf:{cacheTtl:0,cacheEverything:false}});
   let payload:any;try{payload=await response.json()}catch{throw new Error("5DollarFootballAPI returned a non-JSON response (HTTP "+response.status+").");}
   if(!response.ok||payload?.success!==1){const detail=String(payload?.error?.message||payload?.error?.code||payload?.message||JSON.stringify(payload?.errors||"Provider request failed")).slice(0,250);throw new Error("5DollarFootballAPI "+path+" failed (HTTP "+response.status+"): "+detail);}
@@ -665,22 +671,37 @@ async function storeFootballOdds(env: Env, entries: ApiFootballOdds[]): Promise<
   for(let i=0;i<statements.length;i+=80) await env.DB.batch(statements.slice(i,i+80));
   return count;
 }
-async function syncFootballRange(env: Env, _from: string, _to: string): Promise<{fixtures:number;odds:number;oddsWarning?:string}> {
+async function syncFootballRange(env: Env, _from: string, _to: string, options:{includeOdds?:boolean}={}): Promise<{fixtures:number;odds:number;oddsWarning?:string}> {
   const fixtureData=await apiFootball<ApiFootballFixture>(env,"fixtures?next=99");
   const fixtures=await storeFootballFixtures(env,fixtureData.response);
   const today=dayString(new Date());
+  const includeOdds=options.includeOdds!==false;
   let odds=0,oddsError:string|null=null;
-  try{
-    // Keep a manual sync to three paced provider calls (fixtures, first odds page, live).
-    // Fetching every odds page can exceed the admin UI's request window and the provider's per-minute quota.
-    const first=await apiFootball<ApiFootballOdds>(env,"odds?date="+today+"&bet=1&page=1");
-    odds=await storeFootballOdds(env,first.response);
-  }catch(error){
-    oddsError=(error instanceof Error?error.message:"5DollarFootballAPI odds sync failed").slice(0,500);
+  if(includeOdds){
+    try{
+      const first=await apiFootball<ApiFootballOdds>(env,"odds?date="+today+"&bet=1&page=1");
+      odds=await storeFootballOdds(env,first.response);
+    }catch(error){
+      oddsError=(error instanceof Error?error.message:"Football provider odds sync failed").slice(0,500);
+    }
   }
   const now=isoNow();
-  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_fixtures_sync,last_odds_sync,last_error,updated_at) VALUES ('5dollar-football-api',?,?,?,?) ON CONFLICT(provider) DO UPDATE SET last_fixtures_sync=excluded.last_fixtures_sync,last_odds_sync=CASE WHEN excluded.last_error IS NULL THEN excluded.last_odds_sync ELSE sports_sync_state.last_odds_sync END,last_error=excluded.last_error,updated_at=excluded.updated_at").bind(now,oddsError?null:now,oddsError,now).run();
+  await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_fixtures_sync,last_odds_sync,last_error,updated_at) VALUES ('5dollar-football-api',?,?,?,?) ON CONFLICT(provider) DO UPDATE SET last_fixtures_sync=excluded.last_fixtures_sync,last_odds_sync=CASE WHEN excluded.last_odds_sync IS NOT NULL THEN excluded.last_odds_sync ELSE sports_sync_state.last_odds_sync END,last_error=excluded.last_error,updated_at=excluded.updated_at").bind(now,includeOdds&&!oddsError?now:null,oddsError,now).run();
   return {fixtures,odds,...(oddsError?{oddsWarning:oddsError}:{})};
+}
+async function syncFootballOdds(env:Env):Promise<{odds:number;oddsWarning?:string}>{
+  const today=dayString(new Date());
+  try{
+    const first=await apiFootball<ApiFootballOdds>(env,"odds?date="+today+"&bet=1&page=1");
+    const odds=await storeFootballOdds(env,first.response);
+    const now=isoNow();
+    await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_odds_sync,last_error,updated_at) VALUES ('5dollar-football-api',?,NULL,?) ON CONFLICT(provider) DO UPDATE SET last_odds_sync=excluded.last_odds_sync,last_error=NULL,updated_at=excluded.updated_at").bind(now,now).run();
+    return {odds};
+  }catch(error){
+    const message=(error instanceof Error?error.message:"Football provider odds sync failed").slice(0,500);
+    await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('5dollar-football-api',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind(message,isoNow()).run();
+    return {odds:0,oddsWarning:message};
+  }
 }
 async function syncFootballLive(env: Env): Promise<{fixtures:number;odds:number}> {
   // One request for live scores; live odds are not polled on every refresh.
@@ -1466,11 +1487,11 @@ export default {
     if (controller.cron === "*/30 * * * *") {
       if (env.FIVE_DOLLAR_FOOTBALL_API_KEY) {
         try {
-          await syncFootballRange(env, dayString(new Date()), dayString(new Date()));
+          // One bulk live-fixtures call per interval. Fixture discovery and odds have separate schedules.
           await syncFootballLive(env);
         } catch (error) {
-          console.error("Scheduled 5DollarFootballAPI fixture/live/odds sync failed", error instanceof Error ? error.message : String(error));
-          await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('5dollar-football-api',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind((error instanceof Error?error.message:"Scheduled sync failed").slice(0,500),isoNow()).run();
+          console.error("Scheduled football live-score sync failed", error instanceof Error ? error.message : String(error));
+          await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('5dollar-football-api',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind((error instanceof Error?error.message:"Scheduled live sync failed").slice(0,500),isoNow()).run();
         }
       }
       return;
@@ -1479,10 +1500,14 @@ export default {
     try {
       if (controller.cron === "0 */2 * * *") {
         await refreshAndSettleBetResults(env);
+      } else if (controller.cron === "0 */4 * * *") {
+        // Refresh the first available 1X2 odds page every four hours, not on every live-score poll.
+        await syncFootballOdds(env);
       } else if (controller.cron === "15 0 * * *") {
         await env.DB.prepare("DELETE FROM user_sessions WHERE expires_at<datetime('now','-7 days') OR revoked_at<datetime('now','-30 days')").run();
         await env.DB.prepare("DELETE FROM admin_login_attempts WHERE created_at<datetime('now','-30 days')").run();
-        await syncFootballRange(env, dayString(new Date()), dayString(new Date()));
+        // Daily fixture discovery is independent from odds refresh.
+        await syncFootballRange(env, dayString(new Date()), dayString(new Date()), {includeOdds:false});
       }
     } catch (error) {
       const message=error instanceof Error?error.message:"Scheduled sports refresh failed";
