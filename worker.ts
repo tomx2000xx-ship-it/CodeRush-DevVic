@@ -203,9 +203,13 @@ async function requestIsSameOrigin(request:Request):Promise<boolean>{if(sameOrig
 async function newAdminSession(request:Request,env:Env,id:string):Promise<Response>{const token=hex(crypto.getRandomValues(new Uint8Array(32)).buffer),hash=await sha256(token),expires=new Date(Date.now()+43200000).toISOString();await env.DB.prepare("INSERT INTO user_sessions(token_hash,user_id,expires_at,user_agent) VALUES(?,?,?,?)").bind(hash,id,expires,(request.headers.get("user-agent")||"").slice(0,300)||null).run();return new Response(JSON.stringify({ok:true}),{headers:{"content-type":"application/json","cache-control":"no-store","set-cookie":sessionCookie(token)}})}
 async function adminSetup(request:Request,env:Env):Promise<Response>{const formAuth=(request.headers.get("content-type")||"").toLowerCase().includes("application/x-www-form-urlencoded");if(!(await requestIsSameOrigin(request)))return json({ok:false,error:"Invalid origin"},403);if(await adminCount(env))return json({ok:false,error:"Initial setup is already complete. Sign in instead."},409);let b:{email?:string;password?:string;name?:string};try{b=formAuth?Object.fromEntries(await request.formData()) as any:await request.json()}catch{return json({ok:false,error:"Invalid request"},400)}const email=(b.email||"").trim().toLowerCase(),pass=b.password||"",name=(b.name||"Super Administrator").trim().slice(0,60);if(!validAdminEmail(email))return json({ok:false,error:"Enter a valid email."},400);if(!validAdminPassword(pass))return json({ok:false,error:"Password must be at least 12 characters and include letters and numbers."},400);const id="admin_"+crypto.randomUUID(),salt=hex(crypto.getRandomValues(new Uint8Array(16)).buffer),hash=await adminPasswordHash(pass,salt);try{await env.DB.batch([env.DB.prepare("INSERT INTO users(id,display_name,role,status) VALUES(?,?,'admin','active')").bind(id,name||"Super Administrator"),env.DB.prepare("INSERT INTO admin_accounts(user_id,email,password_hash,password_salt,is_super_admin) SELECT ?,?,?,?,1 WHERE NOT EXISTS(SELECT 1 FROM admin_accounts)").bind(id,email,hash,salt)])}catch{return json({ok:false,error:"Setup has already been claimed or the email is already registered. Please sign in."},409)}const row=await env.DB.prepare("SELECT user_id FROM admin_accounts WHERE user_id=? AND is_super_admin=1").bind(id).first();if(!row){await env.DB.prepare("DELETE FROM users WHERE id=?").bind(id).run();return json({ok:false,error:"Another administrator completed setup first. Please sign in."},409)}await recordAuthEvent(env,id,"admin_super_setup",request);const session=await newAdminSession(request,env,id);if(formAuth){const headers=new Headers(session.headers);headers.set("location","/admin/dashboard");return new Response(null,{status:303,headers})}return session}
 async function adminLogin(request:Request,env:Env):Promise<Response>{
- const formAuth=(request.headers.get("content-type")||"").toLowerCase().includes("application/x-www-form-urlencoded");
-
- let body:{email?:string;password?:string};try{body=formAuth?Object.fromEntries(await request.formData()) as any:await request.json() as typeof body}catch{return json({ok:false,error:"Invalid request"},400)}
+ const contentType=(request.headers.get("content-type")||"").toLowerCase();
+ const formAuth=contentType.includes("application/x-www-form-urlencoded")||contentType.includes("multipart/form-data");
+ let body:{email?:string;password?:string};try{
+  if(contentType.includes("application/x-www-form-urlencoded")){const raw=await request.text();body=Object.fromEntries(new URLSearchParams(raw)) as any;}
+  else if(contentType.includes("multipart/form-data")){body=Object.fromEntries(await request.formData()) as any;}
+  else{body=await request.json() as typeof body;}
+ }catch{return json({ok:false,error:"Invalid request body. Please refresh the login page and try again."},400)}
  const email=(body.email||"").trim().toLowerCase(),pass=body.password||"";
  if(!validAdminEmail(email)||pass.length>128)return json({ok:false,error:"Invalid email or password."},401);
  const clientKeyHash=await sha256("CodeRush admin login:"+String(request.headers.get("CF-Connecting-IP")||"unknown"));
@@ -1369,17 +1373,18 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const response = await (async (): Promise<Response> => {
     const url = new URL(request.url);
+    const routePath=url.pathname.replace(/\\/+$/, "")||"/";
     const unsafeMethod=["POST","PUT","PATCH","DELETE"].includes(request.method.toUpperCase());
-    const loginRoute=url.pathname==="/admin/login"||url.pathname==="/api/admin/login";
-    const originExempt=loginRoute||url.pathname==="/api/telegram/webhook"||url.pathname==="/api/telegram/broadcast";
-    const adminFormFallback=(url.pathname==="/api/admin/login"||url.pathname==="/admin/login"||url.pathname==="/api/admin/setup")&&(request.headers.get("content-type")||"").toLowerCase().includes("application/x-www-form-urlencoded")&&await requestIsSameOrigin(request);if(unsafeMethod&&!originExempt&&!sameOrigin(request)&&!adminFormFallback)return json({ok:false,error:"Invalid or missing request origin"},403);
+    const loginRoute=routePath==="/admin/login"||routePath==="/api/admin/login";
+    const originExempt=loginRoute||routePath==="/api/telegram/webhook"||routePath==="/api/telegram/broadcast";
+    const adminFormFallback=(routePath==="/api/admin/login"||routePath==="/admin/login"||routePath==="/api/admin/setup")&&(request.headers.get("content-type")||"").toLowerCase().includes("application/x-www-form-urlencoded")&&await requestIsSameOrigin(request);if(unsafeMethod&&!originExempt&&!sameOrigin(request)&&!adminFormFallback)return json({ok:false,error:"Invalid or missing request origin"},403);
     const contentType=(request.headers.get("content-type")||"").toLowerCase();const formAuth=(url.pathname==="/api/admin/login"||url.pathname==="/admin/login"||url.pathname==="/api/admin/setup")&&contentType.includes("application/x-www-form-urlencoded");if(unsafeMethod&&!contentType.includes("application/json")&&!formAuth)return json({ok:false,error:"Content-Type must be application/json."},415);
     const declaredLength=Number(request.headers.get("content-length")||0),bodyLimit=url.pathname==="/api/telegram/webhook"?1048576:65536;
     if(declaredLength>bodyLimit)return json({ok:false,error:"Request body is too large."},413);
 
-    if ((url.pathname === "/admin" || url.pathname === "/admin/login") && request.method === "GET") return adminHtml(env,request,false);
-    if (url.pathname === "/admin/dashboard" && request.method === "GET") return adminHtml(env,request,true);
-    if (url.pathname === "/admin/login" && request.method === "POST") return adminLogin(request,env);
+    if ((routePath === "/admin" || routePath === "/admin/login") && request.method === "GET") return adminHtml(env,request,false);
+    if (routePath === "/admin/dashboard" && request.method === "GET") return adminHtml(env,request,true);
+    if (routePath === "/admin/login" && request.method === "POST") return adminLogin(request,env);
     if (url.pathname === "/admin/notifications" && request.method === "GET") return adminNotificationsHtml();
     if (url.pathname === "/api/auth/telegram" && request.method === "POST") return handleTelegramAuth(request, env);
     if (url.pathname === "/api/auth/session" && request.method === "GET") return handleAuthSession(request, env);
