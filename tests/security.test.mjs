@@ -133,3 +133,10 @@ test("runtime allows same-origin logout and attaches security headers", async ()
   assert.equal(response.headers.get("referrer-policy"), "no-referrer");
   assert.match(response.headers.get("content-security-policy") || "", /frame-ancestors 'none'/);
 });
+
+test("Telegram Mini App initData uses the official two-stage HMAC key/message order", () => {
+  assert.match(worker, /hmacSha256\(new TextEncoder\(\)\.encode\("WebAppData"\), botToken\)/);
+  assert.match(worker, /params\.delete\("hash"\)/);
+  assert.match(worker, /\.sort\(\(\[a\], \[b\]\) => a < b \? -1 : a > b \? 1 : 0\)/);
+  assert.match(worker, /\.join\("\\n"\)/);
+});
