@@ -50,42 +50,6 @@ async function verifyFlashscoreGithubOidc(token:string):Promise<string|null>{
     return valid?String(claims.workflow_ref):null;
   }catch{return null;}
 }
-async function updateFlashscoreRunnerMonitor(env:Env):Promise<void>{
-  try{
-    const prior=await env.DB.prepare("SELECT last_attempt_at FROM sports_source_sync_state WHERE provider='flashscore_runner'").first<{last_attempt_at:string}>();
-    if(prior?.last_attempt_at&&Date.now()-Date.parse(prior.last_attempt_at)<2*60*1000)return;
-    const response=await fetch("https://api.github.com/repos/tomx2000xx-ship-it/CodeRush-DevVic/actions/runs?per_page=20",{
-      headers:{Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","User-Agent":"CodeRush-Flashscore-Monitor"}
-    });
-    if(!response.ok)throw new Error("GitHub Actions status HTTP "+response.status);
-    const data=await response.json() as any;
-    const allRuns=data.workflow_runs||[];
-    const persist=async(provider:string,runs:any[])=>{
-      const latest=runs[0]||null;
-      const successful=runs.find((run:any)=>run.conclusion==="success");
-      const attemptedAt=isoNow();
-      const status=latest?JSON.stringify({run_id:latest.id,status:latest.status,conclusion:latest.conclusion,event:latest.event,head_sha:latest.head_sha,created_at:latest.created_at,updated_at:latest.updated_at,html_url:latest.html_url}):"No workflow runs found";
-      await env.DB.prepare(`
-        INSERT INTO sports_source_sync_state(provider,last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded,updated_at)
-        VALUES (?,?,?, ?,0,0,?)
-        ON CONFLICT(provider) DO UPDATE SET
-          last_success_at=COALESCE(excluded.last_success_at,sports_source_sync_state.last_success_at),
-          last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,updated_at=excluded.updated_at
-      `).bind(provider,successful?.updated_at||null,attemptedAt,status,attemptedAt).run();
-    };
-    await persist("flashscore_runner",allRuns.filter((run:any)=>String(run.path||"").endsWith("flashscore-live.yml")));
-    await persist("flashscore_watchdog",allRuns.filter((run:any)=>String(run.path||"").endsWith("flashscore-watchdog.yml")));
-  }catch(error){
-    const attemptedAt=isoNow(),message=(error instanceof Error?error.message:"GitHub Actions status unavailable").slice(0,500);
-    for(const provider of ["flashscore_runner","flashscore_watchdog"]){
-      try{await env.DB.prepare(`INSERT INTO sports_source_sync_state(provider,last_attempt_at,last_error,datasets_loaded,fixtures_loaded,updated_at)
-        VALUES (?,?,?,0,0,?)
-        ON CONFLICT(provider) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,updated_at=excluded.updated_at
-      `).bind(provider,attemptedAt,message,attemptedAt).run();}catch{}
-    }
-  }
-}
-
 async function handleFlashscoreRunnerStatus(env:Env):Promise<Response>{
   const [sync,counts]=await Promise.all([
     env.DB.prepare("SELECT last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded FROM sports_source_sync_state WHERE provider='flashscore'").first<Record<string,unknown>>(),
@@ -1683,7 +1647,6 @@ export default {
   },
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     if (controller.cron === "* * * * *") {
-      await updateFlashscoreRunnerMonitor(env);
       try { await deliverTelegramNotificationOutbox(env); }
       catch (error) { console.error("Telegram notification outbox failed", error instanceof Error ? error.message : "unknown error"); }
       try { await deliverTelegramBroadcastJobs(env); }
