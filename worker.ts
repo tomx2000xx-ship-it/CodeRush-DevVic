@@ -48,7 +48,7 @@ async function verifyFlashscoreGithubOidc(token:string):Promise<boolean>{
 async function updateFlashscoreRunnerMonitor(env:Env):Promise<void>{
   try{
     const prior=await env.DB.prepare("SELECT last_attempt_at FROM sports_source_sync_state WHERE provider='flashscore_runner'").first<{last_attempt_at:string}>();
-    if(prior?.last_attempt_at&&Date.now()-Date.parse(prior.last_attempt_at)<5*60*1000)return;
+    if(prior?.last_attempt_at&&Date.now()-Date.parse(prior.last_attempt_at)<2*60*1000)return;
     const response=await fetch("https://api.github.com/repos/tomx2000xx-ship-it/CodeRush-DevVic/actions/workflows/flashscore-live.yml/runs?per_page=5",{
       headers:{Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","User-Agent":"CodeRush-Flashscore-Monitor"}
     });
