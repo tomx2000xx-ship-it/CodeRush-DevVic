@@ -26,7 +26,7 @@ jobs:
       - name: Report heartbeat and start the live feed if needed
         env:
           GH_TOKEN: ${{ github.token }}
-          CODERUSH_WORKER_URL: https://coderush-devvic.tomx200xx.workers.dev
+          CODERUSH_WORKER_URL: https://coderush-devvic.tomx2000xx.workers.dev
         shell: bash
         run: |
           TOKEN_SEPARATOR="?"
@@ -59,7 +59,7 @@ jobs:
           fi
           echo "Active Flashscore feed runs: $ACTIVE_COUNT"
           if [ "$ACTIVE_COUNT" -eq 0 ]; then
-            gh workflow run flashscore-live.yml --ref main
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/flashscore-live.yml/dispatches" -f ref=main
             echo "Dispatched a new Flashscore feed run."
           fi
 
