@@ -15,7 +15,7 @@ permissions:
 
 # v2 avoids the abandoned pending run in the previous concurrency group.
 concurrency:
-  group: coderush-flashscore-live-v5
+  group: coderush-flashscore-live-v6
   cancel-in-progress: true
 
 jobs:
