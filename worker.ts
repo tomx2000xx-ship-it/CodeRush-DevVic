@@ -1,9 +1,8 @@
 import { syncOpenFootballFixtures } from "./sports/openfootball";
-import { syncFlashscoreDay, flashscoreProxy } from "./sports/flashscore";
+import { ingestFlashscoreSnapshot } from "./sports/flashscore";
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   DB: D1Database;
-  FLASHSCORE_SCRAPER: { getByName(name: string): { fetch(request: Request): Promise<Response> } };
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_BROADCAST_SECRET?: string;
   TELEGRAM_CHANNEL_URL?: string;
@@ -16,36 +15,57 @@ interface Env {
   BSC_RPC_URL?: string;
 }
 
-export class FlashscoreScraper {
-  private starting: Promise<void> | undefined;
-  private ctx: any;
-  constructor(ctx: any, _env: Env) { this.ctx = ctx; }
-  async fetch(request: Request): Promise<Response> {
-    this.starting ??= this.startAndWaitForPort().finally(() => { this.starting = undefined; });
-    await this.starting;
-    const url = new URL(request.url);
-    url.protocol = "http:";
-    url.host = "container";
-    const forwarded = new Request(url, request);
-    forwarded.headers.delete("host");
-    return (this.ctx as any).container.getTcpPort(8000).fetch(forwarded);
-  }
-  private async startAndWaitForPort(): Promise<void> {
-    const container = (this.ctx as any).container;
-    if (!container.running) container.start({ image: container.images.base, instance: "lite", enableInternet: true });
-    await container.setInactivityTimeout(30 * 60 * 1000);
-    const port = container.getTcpPort(8000);
-    let lastError: unknown;
-    for (let attempt = 0; attempt < 60; attempt++) {
-      try {
-        const response = await port.fetch("http://container/health", { signal: AbortSignal.timeout(2000) });
-        await response.body?.cancel();
-        if (response.ok) return;
-        lastError = new Error("Flashscore container health check returned " + response.status);
-      } catch (error) { lastError = error; }
-      await scheduler.wait(500);
+const FLASHCORE_OIDC_AUDIENCE = "api://coderush-flashscore-ingest";
+let githubOidcJwksCache:{expiresAt:number;keys:JsonWebKey[]}|null=null;
+function decodeBase64Url(value:string):Uint8Array{
+  const padded=value.replace(/-/g,"+").replace(/_/g,"/")+"=".repeat((4-value.length%4)%4);
+  return Uint8Array.from(atob(padded),character=>character.charCodeAt(0));
+}
+async function verifyFlashscoreGithubOidc(token:string):Promise<boolean>{
+  try{
+    const parts=token.split(".");
+    if(parts.length!==3)return false;
+    const header=JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[0])));
+    const claims=JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1])));
+    const now=Math.floor(Date.now()/1000);
+    if(header.alg!=="RS256"||!header.kid||claims.iss!=="https://token.actions.githubusercontent.com")return false;
+    if(claims.repository!=="tomx2000xx-ship-it/CodeRush-DevVic"||claims.ref!=="refs/heads/main")return false;
+    if(claims.workflow_ref!=="tomx2000xx-ship-it/CodeRush-DevVic/.github/workflows/flashscore-live.yml@refs/heads/main")return false;
+    const audiences=Array.isArray(claims.aud)?claims.aud:[claims.aud];
+    if(!audiences.includes(FLASHCORE_OIDC_AUDIENCE)||Number(claims.exp)<=now||Number(claims.iat)>now+30)return false;
+    if(!githubOidcJwksCache||githubOidcJwksCache.expiresAt<Date.now()){
+      const response=await fetch("https://token.actions.githubusercontent.com/.well-known/jwks");
+      if(!response.ok)return false;
+      const body=await response.json() as {keys:JsonWebKey[]};
+      githubOidcJwksCache={keys:body.keys,expiresAt:Date.now()+6*60*60*1000};
     }
-    throw new Error("Flashscore scraper container did not become ready on port 8000", { cause: lastError });
+    const jwk=githubOidcJwksCache.keys.find(key=>(key as any).kid===header.kid);
+    if(!jwk)return false;
+    const key=await crypto.subtle.importKey("jwk",jwk,{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["verify"]);
+    return await crypto.subtle.verify("RSASSA-PKCS1-v1_5",key,decodeBase64Url(parts[2]),new TextEncoder().encode(parts[0]+"."+parts[1]));
+  }catch{return false;}
+}
+async function handleFlashscoreIngest(request:Request,env:Env):Promise<Response>{
+  const authorization=request.headers.get("authorization")||"";
+  const token=authorization.startsWith("Bearer ")?authorization.slice(7):"";
+  if(!token||!(await verifyFlashscoreGithubOidc(token)))return json({ok:false,error:"GitHub Actions identity verification failed."},401);
+  let payload:any;
+  try{
+    const raw=await request.text();
+    if(new TextEncoder().encode(raw).length>4194304)return json({ok:false,error:"Sports snapshot is too large."},413);
+    payload=JSON.parse(raw);
+  }catch{return json({ok:false,error:"Invalid sports snapshot JSON."},400);}
+  if(!payload||!Array.isArray(payload.competitions))return json({ok:false,error:"Missing competitions data."},400);
+  try{
+    const result=await ingestFlashscoreSnapshot(env,payload);
+    let settlement=null;
+    try{settlement=await refreshAndSettleBetResults(env);}catch(error){console.error("Flashscore settlement pass failed",error instanceof Error?error.message:"unknown");}
+    return json({ok:true,...result,settlement});
+  }catch(error){
+    const message=(error instanceof Error?error.message:"Flashscore ingestion failed").slice(0,1000);
+    const attemptedAt=isoNow();
+    try{await env.DB.prepare("INSERT INTO sports_source_sync_state(provider,last_attempt_at,last_error,updated_at) VALUES ('flashscore',?,?,?) ON CONFLICT(provider) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,updated_at=excluded.updated_at").bind(attemptedAt,message,attemptedAt).run();}catch{}
+    return json({ok:false,error:message},502);
   }
 }
 
@@ -827,19 +847,16 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
   }
   const fixtures=Array.from(deduplicated.values());
   for(const fixture of fixtures)delete fixture._dateKey;
-  return new Response(JSON.stringify({ok:true,configured:true,provider:"OpenFootball public-domain fixtures",fixtures,sync:{openFootball:openState||null}}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
+  return new Response(JSON.stringify({ok:true,configured:true,provider:"Flashscore live fixtures, scores and bookmaker snapshots with OpenFootball backup",fixtures,sync:{openFootball:openState||null}}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
 }
 async function handleSportsFixtureDetails(request:Request,env:Env):Promise<Response>{
   const id=(new URL(request.url)).searchParams.get("id")||"";
   if(!/^fs-[A-Za-z0-9]{8}$/.test(id))return json({ok:false,error:"Match events are unavailable for this fixture source."},501);
-  const match=id.slice(3);
+  const row=await env.DB.prepare("SELECT raw_json FROM sports_fixtures WHERE id=?").bind(id).first<{raw_json:string}>();
+  if(!row?.raw_json)return json({ok:false,error:"Match details are not available yet."},404);
   try{
-    const [summaryResponse,statisticsResponse]=await Promise.all([
-      flashscoreProxy(env,"/matches/summary",{match}),
-      flashscoreProxy(env,"/matches/statistics",{match}).catch(()=>null)
-    ]);
-    const summary=await summaryResponse.json() as any;
-    const statistics=statisticsResponse?await statisticsResponse.json() as any:null;
+    const raw=JSON.parse(row.raw_json) as any;
+    const summary=raw.flashscoreSummary||{};
     const events=(summary.periods||[]).flatMap((period:any)=>(period.incidents||[]).map((event:any)=>({
       id:event.id||null,minute:event.minute||event.minute_number||null,
       team:event.team||null,type:event.type||"event",reason:event.reason||null,
@@ -848,10 +865,8 @@ async function handleSportsFixtureDetails(request:Request,env:Env):Promise<Respo
       assistPlayer:event.assist_player?.name||event.assist_player?.short_name||null,
       homeScore:event.home_score??null,awayScore:event.away_score??null
     })));
-    return json({ok:true,statistics:statistics||{available:false},events});
-  }catch(error){
-    return json({ok:false,error:error instanceof Error?error.message:"Flashscore match details unavailable"},502);
-  }
+    return json({ok:true,statistics:raw.flashscoreStatistics||{available:false},events});
+  }catch{return json({ok:false,error:"Stored match details could not be read."},500);}
 }
 async function handleSportsSync(request: Request, env: Env): Promise<Response> {
   const session=await currentSession(request,env);
@@ -1095,56 +1110,21 @@ async function settleStoredTicket(env:Env,ticketId:string,checkedAt:string):Prom
   }
   return {selectionUpdates,ticketStatus:finalStatus};
 }
-async function verifyFlashscoreFinalResult(env:Env,fixtureId:string):Promise<boolean>{
-  const sourceId=fixtureId.replace(/^fs-/,"");
-  if(!/^[A-Za-z0-9]{8}$/.test(sourceId))return false;
-  try{
-    const [detailsResponse,summaryResponse]=await Promise.all([
-      flashscoreProxy(env,"/matches/details",{match:sourceId}),
-      flashscoreProxy(env,"/matches/summary",{match:sourceId})
-    ]);
-    const details=await detailsResponse.json() as any;
-    const summary=await summaryResponse.json() as any;
-    const detailStatus=String(details.status||details.stage||"").toLowerCase();
-    const summaryStatus=String(summary.status||summary.stage||"").toLowerCase();
-    const combined=detailStatus+" "+summaryStatus;
-    let status="FT";
-    if(combined.includes("walkover"))status="WO";
-    else if(combined.includes("awarded"))status="AWD";
-    else if(combined.includes("after penalties"))status="PEN";
-    else if(combined.includes("after extra time"))status="AET";
-    else if(!combined.includes("finished")&&!combined.includes("ended")&&!combined.includes("full time"))return false;
-    const dh=Number(details.home_score), da=Number(details.away_score);
-    const sh=Number(summary.home_score), sa=Number(summary.away_score);
-    if(!Number.isInteger(dh)||!Number.isInteger(da)||!Number.isInteger(sh)||!Number.isInteger(sa)||dh<0||da<0||dh!==sh||da!==sa)return false;
-    const checkedAt=isoNow();
-    await env.DB.prepare(`UPDATE sports_fixtures SET status_short=?,status_long=?,home_score=?,away_score=?,
-      result_home_score=?,result_away_score=?,result_checked_at=?,is_live=0,updated_at=? WHERE id=?`)
-      .bind(status,String(details.stage||details.status||"Finished"),dh,da,dh,da,checkedAt,checkedAt,fixtureId).run();
-    return true;
-  }catch(error){
-    console.error("Flashscore final-result verification failed",fixtureId,error instanceof Error?error.message:"unknown");
-    return false;
-  }
-}
 async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:number;selectionUpdates:number;ticketsSettled:number}>{
   const now=isoNow(),cutoff=new Date(Date.now()-110*60*1000).toISOString();
   const flashscoreCutoff=new Date(Date.now()-5*60*1000).toISOString();
   const flashscoreDue=await env.DB.prepare(`
     SELECT DISTINCT f.id
-    FROM bet_ticket_selections s
-    JOIN bet_tickets t ON t.id=s.ticket_id
+    FROM bet_ticket_selections s JOIN bet_tickets t ON t.id=s.ticket_id
     JOIN sports_fixtures f ON f.id=s.fixture_id
     WHERE s.result_status='pending' AND f.id LIKE 'fs-%'
       AND datetime(f.kickoff)<=datetime(?)
       AND f.status_short IN ('FT','AET','PEN','AWD','WO')
-      AND (f.result_checked_at IS NULL OR datetime(f.result_checked_at)<=datetime(?))
+      AND f.result_checked_at IS NOT NULL
+      AND datetime(f.result_checked_at)<=datetime(?)
     ORDER BY f.kickoff ASC LIMIT 20
   `).bind(now,flashscoreCutoff).all<{id:string}>();
-  const verifiedFlashscoreIds:string[]=[];
-  for(const row of flashscoreDue.results||[]){
-    if(await verifyFlashscoreFinalResult(env,row.id))verifiedFlashscoreIds.push(row.id);
-  }
+  const verifiedFlashscoreIds=(flashscoreDue.results||[]).map(row=>row.id);
   let selectionUpdates=0,ticketsSettled=0;
   if(verifiedFlashscoreIds.length){
     const placeholders=verifiedFlashscoreIds.map(()=>"?").join(",");
@@ -1157,8 +1137,7 @@ async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:numb
   }
   const due=await env.DB.prepare(`
     SELECT DISTINCT f.id
-    FROM bet_ticket_selections s
-    JOIN bet_tickets t ON t.id=s.ticket_id
+    FROM bet_ticket_selections s JOIN bet_tickets t ON t.id=s.ticket_id
     JOIN sports_fixtures f ON f.id=s.fixture_id
     WHERE s.result_status='pending' AND datetime(f.kickoff)<=datetime(?)
       AND f.id NOT LIKE 'of-%' AND f.id NOT LIKE 'fs-%'
@@ -1552,10 +1531,10 @@ export default {
     const routePath=url.pathname.replace(/\/+$/, "")||"/";
     const unsafeMethod=["POST","PUT","PATCH","DELETE"].includes(request.method.toUpperCase());
     const loginRoute=routePath==="/admin/login"||routePath==="/api/admin/login";
-    const originExempt=loginRoute||routePath==="/api/telegram/webhook"||routePath==="/api/telegram/broadcast";
+    const originExempt=loginRoute||routePath==="/api/telegram/webhook"||routePath==="/api/telegram/broadcast"||routePath==="/api/sports/ingest";
     const adminFormFallback=(routePath==="/api/admin/login"||routePath==="/admin/login"||routePath==="/api/admin/setup")&&(request.headers.get("content-type")||"").toLowerCase().includes("application/x-www-form-urlencoded")&&await requestIsSameOrigin(request);if(unsafeMethod&&!originExempt&&!sameOrigin(request)&&!adminFormFallback)return json({ok:false,error:"Invalid or missing request origin"},403);
     const contentType=(request.headers.get("content-type")||"").toLowerCase();const formAuth=(url.pathname==="/api/admin/login"||url.pathname==="/admin/login"||url.pathname==="/api/admin/setup")&&contentType.includes("application/x-www-form-urlencoded");if(unsafeMethod&&!contentType.includes("application/json")&&!formAuth)return json({ok:false,error:"Content-Type must be application/json."},415);
-    const declaredLength=Number(request.headers.get("content-length")||0),bodyLimit=url.pathname==="/api/telegram/webhook"?1048576:65536;
+    const declaredLength=Number(request.headers.get("content-length")||0),bodyLimit=url.pathname==="/api/telegram/webhook"?1048576:url.pathname==="/api/sports/ingest"?4194304:65536;
     if(declaredLength>bodyLimit)return json({ok:false,error:"Request body is too large."},413);
 
     if ((routePath === "/admin" || routePath === "/admin/login") && request.method === "GET") return adminHtml(env,request,false);
@@ -1600,6 +1579,7 @@ export default {
     if (url.pathname === "/api/profile" && request.method === "POST") return handleProfileUpdate(request, env);
     if (url.pathname === "/api/admin/sports-provider-probe" && request.method === "POST") return handleSportsProviderProbe(request,env);
     if (url.pathname === "/api/admin/sports-provider-probe-status" && request.method === "GET") return handleSportsProviderProbeStatus(request,env);
+    if (url.pathname === "/api/sports/ingest" && request.method === "POST") return handleFlashscoreIngest(request,env);
     if (url.pathname === "/api/sports/fixtures" && request.method === "GET") return handleSportsFixtures(request, env);
     if (url.pathname === "/api/sports/fixture-details" && request.method === "GET") return handleSportsFixtureDetails(request, env);
     if (url.pathname === "/api/sports/sync" && request.method === "POST") return handleSportsSync(request, env);
@@ -1659,12 +1639,6 @@ export default {
       await deliverTelegramNotificationOutbox(env);
       await deliverTelegramBroadcastJobs(env);
       try {
-        const today = dayString(new Date());
-        const [todayResult, tomorrowResult] = await Promise.all([
-          syncFlashscoreDay(env, today),
-          syncFlashscoreDay(env, addCalendarDays(today, 1))
-        ]);
-        console.log("Flashscore minute sync", JSON.stringify({today:todayResult,tomorrow:tomorrowResult}));
         const settlement = await refreshAndSettleBetResults(env);
         if (settlement.ticketsSettled) console.log("Bet settlement", JSON.stringify(settlement));
       } catch (error) {
@@ -1678,7 +1652,7 @@ export default {
     }
     if (controller.cron === "*/30 * * * *") {
       // Retired-provider rows must never remain marked live.
-      await env.DB.prepare("UPDATE sports_fixtures SET is_live=0 WHERE id NOT LIKE 'of-%' AND is_live<>0").run();
+      await env.DB.prepare("UPDATE sports_fixtures SET is_live=0 WHERE id NOT LIKE 'of-%' AND id NOT LIKE 'fs-%' AND is_live<>0").run();
       return;
     }
     try {
@@ -1688,15 +1662,6 @@ export default {
       } else if (controller.cron === "15 6 * * *") {
         await env.DB.prepare("DELETE FROM user_sessions WHERE expires_at<datetime('now','-7 days') OR revoked_at<datetime('now','-30 days')").run();
         await env.DB.prepare("DELETE FROM admin_login_attempts WHERE created_at<datetime('now','-30 days')").run();
-        for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
-          const day = addCalendarDays(dayString(new Date()), dayOffset);
-          try {
-            const result = await syncFlashscoreDay(env, day);
-            console.log("Flashscore fixture sync", day, JSON.stringify(result));
-          } catch (error) {
-            console.error("Flashscore fixture sync failed", day, error instanceof Error ? error.message : "unknown error");
-          }
-        }
         const attemptedAt=isoNow();
         try {
           const result=await syncOpenFootballFixtures(env.DB);
