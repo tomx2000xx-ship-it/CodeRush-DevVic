@@ -45,6 +45,8 @@ function kickoff(match: OpenFootballMatch, country: string): string {
   if (!validDate(date)) return "";
   const time = match.time || "";
   if (!/^\d{2}:\d{2}$/.test(time)) return date;
+  const [hour, minute] = time.split(":").map(Number);
+  if (hour > 23 || minute > 59) return date;
   const zone = LEAGUE_TIME_ZONES[country];
   if (!zone) return date;
   const [year, month, day] = date.split("-").map(Number);
