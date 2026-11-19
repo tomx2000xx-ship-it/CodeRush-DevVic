@@ -200,6 +200,26 @@ export async function ingestFlashscoreSnapshot(env: FlashscoreEnv, payload: Snap
           result_away_score=COALESCE(excluded.result_away_score,sports_fixtures.result_away_score),
           result_checked_at=COALESCE(excluded.result_checked_at,sports_fixtures.result_checked_at),
           is_live=excluded.is_live,updated_at=excluded.updated_at,raw_json=excluded.raw_json
+        WHERE
+          sports_fixtures.league_id IS NOT excluded.league_id OR
+          sports_fixtures.league_name IS NOT excluded.league_name OR
+          sports_fixtures.country IS NOT excluded.country OR
+          sports_fixtures.season IS NOT excluded.season OR
+          sports_fixtures.kickoff IS NOT excluded.kickoff OR
+          sports_fixtures.status_short IS NOT excluded.status_short OR
+          sports_fixtures.status_long IS NOT excluded.status_long OR
+          sports_fixtures.elapsed IS NOT excluded.elapsed OR
+          sports_fixtures.home_team IS NOT excluded.home_team OR
+          sports_fixtures.away_team IS NOT excluded.away_team OR
+          sports_fixtures.home_code IS NOT excluded.home_code OR
+          sports_fixtures.away_code IS NOT excluded.away_code OR
+          sports_fixtures.home_score IS NOT excluded.home_score OR
+          sports_fixtures.away_score IS NOT excluded.away_score OR
+          sports_fixtures.is_live IS NOT excluded.is_live OR
+          sports_fixtures.raw_json IS NOT excluded.raw_json OR
+          (excluded.result_home_score IS NOT NULL AND sports_fixtures.result_home_score IS NOT excluded.result_home_score) OR
+          (excluded.result_away_score IS NOT NULL AND sports_fixtures.result_away_score IS NOT excluded.result_away_score) OR
+          (excluded.result_checked_at IS NOT NULL AND sports_fixtures.result_checked_at IS NOT excluded.result_checked_at)
       `).bind(fixtureId,hashInt(String(competition.name||"Football")+"|"+String(competition.country?.name||"")),
         String(competition.name||"Football"),String(competition.country?.name||""),new Date(kickoffMs).getUTCFullYear(),
         new Date(kickoffMs).toISOString(),status,String(match.stage||match.status||"Scheduled"),null,
