@@ -1112,9 +1112,8 @@ async function settleStoredTicket(env:Env,ticketId:string,checkedAt:string):Prom
   return {selectionUpdates,ticketStatus:finalStatus};
 }
 async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:number;selectionUpdates:number;ticketsSettled:number}>{
-  const now=isoNow(),cutoff=new Date(Date.now()-110*60*1000).toISOString();
-  const flashscoreCutoff=new Date(Date.now()-5*60*1000).toISOString();
-  const flashscoreDue=await env.DB.prepare(`
+  const now=isoNow(),flashscoreCutoff=new Date(Date.now()-5*60*1000).toISOString();
+  const due=await env.DB.prepare(`
     SELECT DISTINCT f.id
     FROM bet_ticket_selections s JOIN bet_tickets t ON t.id=s.ticket_id
     JOIN sports_fixtures f ON f.id=s.fixture_id
@@ -1125,48 +1124,18 @@ async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:numb
       AND datetime(f.result_checked_at)<=datetime(?)
     ORDER BY f.kickoff ASC LIMIT 20
   `).bind(now,flashscoreCutoff).all<{id:string}>();
-  const verifiedFlashscoreIds=(flashscoreDue.results||[]).map(row=>row.id);
+  const fixtureIds=(due.results||[]).map(row=>row.id);
   let selectionUpdates=0,ticketsSettled=0;
-  if(verifiedFlashscoreIds.length){
-    const placeholders=verifiedFlashscoreIds.map(()=>"?").join(",");
-    const affected=await env.DB.prepare("SELECT DISTINCT ticket_id FROM bet_ticket_selections WHERE result_status='pending' AND fixture_id IN ("+placeholders+")").bind(...verifiedFlashscoreIds).all<{ticket_id:string}>();
+  if(fixtureIds.length){
+    const placeholders=fixtureIds.map(()=>"?").join(",");
+    const affected=await env.DB.prepare("SELECT DISTINCT ticket_id FROM bet_ticket_selections WHERE result_status='pending' AND fixture_id IN ("+placeholders+")").bind(...fixtureIds).all<{ticket_id:string}>();
     for(const row of affected.results||[]){
       const result=await settleStoredTicket(env,row.ticket_id,isoNow());
       selectionUpdates+=result.selectionUpdates;
       if(result.ticketStatus)ticketsSettled++;
     }
   }
-  const due=await env.DB.prepare(`
-    SELECT DISTINCT f.id
-    FROM bet_ticket_selections s JOIN bet_tickets t ON t.id=s.ticket_id
-    JOIN sports_fixtures f ON f.id=s.fixture_id
-    WHERE s.result_status='pending' AND datetime(f.kickoff)<=datetime(?)
-      AND f.id NOT LIKE 'of-%' AND f.id NOT LIKE 'fs-%'
-      AND (f.result_checked_at IS NULL OR datetime(f.result_checked_at)<=datetime(?))
-    ORDER BY CASE WHEN f.result_checked_at IS NULL THEN 0 ELSE 1 END,f.result_checked_at ASC,f.kickoff ASC
-    LIMIT 20
-  `).bind(now,cutoff).all<{id:string}>();
-  const fixtureIds=(due.results||[]).map(row=>row.id);
-  if(fixtureIds.length){
-    const sourceIds=fixtureIds.map(id=>id.replace(/^5d-/,""));
-    const response=await apiFootball<ApiFootballFixture>(env,"fixtures?ids="+sourceIds.join("-"));
-    const verifiedIds=new Set((response.response||[]).map(item=>String(item.fixture.id)));
-    await storeFootballFixtures(env,response.response||[]);
-    const verifiedFixtureIds=fixtureIds.filter(id=>verifiedIds.has(id.replace(/^5d-/,"")));
-    if(verifiedFixtureIds.length){
-      const checkedAt=isoNow();
-      await env.DB.batch(verifiedFixtureIds.map(id=>env.DB.prepare("UPDATE sports_fixtures SET result_checked_at=? WHERE id=?").bind(checkedAt,id)));
-      const placeholders=verifiedFixtureIds.map(()=>"?").join(",");
-      const affected=await env.DB.prepare("SELECT DISTINCT ticket_id FROM bet_ticket_selections WHERE result_status='pending' AND fixture_id IN ("+placeholders+")").bind(...verifiedFixtureIds).all<{ticket_id:string}>();
-      for(const row of affected.results||[]){
-        const result=await settleStoredTicket(env,row.ticket_id,checkedAt);
-        selectionUpdates+=result.selectionUpdates;
-        if(result.ticketStatus)ticketsSettled++;
-      }
-    }
-    return {checkedFixtures:verifiedFlashscoreIds.length+verifiedIds.size,selectionUpdates,ticketsSettled};
-  }
-  return {checkedFixtures:verifiedFlashscoreIds.length,selectionUpdates,ticketsSettled};
+  return {checkedFixtures:fixtureIds.length,selectionUpdates,ticketsSettled};
 }
 async function handleBetSettlementDiagnostics(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
