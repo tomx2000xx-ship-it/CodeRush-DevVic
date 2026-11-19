@@ -32,10 +32,10 @@ jobs:
           TOKEN_SEPARATOR="?"
           if [[ "$ACTIONS_ID_TOKEN_REQUEST_URL" == *"?"* ]]; then TOKEN_SEPARATOR="&"; fi
           TOKEN_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}${TOKEN_SEPARATOR}audience=api://coderush-flashscore-ingest"
-          OIDC_TOKEN=$(curl -fsS -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$TOKEN_URL" | jq -r '.value' || true)
+          OIDC_TOKEN=$(curl -fsS -A "CodeRush-FlashscoreWatchdog/1.0 (+https://github.com/tomx2000xx-ship-it/CodeRush-DevVic)" -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$TOKEN_URL" | jq -r '.value' || true)
           if [ -n "$OIDC_TOKEN" ]; then
             INITIAL_BODY=$(jq -n '{action:"heartbeat",active_count:-1,latest_run:null}')
-            curl -fsS -X POST "$CODERUSH_WORKER_URL/api/sports/ingest" \
+            curl -fsS -A "CodeRush-FlashscoreWatchdog/1.0 (+https://github.com/tomx2000xx-ship-it/CodeRush-DevVic)" -X POST "$CODERUSH_WORKER_URL/api/sports/ingest" \
               -H "Authorization: Bearer $OIDC_TOKEN" \
               -H "Content-Type: application/json" \
               -d "$INITIAL_BODY" || echo "Initial watchdog heartbeat failed."
