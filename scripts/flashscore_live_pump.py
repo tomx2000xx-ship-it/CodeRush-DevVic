@@ -101,7 +101,7 @@ def kickoff_time(match):
         return None
 
 
-def collect_day(base, day, odds_cache, verified_cache):
+def collect_day(base, day, odds_cache, verified_cache, stats_cache):
     result = local_api(base, "/matches", {"sport": "football", "date": day, "timezone": "Africa/Lagos"})
     groups = result.get("competitions") or []
     odds, details, verification = {}, {}, {}
@@ -124,26 +124,30 @@ def collect_day(base, day, odds_cache, verified_cache):
                         odds_cache.add(match_id)
                 except Exception as exc:
                     print("odds fetch retry", match_id, str(exc)[:180], flush=True)
-            if is_live(match) or (is_final(match) and time.monotonic() - verified_cache.get(match_id, 0) > 15 * 60):
+            if is_live(match):
                 try:
                     summary = local_api(base, "/matches/summary", {"match": match_id})
-                    statistics = None
-                    if is_live(match):
+                    cached_stats = stats_cache.get(match_id)
+                    if not cached_stats or time.monotonic() - cached_stats[0] >= 5 * 60:
                         try:
-                            statistics = local_api(base, "/matches/statistics", {"match": match_id})
-                        except Exception:
-                            pass
-                    details[match_id] = {"summary": summary, "statistics": statistics}
-                    if is_final(match):
-                        try:
-                            final_details = local_api(base, "/matches/details", {"match": match_id})
-                            verification[match_id] = {"details": final_details, "summary": summary}\n                            verified_cache[match_id] = time.monotonic()
+                            fresh_stats = local_api(base, "/matches/statistics", {"match": match_id})
+                            stats_cache[match_id] = (time.monotonic(), fresh_stats)
                         except Exception as exc:
-                            print("final verification retry", match_id, str(exc)[:180], flush=True)
+                            print("live statistics retry", match_id, str(exc)[:160], flush=True)
+                    statistics = stats_cache.get(match_id, (0, None))[1]
+                    details[match_id] = {"summary": summary, "statistics": statistics}
                 except Exception as exc:
-                    print("match detail retry", match_id, str(exc)[:180], flush=True)
+                    print("live summary retry", match_id, str(exc)[:180], flush=True)
+            elif is_final(match) and time.monotonic() - verified_cache.get(match_id, 0) > 15 * 60:
+                try:
+                    summary = local_api(base, "/matches/summary", {"match": match_id})
+                    final_details = local_api(base, "/matches/details", {"match": match_id})
+                    verification[match_id] = {"details": final_details, "summary": summary}
+                    details[match_id] = {"summary": summary, "statistics": None}
+                    verified_cache[match_id] = time.monotonic()
+                except Exception as exc:
+                    print("final verification retry", match_id, str(exc)[:180], flush=True)
     return groups, odds, details, verification
-
 
 def push_snapshot(payload):
     token = get_oidc_token()
@@ -157,7 +161,10 @@ def push_snapshot(payload):
 
 def main():
     start = time.monotonic()
-    odds_cache = set()\n    verified_cache = {}
+    odds_cache = set()
+    verified_cache = {}
+    stats_cache = {}
+    future_refresh = {}
     with tempfile.TemporaryDirectory(prefix="coderush-flashscore-") as directory:
         clone_scraper(directory)
         process, base = start_scraper(directory)
@@ -176,7 +183,7 @@ def main():
                 competitions, odds, details, verification = [], {}, {}, {}
                 for day in days:
                     try:
-                        groups, day_odds, day_details, day_verification = collect_day(base, day, odds_cache, verified_cache)
+                        groups, day_odds, day_details, day_verification = collect_day(base, day, odds_cache, verified_cache, stats_cache)
                         competitions.extend(groups)
                         odds.update(day_odds)
                         details.update(day_details)
