@@ -64,3 +64,20 @@ jobs:
         env:
           CODERUSH_WORKER_URL: https://coderush-devvic.tomx2000xx.workers.dev
         run: python scripts/flashscore_live_pump.py
+
+      - name: Start the next feed window
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          for ATTEMPT in 1 2 3; do
+            if gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/flashscore-live.yml/dispatches" -f ref=main; then
+              echo "Queued the next authenticated Flashscore feed window."
+              exit 0
+            fi
+            echo "Feed restart attempt $ATTEMPT failed; retrying."
+            sleep 10
+          done
+          echo "Unable to queue the next feed window." >&2
+          exit 1
