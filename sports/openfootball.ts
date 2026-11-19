@@ -105,14 +105,18 @@ export async function syncOpenFootballFixtures(db: D1DatabaseLike): Promise<{ fe
         if (!match.team1 || !match.team2) continue;
         const date = match.date || "";
         if (!validDate(date) || date < cutoff || date > horizon) continue;
-        fetched++;
-        const id = "of-" + stableHash([item.code, date, match.team1, match.team2].join("|"));
         const [homeScore, awayScore] = parseScore(match);
         const completed = homeScore !== null && awayScore !== null;
+        const kickoffAt = kickoff(match, item.country);
+        // This feed is a fixture/results dataset, not a live-score service.
+        // Never label a match that has already kicked off but has no FT result as upcoming.
+        if (!completed && (kickoffAt.length === 10 ? date < isoNow().slice(0, 10) : Date.parse(kickoffAt) <= Date.now())) continue;
+        fetched++;
+        const id = "of-" + stableHash([item.code, date, match.team1, match.team2].join("|"));
         const status = completed ? "FT" : "NS";
         const raw = JSON.stringify({
           source: SOURCE, sourcePath: item.path, sourceMatch: match,
-          fixture: { id, date: kickoff(match, item.country), status: { short: status, long: completed ? "Match Finished" : "Not Started", elapsed: null } },
+          fixture: { id, date: kickoffAt, status: { short: status, long: completed ? "Match Finished" : "Not Started", elapsed: null } },
           league: { id: parseInt(stableHash(item.code), 16), name: item.league, country: item.country, season: Number(date.slice(0, 4)) },
           teams: { home: { name: match.team1 }, away: { name: match.team2 } },
           goals: { home: homeScore, away: awayScore },
@@ -135,7 +139,7 @@ export async function syncOpenFootballFixtures(db: D1DatabaseLike): Promise<{ fe
             updated_at=excluded.updated_at,raw_json=excluded.raw_json
         `).bind(
           id, parseInt(stableHash(item.code), 16), item.league, item.country, Number(date.slice(0, 4)),
-          kickoff(match, item.country), status, completed ? "Match Finished" : "Not Started", null, match.team1, match.team2,
+          kickoffAt, status, completed ? "Match Finished" : "Not Started", null, match.team1, match.team2,
           homeScore, awayScore, homeScore, awayScore, 0, isoNow(), raw
         ));
       }
