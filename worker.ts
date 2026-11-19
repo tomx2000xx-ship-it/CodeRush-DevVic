@@ -786,7 +786,7 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
     env.DB.prepare("SELECT last_fixtures_sync,last_live_sync,last_odds_sync,last_error FROM sports_sync_state WHERE provider='api-football'").first<Record<string,unknown>>(),
     env.DB.prepare("SELECT last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded FROM sports_source_sync_state WHERE provider='openfootball'").first<Record<string,unknown>>()
   ]);
-  const normalizeTeam=(value:unknown)=>String(value||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/&/g,"and").replace(/\\b(fc|afc|cf|sc)\\b/g,"").replace(/[^a-z0-9]/g,"");
+  const normalizeTeam=(value:unknown)=>String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g,"and").replace(/\b(fc|afc|cf|sc)\b/g,"").replace(/[^a-z0-9]/g,"");
   const deduplicated=new Map<string,Record<string,unknown>>();
   for(const fixture of map.values()){
     const key=[fixture._dateKey,normalizeTeam(fixture.home),normalizeTeam(fixture.away)].join("|");
