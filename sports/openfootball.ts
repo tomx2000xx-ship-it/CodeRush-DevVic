@@ -42,7 +42,7 @@ function kickoff(match: OpenFootballMatch, country: string): string {
   const date = match.date || "";
   if (!validDate(date)) return "";
   const time = match.time || "";
-  if (!/^\\d{2}:\\d{2}$/.test(time)) return date;
+  if (!/^\d{2}:\d{2}$/.test(time)) return date;
   const zone = LEAGUE_TIME_ZONES[country];
   if (!zone) return date;
   const [year, month, day] = date.split("-").map(Number);
