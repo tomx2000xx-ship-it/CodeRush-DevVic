@@ -5,7 +5,7 @@ type D1Like = {
 
 export type FlashscoreEnv = {
   DB: D1Like;
-  FLASHSCORE_SCRAPER: DurableObjectNamespace;
+  FLASHSCORE_SCRAPER: { getByName(name: string): { fetch(request: Request): Promise<Response> } };
 };
 
 type FlashscoreMatch = {
