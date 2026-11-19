@@ -846,7 +846,8 @@ async function handleSportsSync(request: Request, env: Env): Promise<Response> {
       await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('api-football',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind(apiFootballWarning.slice(0,500),isoNow()).run();
     }
   }
-  return json({ok:true,provider:apiFootball?"OpenFootball fixtures + API-Football odds/live":"OpenFootball public-domain fixtures",openFootball,apiFootball,apiFootballWarning});
+  const success=openFootball.datasets>0||!!apiFootball;
+  return json({ok:success,provider:apiFootball?"OpenFootball fixtures + API-Football odds/live":"OpenFootball public-domain fixtures",openFootball,apiFootball,apiFootballWarning,...(success?{}:{error:"No current-season fixture dataset could be loaded from the available providers."})},success?200:502);
 }
 
 
