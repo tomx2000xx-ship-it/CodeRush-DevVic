@@ -830,6 +830,7 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
     if(row.bookmaker_name&&oddsFresh){item.bookmaker=row.bookmaker_name;item.oddsUpdatedAt=row.odds_updated_at;}
   }
   const openState=await env.DB.prepare("SELECT last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded FROM sports_source_sync_state WHERE provider='openfootball'").first<Record<string,unknown>>();
+  const flashscoreState=await env.DB.prepare("SELECT last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded FROM sports_source_sync_state WHERE provider='flashscore'").first<Record<string,unknown>>();
   const normalizeTeam=(value:unknown)=>String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g,"and").replace(/\b(fc|afc|cf|sc)\b/g,"").replace(/[^a-z0-9]/g,"");
   const deduplicated=new Map<string,Record<string,unknown>>();
   for(const fixture of map.values()){
@@ -847,7 +848,7 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
   }
   const fixtures=Array.from(deduplicated.values());
   for(const fixture of fixtures)delete fixture._dateKey;
-  return new Response(JSON.stringify({ok:true,configured:true,provider:"Flashscore live fixtures, scores and bookmaker snapshots with OpenFootball backup",fixtures,sync:{openFootball:openState||null}}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
+  return new Response(JSON.stringify({ok:true,configured:true,provider:"Flashscore live fixtures, scores and bookmaker snapshots with OpenFootball backup",fixtures,sync:{flashscore:flashscoreState||null,openFootball:openState||null}}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
 }
 async function handleSportsFixtureDetails(request:Request,env:Env):Promise<Response>{
   const id=(new URL(request.url)).searchParams.get("id")||"";
@@ -1657,7 +1658,7 @@ export default {
     }
     try {
       if (controller.cron === "0 */2 * * *") {
-        // No bookmaker feed is currently approved; do not quote odds or auto-settle.
+        // Flashscore odds are snapshotted by the authenticated feed before kickoff; never refresh locked prices here.
         return;
       } else if (controller.cron === "15 6 * * *") {
         await env.DB.prepare("DELETE FROM user_sessions WHERE expires_at<datetime('now','-7 days') OR revoked_at<datetime('now','-30 days')").run();
