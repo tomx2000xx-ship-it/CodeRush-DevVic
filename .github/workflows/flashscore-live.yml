@@ -1,0 +1,36 @@
+name: CodeRush Flashscore Live Feed
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["CodeRush Flashscore Live Feed"]
+    types: [completed]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: coderush-flashscore-live
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Check out CodeRush
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run the Flashscore live feed
+        env:
+          CODERUSH_WORKER_URL: https://coderush-devvic.tomx2000xx.workers.dev
+        run: python scripts/flashscore_live_pump.py
