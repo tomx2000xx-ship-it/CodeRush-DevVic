@@ -764,7 +764,7 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
     SELECT f.id,f.league_name,f.country,f.kickoff,f.status_short,f.elapsed,f.home_team,f.away_team,f.home_code,f.away_code,
       json_extract(f.raw_json,'$.teams.home.logo') AS home_logo,json_extract(f.raw_json,'$.teams.away.logo') AS away_logo,json_extract(f.raw_json,'$.league.logo') AS league_logo,
       f.home_score,f.away_score,o.bookmaker_name,o.outcome_key,o.odd,o.suspended,o.updated_at AS odds_updated_at
-    FROM sports_fixtures f LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1
+    FROM sports_fixtures f LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1 AND o.bookmaker_id=(SELECT o2.bookmaker_id FROM sports_odds o2 WHERE o2.fixture_id=f.id AND o2.market_id=1 ORDER BY o2.updated_at DESC LIMIT 1)
     WHERE datetime(f.kickoff)>=datetime(?,'-1 day') AND datetime(f.kickoff)<datetime(?,'+2 day')
     ORDER BY f.kickoff ASC
   `).bind(from,to).all<Record<string,unknown>>();
@@ -772,10 +772,12 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
   for(const row of rows.results||[]){
     let item=map.get(String(row.id));
     if(!item){item={id:String(row.id),league:String(row.league_name),country:row.country||"",kickoff:row.kickoff,home:String(row.home_team),away:String(row.away_team),homeCode:row.home_code||"",awayCode:row.away_code||"",homeLogo:row.home_logo||null,awayLogo:row.away_logo||null,leagueLogo:row.league_logo||null,status:String(row.status_short),minute:row.elapsed,live:fixtureIsLive(String(row.status_short)),completed:["FT","AWD","WO"].includes(String(row.status_short)),score:row.home_score===null||row.away_score===null?null:String(row.home_score)+" : "+String(row.away_score),odds:[null,null,null],bookmaker:null,oddsUpdatedAt:null};map.set(String(row.id),item);}
-    if(row.outcome_key==="home") (item.odds as (number|null)[])[0]=row.suspended?null:Number(row.odd);
-    if(row.outcome_key==="draw") (item.odds as (number|null)[])[1]=row.suspended?null:Number(row.odd);
-    if(row.outcome_key==="away") (item.odds as (number|null)[])[2]=row.suspended?null:Number(row.odd);
-    if(row.bookmaker_name){item.bookmaker=row.bookmaker_name;item.oddsUpdatedAt=row.odds_updated_at;}
+    const oddsUpdated=Date.parse(String(row.odds_updated_at||""));
+    const oddsFresh=Number.isFinite(oddsUpdated)&&Date.now()-oddsUpdated<=45*60*1000&&oddsUpdated<=Date.now()+60*1000;
+    if(row.outcome_key==="home") (item.odds as (number|null)[])[0]=row.suspended||!oddsFresh?null:Number(row.odd);
+    if(row.outcome_key==="draw") (item.odds as (number|null)[])[1]=row.suspended||!oddsFresh?null:Number(row.odd);
+    if(row.outcome_key==="away") (item.odds as (number|null)[])[2]=row.suspended||!oddsFresh?null:Number(row.odd);
+    if(row.bookmaker_name&&oddsFresh){item.bookmaker=row.bookmaker_name;item.oddsUpdatedAt=row.odds_updated_at;}
   }
   const [state,openState]=await Promise.all([
     env.DB.prepare("SELECT last_fixtures_sync,last_live_sync,last_odds_sync,last_error FROM sports_sync_state WHERE provider='api-football'").first<Record<string,unknown>>(),
