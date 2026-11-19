@@ -31,7 +31,9 @@ function stableHash(value: string): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 function validDate(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value + "T00:00:00Z"));
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+  const parsed = new Date(value + "T00:00:00Z");
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 const LEAGUE_TIME_ZONES: Record<string, string> = {
   England: "Europe/London", Germany: "Europe/Berlin", Spain: "Europe/Madrid",
@@ -80,7 +82,6 @@ async function loadDataset(path: string): Promise<Dataset> {
 }
 
 export async function syncOpenFootballFixtures(db: D1DatabaseLike): Promise<{ fetched: number; stored: number; datasets: number; errors: string[] }> {
-  const today = new Date().toISOString().slice(0, 10);
   const cutoff = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const horizon = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
   let fetched = 0, stored = 0, datasets = 0;
