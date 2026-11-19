@@ -98,7 +98,7 @@ export async function syncOpenFootballFixtures(db: D1DatabaseLike): Promise<{ fe
         const status = completed ? "FT" : "NS";
         const raw = JSON.stringify({
           source: SOURCE, sourcePath: item.path, sourceMatch: match,
-          fixture: { id, date: kickoff(match), status: { short: status, long: completed ? "Match Finished" : "Not Started", elapsed: null } },
+          fixture: { id, date: kickoff(match, item.country), status: { short: status, long: completed ? "Match Finished" : "Not Started", elapsed: null } },
           league: { id: parseInt(stableHash(item.code), 16), name: item.league, country: item.country, season: Number(date.slice(0, 4)) },
           teams: { home: { name: match.team1 }, away: { name: match.team2 } },
           goals: { home: homeScore, away: awayScore },
@@ -121,7 +121,7 @@ export async function syncOpenFootballFixtures(db: D1DatabaseLike): Promise<{ fe
             updated_at=excluded.updated_at,raw_json=excluded.raw_json
         `).bind(
           id, parseInt(stableHash(item.code), 16), item.league, item.country, Number(date.slice(0, 4)),
-          kickoff(match), status, completed ? "Match Finished" : "Not Started", null, match.team1, match.team2,
+          kickoff(match, item.country), status, completed ? "Match Finished" : "Not Started", null, match.team1, match.team2,
           homeScore, awayScore, homeScore, awayScore, 0, isoNow(), raw
         ));
       }
