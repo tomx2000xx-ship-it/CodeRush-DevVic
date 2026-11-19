@@ -84,15 +84,15 @@ function verifiedFinal(match: FlashscoreMatch, code: string, verification: any):
       })),
     ];
     const regularPeriods = periodRows.filter((period: any) => {
-      const label = period.label.toLowerCase().replace(/[\\s_-]/g, "");
+      const label = period.label.toLowerCase().replace(/[\s_-]/g, "");
       return label === "1sthalf" || label === "firsthalf" || label === "2ndhalf" || label === "secondhalf";
     });
     const firstHalf = regularPeriods.find((period: any) => {
-      const label = period.label.toLowerCase().replace(/[\\s_-]/g, "");
+      const label = period.label.toLowerCase().replace(/[\s_-]/g, "");
       return label === "1sthalf" || label === "firsthalf";
     });
     const secondHalf = regularPeriods.find((period: any) => {
-      const label = period.label.toLowerCase().replace(/[\\s_-]/g, "");
+      const label = period.label.toLowerCase().replace(/[\s_-]/g, "");
       return label === "2ndhalf" || label === "secondhalf";
     });
     if (!firstHalf || !secondHalf) return null;
