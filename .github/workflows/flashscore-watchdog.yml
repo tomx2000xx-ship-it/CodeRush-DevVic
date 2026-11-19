@@ -1,6 +1,10 @@
 name: CodeRush Flashscore Feed Watchdog
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/flashscore-watchdog.yml"
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
