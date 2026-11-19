@@ -1,3 +1,4 @@
+type D1Statement = any;
 type D1DatabaseLike = { prepare(sql: string): any; batch(statements: any[]): Promise<any> };
 type OpenFootballMatch = {
   date?: string; time?: string; round?: string;
@@ -15,19 +16,6 @@ const DATASETS = [
   { path: "2026-27/fr.1.json", country: "France", league: "Ligue 1", code: "fr1" },
   { path: "2026-27/nl.1.json", country: "Netherlands", league: "Eredivisie", code: "nl1" },
   { path: "2026-27/pt.1.json", country: "Portugal", league: "Primeira Liga", code: "pt1" },
-  { path: "2025-26/en.3.json", country: "England", league: "League One", code: "en3" },
-  { path: "2025-26/en.4.json", country: "England", league: "League Two", code: "en4" },
-  { path: "2025-26/de.2.json", country: "Germany", league: "2. Bundesliga", code: "de2" },
-  { path: "2025-26/es.2.json", country: "Spain", league: "Segunda División", code: "es2" },
-  { path: "2025-26/it.2.json", country: "Italy", league: "Serie B", code: "it2" },
-  { path: "2025-26/fr.2.json", country: "France", league: "Ligue 2", code: "fr2" },
-  { path: "2025-26/be.1.json", country: "Belgium", league: "Belgian Pro League", code: "be1" },
-  { path: "2025-26/sco.1.json", country: "Scotland", league: "Scottish Premiership", code: "sco1" },
-  { path: "2025-26/tr.1.json", country: "Türkiye", league: "Süper Lig", code: "tr1" },
-  { path: "2025/br.1.json", country: "Brazil", league: "Brasileirão Série A", code: "br1" },
-  { path: "2025/ar.1.json", country: "Argentina", league: "Primera División", code: "ar1" },
-  { path: "2025/jp.1.json", country: "Japan", league: "J1 League", code: "jp1" },
-  { path: "2025/mls.json", country: "USA", league: "Major League Soccer", code: "mls" },
 ] as const;
 
 const SOURCE = "openfootball";
@@ -45,11 +33,32 @@ function stableHash(value: string): string {
 function validDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value + "T00:00:00Z"));
 }
-function kickoff(match: OpenFootballMatch): string {
+const LEAGUE_TIME_ZONES: Record<string, string> = {
+  England: "Europe/London", Germany: "Europe/Berlin", Spain: "Europe/Madrid",
+  Italy: "Europe/Rome", France: "Europe/Paris", Netherlands: "Europe/Amsterdam",
+  Portugal: "Europe/Lisbon",
+};
+function kickoff(match: OpenFootballMatch, country: string): string {
   const date = match.date || "";
   if (!validDate(date)) return "";
   const time = match.time || "";
-  return /^\d{2}:\d{2}$/.test(time) ? date + "T" + time + ":00Z" : date;
+  if (!/^\\d{2}:\\d{2}$/.test(time)) return date;
+  const zone = LEAGUE_TIME_ZONES[country];
+  if (!zone) return date;
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const target = Date.UTC(year, month - 1, day, hour, minute);
+  let utc = target;
+  for (let i = 0; i < 2; i++) {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(new Date(utc));
+    const get = (key: string) => Number(parts.find(part => part.type === key)?.value || 0);
+    const represented = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"));
+    utc += target - represented;
+  }
+  return new Date(utc).toISOString();
 }
 function parseScore(match: OpenFootballMatch): [number | null, number | null] {
   const score = match.score?.ft;
