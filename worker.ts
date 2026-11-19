@@ -1563,7 +1563,7 @@ export default {
         const attemptedAt=isoNow();
         try {
           const result=await syncOpenFootballFixtures(env.DB);
-          await env.DB.prepare("INSERT INTO sports_source_sync_state(provider,last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded,updated_at) VALUES ('openfootball',?,?,?,?,?,?) ON CONFLICT(provider) DO UPDATE SET last_success_at=excluded.last_success_at,last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,datasets_loaded=excluded.datasets_loaded,fixtures_loaded=excluded.fixtures_loaded,updated_at=excluded.updated_at").bind(attemptedAt,attemptedAt,result.errors.length?result.errors.join("; ").slice(0,1000):null,result.datasets,result.stored,attemptedAt).run();
+          await env.DB.prepare("INSERT INTO sports_source_sync_state(provider,last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded,updated_at) VALUES ('openfootball',?,?,?,?,?,?) ON CONFLICT(provider) DO UPDATE SET last_success_at=COALESCE(excluded.last_success_at,sports_source_sync_state.last_success_at),last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,datasets_loaded=excluded.datasets_loaded,fixtures_loaded=excluded.fixtures_loaded,updated_at=excluded.updated_at").bind(result.datasets>0?attemptedAt:null,attemptedAt,result.errors.length?result.errors.join("; ").slice(0,1000):null,result.datasets,result.stored,attemptedAt).run();
           console.log("OpenFootball fixture sync",JSON.stringify(result));
         } catch(error) {
           const message=(error instanceof Error?error.message:"OpenFootball sync failed").slice(0,1000);
