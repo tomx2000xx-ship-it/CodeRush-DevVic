@@ -792,14 +792,14 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
       json_extract(f.raw_json,'$.teams.home.logo') AS home_logo,json_extract(f.raw_json,'$.teams.away.logo') AS away_logo,json_extract(f.raw_json,'$.league.logo') AS league_logo,
       COALESCE(json_extract(f.raw_json,'$.sourceMatch.date'),substr(f.kickoff,1,10)) AS source_date,
       f.home_score,f.away_score,o.bookmaker_name,o.outcome_key,o.odd,o.suspended,o.updated_at AS odds_updated_at
-    FROM sports_fixtures f LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1 AND o.bookmaker_id=(SELECT o2.bookmaker_id FROM sports_odds o2 WHERE o2.fixture_id=f.id AND o2.market_id=1 ORDER BY o2.updated_at DESC LIMIT 1)
+    FROM sports_fixtures f LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1 AND o.bookmaker_id=(SELECT o2.bookmaker_id FROM sports_odds o2 WHERE o2.fixture_id=f.id AND o2.market_id=1 ORDER BY o2.updated_at DESC,o2.bookmaker_id ASC LIMIT 1)
     WHERE (f.id LIKE 'of-%' OR f.id LIKE 'fs-%') AND datetime(f.kickoff)>=datetime(?,'-1 day') AND datetime(f.kickoff)<datetime(?,'+2 day')
     ORDER BY f.kickoff ASC
   `).bind(from,to).all<Record<string,unknown>>();
   const map=new Map<string,Record<string,unknown>>();
   for(const row of rows.results||[]){
     let item=map.get(String(row.id));
-    if(!item){item={id:String(row.id),league:String(row.league_name),country:row.country||"",kickoff:row.kickoff,_dateKey:String(row.source_date||String(row.kickoff||"").slice(0,10)),home:String(row.home_team),away:String(row.away_team),homeCode:row.home_code||"",awayCode:row.away_code||"",homeLogo:row.home_logo||null,awayLogo:row.away_logo||null,leagueLogo:row.league_logo||null,status:String(row.status_short),minute:row.elapsed,live:fixtureIsLive(String(row.status_short)),completed:["FT","AWD","WO"].includes(String(row.status_short)),score:row.home_score===null||row.away_score===null?null:String(row.home_score)+" : "+String(row.away_score),odds:[null,null,null],bookmaker:null,oddsUpdatedAt:null};map.set(String(row.id),item);}
+    if(!item){item={id:String(row.id),league:String(row.league_name),country:row.country||"",kickoff:row.kickoff,_dateKey:String(row.source_date||String(row.kickoff||"").slice(0,10)),home:String(row.home_team),away:String(row.away_team),homeCode:row.home_code||"",awayCode:row.away_code||"",homeLogo:row.home_logo||null,awayLogo:row.away_logo||null,leagueLogo:row.league_logo||null,status:String(row.status_short),minute:row.elapsed,live:fixtureIsLive(String(row.status_short)),completed:["FT","AET","PEN","AWD","WO"].includes(String(row.status_short)),score:row.home_score===null||row.away_score===null?null:String(row.home_score)+" : "+String(row.away_score),odds:[null,null,null],bookmaker:null,oddsUpdatedAt:null};map.set(String(row.id),item);}
     const oddsUpdated=Date.parse(String(row.odds_updated_at||""));
     const oddsAgeLimit=String(row.id).startsWith("fs-")?24*60*60*1000:45*60*1000;
     const oddsFresh=Number.isFinite(oddsUpdated)&&Date.now()-oddsUpdated<=oddsAgeLimit&&oddsUpdated<=Date.now()+60*1000;
@@ -915,7 +915,7 @@ async function validateBetSelections(env:Env, inputs:BetQuoteSelectionInput[]):P
       SELECT f.id,f.home_team,f.away_team,f.league_name,f.kickoff,f.status_short,
              o.outcome_name,o.odd,o.suspended,o.updated_at AS odds_updated_at
       FROM sports_fixtures f
-      LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1 AND o.outcome_key=?
+      LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1 AND o.outcome_key=? AND o.bookmaker_id=(SELECT o2.bookmaker_id FROM sports_odds o2 WHERE o2.fixture_id=f.id AND o2.market_id=1 ORDER BY o2.updated_at DESC,o2.bookmaker_id ASC LIMIT 1)
       WHERE f.id=? LIMIT 1
     `).bind(outcomeKey,databaseFixtureId).first<{
       id:string;home_team:string;away_team:string;league_name:string;kickoff:string;status_short:string;
