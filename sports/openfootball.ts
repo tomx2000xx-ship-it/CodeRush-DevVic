@@ -1,5 +1,4 @@
-type D1Statement = { bind(...values: unknown[]): D1Statement; run(): Promise<unknown> };
-type D1DatabaseLike = { prepare(sql: string): D1Statement; batch(statements: D1Statement[]): Promise<unknown> };
+type D1DatabaseLike = { prepare(sql: string): any; batch(statements: any[]): Promise<any> };
 type OpenFootballMatch = {
   date?: string; time?: string; round?: string;
   team1?: string; team2?: string;
