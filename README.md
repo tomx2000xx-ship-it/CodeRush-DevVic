@@ -63,6 +63,8 @@ A successful build/deployment confirms the Worker bundle was published; it does 
 
 ## Phase 4 — Results processing and ticket settlement foundation
 
+Schema activation: `migrations/0019_sportsbook_wallet_activation.sql` replaces the demo-only ticket/funding constraints with production `sportsbook` tickets funded by the server-authoritative wallet balance. Existing ticket rows are preserved and reclassified; wallet and ledger history is not rewritten.
+
 - Flashscore final results are checked against the match listing, match details and match summary before being accepted.
 - For normal full-time matches, all three source score readings must agree. For after-extra-time and penalty matches, the engine derives the 90-minute 1X2 result from the first-half and second-half period scores; extra-time and shootout scores are not used to decide a 90-minute market.
 - Awarded and walkover fixtures are voided after provider verification. Cancelled fixtures are voided immediately. Abandoned fixtures receive a 24-hour resumption window; postponed, suspended and interrupted fixtures receive a 48-hour resumption window. A rescheduled kickoff keeps the ticket pending.
