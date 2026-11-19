@@ -14,7 +14,7 @@ CodeRush is a mobile-first sports platform built for the Telegram Web Apps envir
 - Runtime: Cloudflare Worker.
 - Database: Cloudflare D1.
 - Telegram: Bot webhook and Telegram Mini App authentication.
-- Sports data: API-Football (API-Sports) adapter; provider credentials remain server-side.
+- Sports data: pinned Flashscore scraper for fixtures, bookmaker 1X2 prices, live scores and match details; OpenFootball is the free fixtures fallback.
 
 ## Phase 1 — Identity and sessions
 
@@ -32,24 +32,16 @@ Set `CODERUSH_ADMIN_TELEGRAM_IDS` as a comma-separated Cloudflare Worker variabl
 
 Migration: `migrations/0002_sports_data.sql`
 
-- API-Football adapter for global football fixtures.
-- Fixture status, kickoff, teams, league, live score and elapsed minute storage.
-- Match-winner (1X2) bookmaker odds snapshots.
-- Separate live fixture and in-play odds synchronization.
-- Read-only match feed endpoint: `GET /api/sports/fixtures`.
-- Admin-protected synchronization endpoint: `POST /api/sports/sync` (optional `from=YYYY-MM-DD&to=YYYY-MM-DD`, maximum 15 days).
-- The Match Centre now reads fixtures and prices from the backend and does not invent sample matches or odds.
+- Active provider: the public Flashscore scraper at `omkarcloud/flashscore-scraper`, pinned to commit `6b8a517381576b7a7a0f45ad4a23a9780fa26b72`.
+- Broad football coverage across domestic and international competitions, with team and competition logos, kickoff, status, score, match summary, events and statistics.
+- A GitHub Actions runner polls the Flashscore source every minute and sends snapshots to the Cloudflare Worker using GitHub Actions OIDC. No sports API key or paid sports-data subscription is required.
+- Full-time 1X2 bookmaker prices are captured from the first complete active bookmaker market within 90 minutes before kickoff. The first captured home/draw/away prices are stored in D1 and never overwritten; the selection is locked once kickoff begins.
+- The Worker exposes the public match feed at `GET /api/sports/fixtures` and runner diagnostics at `GET /api/sports/runner-status`.
+- The authenticated ingest endpoint is `POST /api/sports/ingest`; it accepts only signed GitHub Actions OIDC tokens from the repository's approved main-branch workflows.
+- OpenFootball supplies a free fixtures fallback. The admin's manual backup refresh endpoint is `POST /api/sports/sync`; the Flashscore live feed runs automatically and does not depend on that button.
+- The Match Centre reads backend fixtures and bookmaker prices. It does not fabricate sample matches or odds. Bet quotes revalidate the fixture status, kickoff and stored price on the server.
 
-### Required sports provider configuration
-
-Add the provider key as a **Cloudflare Worker secret**, never as a committed variable:
-
-- `API_FOOTBALL_KEY` — API-Football / API-Sports API key.
-- Optional `API_FOOTBALL_BOOKMAKER_ID` — bookmaker ID to use for the displayed 1X2 prices. If omitted, the first bookmaker returned for each fixture is used.
-
-The provider account must have access to the required competitions, pre-match odds and in-play odds endpoints. Coverage and request quotas vary by competition and subscription. The feed remains empty until the owner supplies a valid provider subscription/key and an authorized administrator runs the first sync.
-
-The provider adapter keeps its API key on the Worker and never exposes it to the browser. Odds shown in this phase are reference feed snapshots; bet acceptance must revalidate the current market and price in the Phase 3 betting engine.
+No API-Football or 5DollarFootball subscription/key is used by the active feed.
 
 ## Telegram bot
 
@@ -71,13 +63,13 @@ A successful build/deployment confirms the Worker bundle was published; it does 
 
 ## Phase 4 — Results processing and ticket settlement foundation
 
-- The Worker refreshes due fixture IDs in batches of up to 20 using API-Football's `fixtures?ids=` parameter. A shared two-hour schedule performs this result check without multiplying provider calls for every selection.
-- Final 1X2 results are settled against the regulation-time full-time score. For matches decided after extra time or penalties, the provider's `score.fulltime` regulation-time score is used; the shootout/extra-time winner is not substituted for a 90-minute 1X2 result.
-- Full-time, after-extra-time and penalty statuses are eligible for result processing when a usable regulation-time score is present; awarded/walkover results are only processed when the provider supplies a score. Cancelled fixtures are voided immediately. Abandoned fixtures receive a 24-hour resumption window; postponed, suspended or interrupted fixtures receive a 48-hour resumption window before being voided. If the provider reschedules a fixture, its updated kickoff keeps the ticket pending.
+- Flashscore final results are checked against the match listing, match details and match summary before being accepted.
+- For normal full-time matches, all three source score readings must agree. For after-extra-time and penalty matches, the engine derives the 90-minute 1X2 result from the first-half and second-half period scores; extra-time and shootout scores are not used to decide a 90-minute market.
+- Awarded and walkover fixtures are voided after provider verification. Cancelled fixtures are voided immediately. Abandoned fixtures receive a 24-hour resumption window; postponed, suspended and interrupted fixtures receive a 48-hour resumption window. A rescheduled kickoff keeps the ticket pending.
+- Verified results receive a short five-minute processing grace period before settlement. The Worker checks pending ticket legs every minute and uses the existing idempotent settlement and ledger logic.
 - Accumulators are marked lost as soon as any leg loses. Otherwise they settle when every leg is resolved: winning legs multiply together, void legs are removed from the settled odds, and an all-void ticket is returned at its original stake.
 - Per-selection result snapshots and immutable settlement events are stored in D1. `GET /api/admin/bet-settlements` exposes protected settlement diagnostics to authenticated administrators.
-- My Bets displays each leg's score/result and server-calculated lifetime ticket performance. Real-money ticket placement is currently disabled. The ticket history and settlement engine must be connected to the live USDT wallet ledger before wagers can be accepted.
-- Provider result refresh runs every two hours, while live-score refresh remains every 30 minutes. The additional schedule keeps the planned API-Football request volume within the existing 75-request daily safety ceiling under normal scheduled operation.
+- My Bets displays each leg's score/result and server-calculated lifetime ticket performance. This project is currently a demo; real-money ticket placement remains disabled until the separate wallet and compliance release is approved.
 
 ## Phase 5 — USDT wallet foundation and controlled crypto operations
 
