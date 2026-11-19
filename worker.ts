@@ -51,24 +51,13 @@ async function verifyFlashscoreGithubOidc(token:string):Promise<string|null>{
   }catch{return null;}
 }
 async function handleFlashscoreRunnerStatus(env:Env):Promise<Response>{
-  const [sync,counts]=await Promise.all([
+  const [sync,watchdog,counts,odds]=await Promise.all([
     env.DB.prepare("SELECT last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded FROM sports_source_sync_state WHERE provider='flashscore'").first<Record<string,unknown>>(),
-    env.DB.prepare("SELECT COUNT(*) AS fixtures,SUM(CASE WHEN is_live=1 THEN 1 ELSE 0 END) AS live FROM sports_fixtures WHERE id LIKE 'fs-%'").first<{fixtures:number;live:number}>()
+    env.DB.prepare("SELECT last_attempt_at,last_error FROM sports_source_sync_state WHERE provider='flashscore_watchdog'").first<Record<string,unknown>>(),
+    env.DB.prepare("SELECT COUNT(*) AS fixtures,SUM(CASE WHEN is_live=1 THEN 1 ELSE 0 END) AS live FROM sports_fixtures WHERE id LIKE 'fs-%'").first<{fixtures:number;live:number}>(),
+    env.DB.prepare("SELECT COUNT(*) AS prices FROM sports_odds WHERE fixture_id LIKE 'fs-%'").first<{prices:number}>()
   ]);
-  let workflow:any={available:false};
-  try{
-    const response=await fetch("https://api.github.com/repos/tomx2000xx-ship-it/CodeRush-DevVic/actions/workflows/flashscore-live.yml/runs?per_page=5",{
-      headers:{Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","User-Agent":"CodeRush-Flashscore-Monitor"}
-    });
-    if(response.ok){
-      const data=await response.json() as any;
-      workflow={available:true,runs:(data.workflow_runs||[]).map((run:any)=>({
-        id:run.id,status:run.status,conclusion:run.conclusion,created_at:run.created_at,
-        updated_at:run.updated_at,html_url:run.html_url,head_sha:run.head_sha
-      }))};
-    }else workflow={available:false,error:"GitHub Actions status HTTP "+response.status};
-  }catch(error){workflow={available:false,error:error instanceof Error?error.message:"GitHub status unavailable"};}
-  return json({ok:true,provider:"Flashscore",sync:sync||null,fixtures:counts||{fixtures:0,live:0},workflow});
+  return json({ok:true,provider:"Flashscore",sync:sync||null,watchdog:watchdog||null,fixtures:counts||{fixtures:0,live:0},odds:odds||{prices:0}});
 }
 
 async function handleFlashscoreIngest(request:Request,env:Env):Promise<Response>{
