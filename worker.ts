@@ -1,7 +1,10 @@
 import { syncOpenFootballFixtures } from "./sports/openfootball";
+import { syncFlashscoreDay, flashscoreProxy } from "./sports/flashscore";
+import { DurableObject } from "cloudflare:workers";
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   DB: D1Database;
+  FLASHSCORE_SCRAPER: DurableObjectNamespace<FlashscoreScraper>;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_BROADCAST_SECRET?: string;
   TELEGRAM_CHANNEL_URL?: string;
@@ -12,6 +15,37 @@ interface Env {
   TRONGRID_API_KEY?: string;
   ETHEREUM_RPC_URL?: string;
   BSC_RPC_URL?: string;
+}
+
+export class FlashscoreScraper extends DurableObject<Env> {
+  private starting: Promise<void> | undefined;
+  async fetch(request: Request): Promise<Response> {
+    this.starting ??= this.startAndWaitForPort().finally(() => { this.starting = undefined; });
+    await this.starting;
+    const url = new URL(request.url);
+    url.protocol = "http:";
+    url.host = "container";
+    const forwarded = new Request(url, request);
+    forwarded.headers.delete("host");
+    return (this.ctx as any).container.getTcpPort(8000).fetch(forwarded);
+  }
+  private async startAndWaitForPort(): Promise<void> {
+    const container = (this.ctx as any).container;
+    if (!container.running) container.start({ image: container.images.base, instance: "lite", enableInternet: true });
+    await container.setInactivityTimeout(30 * 60 * 1000);
+    const port = container.getTcpPort(8000);
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 60; attempt++) {
+      try {
+        const response = await port.fetch("http://container/health", { signal: AbortSignal.timeout(2000) });
+        await response.body?.cancel();
+        if (response.ok) return;
+        lastError = new Error("Flashscore container health check returned " + response.status);
+      } catch (error) { lastError = error; }
+      await scheduler.wait(500);
+    }
+    throw new Error("Flashscore scraper container did not become ready on port 8000", { cause: lastError });
+  }
 }
 
 const APP_URL = "https://coderush-devvic.tomx2000xx.workers.dev";
@@ -759,7 +793,7 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
       COALESCE(json_extract(f.raw_json,'$.sourceMatch.date'),substr(f.kickoff,1,10)) AS source_date,
       f.home_score,f.away_score,o.bookmaker_name,o.outcome_key,o.odd,o.suspended,o.updated_at AS odds_updated_at
     FROM sports_fixtures f LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1 AND o.bookmaker_id=(SELECT o2.bookmaker_id FROM sports_odds o2 WHERE o2.fixture_id=f.id AND o2.market_id=1 ORDER BY o2.updated_at DESC LIMIT 1)
-    WHERE f.id LIKE 'of-%' AND datetime(f.kickoff)>=datetime(?,'-1 day') AND datetime(f.kickoff)<datetime(?,'+2 day')
+    WHERE (f.id LIKE 'of-%' OR f.id LIKE 'fs-%') AND datetime(f.kickoff)>=datetime(?,'-1 day') AND datetime(f.kickoff)<datetime(?,'+2 day')
     ORDER BY f.kickoff ASC
   `).bind(from,to).all<Record<string,unknown>>();
   const map=new Map<string,Record<string,unknown>>();
@@ -767,7 +801,8 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
     let item=map.get(String(row.id));
     if(!item){item={id:String(row.id),league:String(row.league_name),country:row.country||"",kickoff:row.kickoff,_dateKey:String(row.source_date||String(row.kickoff||"").slice(0,10)),home:String(row.home_team),away:String(row.away_team),homeCode:row.home_code||"",awayCode:row.away_code||"",homeLogo:row.home_logo||null,awayLogo:row.away_logo||null,leagueLogo:row.league_logo||null,status:String(row.status_short),minute:row.elapsed,live:fixtureIsLive(String(row.status_short)),completed:["FT","AWD","WO"].includes(String(row.status_short)),score:row.home_score===null||row.away_score===null?null:String(row.home_score)+" : "+String(row.away_score),odds:[null,null,null],bookmaker:null,oddsUpdatedAt:null};map.set(String(row.id),item);}
     const oddsUpdated=Date.parse(String(row.odds_updated_at||""));
-    const oddsFresh=Number.isFinite(oddsUpdated)&&Date.now()-oddsUpdated<=45*60*1000&&oddsUpdated<=Date.now()+60*1000;
+    const oddsAgeLimit=String(row.id).startsWith("fs-")?24*60*60*1000:45*60*1000;
+    const oddsFresh=Number.isFinite(oddsUpdated)&&Date.now()-oddsUpdated<=oddsAgeLimit&&oddsUpdated<=Date.now()+60*1000;
     if(row.outcome_key==="home") (item.odds as (number|null)[])[0]=row.suspended||!oddsFresh?null:Number(row.odd);
     if(row.outcome_key==="draw") (item.odds as (number|null)[])[1]=row.suspended||!oddsFresh?null:Number(row.odd);
     if(row.outcome_key==="away") (item.odds as (number|null)[])[2]=row.suspended||!oddsFresh?null:Number(row.odd);
@@ -850,7 +885,7 @@ async function validateBetSelections(env:Env, inputs:BetQuoteSelectionInput[]):P
     const fixtureId=typeof input.fixtureId==="string"?input.fixtureId.trim():"";
     const outcome=typeof input.outcome==="string"?input.outcome.trim():"";
     const outcomeKey=BET_OUTCOME_KEYS[outcome.toLowerCase()];
-    if(!/^(?:5d-)?\d{1,20}$/.test(fixtureId)||!outcomeKey)return {ok:false,error:"One or more ticket selections are invalid.",status:400};
+    if(!/^(?:(?:5d-)?\d{1,20}|fs-[A-Za-z0-9]{8})$/.test(fixtureId)||!outcomeKey)return {ok:false,error:"One or more ticket selections are invalid.",status:400};
     // API-Football fixture IDs are numeric; accept them directly (and normalize legacy 5d- IDs).
     const databaseFixtureId=fixtureId.replace(/^5d-/,"");
     if(seenFixtures.has(databaseFixtureId))return {ok:false,error:"A ticket can contain only one outcome per match.",status:400};
@@ -870,7 +905,8 @@ async function validateBetSelections(env:Env, inputs:BetQuoteSelectionInput[]):P
     if(!Number.isFinite(kickoff)||kickoff<=now||!["NS","TBD"].includes(row.status_short))return {ok:false,error:"A selected match has started, finished, or is not open for selections.",status:409};
     if(row.odd===null||!Number.isFinite(Number(row.odd))||Number(row.odd)<=1||row.suspended)return {ok:false,error:"Odds are unavailable or suspended for one of your selections.",status:409};
     const updated=row.odds_updated_at?Date.parse(row.odds_updated_at):NaN;
-    if(!Number.isFinite(updated)||now-updated>45*60*1000||updated>now+60*1000)return {ok:false,error:"The odds for a selected match are stale. Please wait for an updated price.",status:409};
+    const oddsAgeLimit=databaseFixtureId.startsWith("fs-")?24*60*60*1000:45*60*1000;
+    if(!Number.isFinite(updated)||now-updated>oddsAgeLimit||updated>now+60*1000|| (databaseFixtureId.startsWith("fs-")&&updated>Date.parse(row.kickoff)))return {ok:false,error:"The odds for a selected match are stale. Please wait for an updated price.",status:409};
     normalized.push({fixtureId:row.id,outcome:row.outcome_name||(outcomeKey==="home"?"Home win":outcomeKey==="draw"?"Draw":"Away win"),outcomeKey,fixture:row.home_team+" vs "+row.away_team,league:row.league_name,homeTeam:row.home_team,awayTeam:row.away_team,odd:Number(row.odd),oddsUpdatedAt:row.odds_updated_at!});
   }
   const combinedOdds=normalized.reduce((product,pick)=>product*pick.odd,1);
@@ -1542,6 +1578,12 @@ export default {
     if (controller.cron === "* * * * *") {
       await deliverTelegramNotificationOutbox(env);
       await deliverTelegramBroadcastJobs(env);
+      try {
+        const result = await syncFlashscoreDay(env, dayString(new Date()));
+        console.log("Flashscore minute sync", JSON.stringify(result));
+      } catch (error) {
+        console.error("Flashscore minute sync failed", error instanceof Error ? error.message : "unknown error");
+      }
       return;
     }
     if (controller.cron === "*/5 * * * *") {
@@ -1560,6 +1602,15 @@ export default {
       } else if (controller.cron === "15 6 * * *") {
         await env.DB.prepare("DELETE FROM user_sessions WHERE expires_at<datetime('now','-7 days') OR revoked_at<datetime('now','-30 days')").run();
         await env.DB.prepare("DELETE FROM admin_login_attempts WHERE created_at<datetime('now','-30 days')").run();
+        for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
+          const day = addCalendarDays(dayString(new Date()), dayOffset);
+          try {
+            const result = await syncFlashscoreDay(env, day);
+            console.log("Flashscore fixture sync", day, JSON.stringify(result));
+          } catch (error) {
+            console.error("Flashscore fixture sync failed", day, error instanceof Error ? error.message : "unknown error");
+          }
+        }
         const attemptedAt=isoNow();
         try {
           const result=await syncOpenFootballFixtures(env.DB);
