@@ -51,13 +51,14 @@ async function verifyFlashscoreGithubOidc(token:string):Promise<string|null>{
   }catch{return null;}
 }
 async function handleFlashscoreRunnerStatus(env:Env):Promise<Response>{
-  const [sync,watchdog,counts,odds]=await Promise.all([
+  const [sync,watchdog,runner,counts,odds]=await Promise.all([
     env.DB.prepare("SELECT last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded FROM sports_source_sync_state WHERE provider='flashscore'").first<Record<string,unknown>>(),
     env.DB.prepare("SELECT last_attempt_at,last_error FROM sports_source_sync_state WHERE provider='flashscore_watchdog'").first<Record<string,unknown>>(),
+    env.DB.prepare("SELECT last_attempt_at,last_error FROM sports_source_sync_state WHERE provider='flashscore_runner'").first<Record<string,unknown>>(),
     env.DB.prepare("SELECT COUNT(*) AS fixtures,SUM(CASE WHEN is_live=1 THEN 1 ELSE 0 END) AS live FROM sports_fixtures WHERE id LIKE 'fs-%'").first<{fixtures:number;live:number}>(),
     env.DB.prepare("SELECT COUNT(*) AS prices FROM sports_odds WHERE fixture_id LIKE 'fs-%'").first<{prices:number}>()
   ]);
-  return json({ok:true,provider:"Flashscore",sync:sync||null,watchdog:watchdog||null,fixtures:counts||{fixtures:0,live:0},odds:odds||{prices:0}});
+  return json({ok:true,provider:"Flashscore",sync:sync||null,watchdog:watchdog||null,runner:runner||null,fixtures:counts||{fixtures:0,live:0},odds:odds||{prices:0}});
 }
 
 async function handleFlashscoreIngest(request:Request,env:Env):Promise<Response>{
@@ -73,14 +74,18 @@ async function handleFlashscoreIngest(request:Request,env:Env):Promise<Response>
   }catch{return json({ok:false,error:"Invalid sports snapshot JSON."},400);}
   if(payload?.action==="heartbeat"){
     const watchdogRef="tomx2000xx-ship-it/CodeRush-DevVic/.github/workflows/flashscore-watchdog.yml@refs/heads/main";
-    if(workflowRef!==watchdogRef)return json({ok:false,error:"Heartbeat is only accepted from the watchdog workflow."},403);
+    const liveRef="tomx2000xx-ship-it/CodeRush-DevVic/.github/workflows/flashscore-live.yml@refs/heads/main";
+    const provider=workflowRef===watchdogRef?"flashscore_watchdog":workflowRef===liveRef?"flashscore_runner":null;
+    if(!provider)return json({ok:false,error:"Heartbeat is not accepted from this workflow."},403);
     const attemptedAt=isoNow();
-    const status=JSON.stringify({active_count:Number(payload.active_count||0),latest_run:payload.latest_run||null});
+    const status=provider==="flashscore_watchdog"
+      ?JSON.stringify({active_count:Number(payload.active_count||0),latest_run:payload.latest_run||null})
+      :JSON.stringify({status:String(payload.status||"heartbeat"),cycle:Number(payload.cycle||0),fixture_groups:Number(payload.fixture_groups||0),odds_count:Number(payload.odds_count||0),at:attemptedAt});
     await env.DB.prepare(`INSERT INTO sports_source_sync_state(provider,last_attempt_at,last_error,datasets_loaded,fixtures_loaded,updated_at)
-      VALUES ('flashscore_watchdog',?,?,0,0,?)
+      VALUES (?,?,?,0,0,?)
       ON CONFLICT(provider) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,updated_at=excluded.updated_at
-    `).bind(attemptedAt,status,attemptedAt).run();
-    return json({ok:true,heartbeat:true});
+    `).bind(provider,attemptedAt,status,attemptedAt).run();
+    return json({ok:true,heartbeat:true,provider});
   }
   const liveRef="tomx2000xx-ship-it/CodeRush-DevVic/.github/workflows/flashscore-live.yml@refs/heads/main";
   if(workflowRef!==liveRef)return json({ok:false,error:"Only the live-feed workflow can submit fixture snapshots."},403);
