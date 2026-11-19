@@ -70,7 +70,8 @@ function verifiedFinal(match: FlashscoreMatch, code: string, verification: any):
 
   // The 1X2 "full-time" market is settled at 90 minutes, not after extra time
   // or a penalty shootout. Flashscore summary period scores are goals in each period.
-  if (code === "AET" || code === "PEN") {
+  const hasExtraPeriods = (match.periods || []).some((period: any) => /extra|penalt|period\\s*[3-9]/i.test(String(period.name || "")));
+  if (code === "AET" || code === "PEN" || hasExtraPeriods) {
     const periodRows = [
       ...(summary.periods || []).map((period: any) => ({
         label: String(period.period || ""),
