@@ -50,3 +50,5 @@ jobs:
             gh workflow run flashscore-live.yml --ref main
             echo "Dispatched a new Flashscore feed run."
           fi
+
+# Keeps the no-cost feed runner alive when a long polling job ends.
