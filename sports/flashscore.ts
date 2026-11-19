@@ -47,7 +47,7 @@ function statusCode(status: string, stage: string): string {
   if (value.includes("live") || value.includes("in progress")) return "LIVE";
   return "NS";
 }
-const isFinal = (code: string) => ["FT", "AET", "PEN", "AWD", "WO"].includes(code);
+const isFinal = (code: string) => ["FT", "AET", "PEN", "AWD", "WO", "CANC", "ABD", "PST", "SUSP", "INT"].includes(code);
 const isLive = (code: string) => ["1H", "HT", "2H", "ET", "P", "LIVE"].includes(code);
 
 async function writeBatches(db: D1Like, statements: any[]): Promise<void> {
@@ -55,6 +55,9 @@ async function writeBatches(db: D1Like, statements: any[]): Promise<void> {
 }
 
 function verifiedFinal(match: FlashscoreMatch, code: string, verification: any): { home: number | null; away: number | null } | null {
+  // Status-only outcomes use the provider's explicit fixture status. The
+  // settlement engine applies the required cancellation/resumption grace period.
+  if (["CANC", "ABD", "PST", "SUSP", "INT"].includes(code)) return { home: null, away: null };
   if (!isFinal(code) || !verification?.details || !verification?.summary) return null;
   const details = verification.details, summary = verification.summary;
   const detailText = (String(details.status || "") + " " + String(details.stage || "")).toLowerCase();
@@ -198,7 +201,14 @@ export async function ingestFlashscoreSnapshot(env: FlashscoreEnv, payload: Snap
           away_score=excluded.away_score,
           result_home_score=COALESCE(excluded.result_home_score,sports_fixtures.result_home_score),
           result_away_score=COALESCE(excluded.result_away_score,sports_fixtures.result_away_score),
-          result_checked_at=COALESCE(excluded.result_checked_at,sports_fixtures.result_checked_at),
+          result_checked_at=CASE
+            WHEN excluded.result_checked_at IS NULL THEN sports_fixtures.result_checked_at
+            WHEN sports_fixtures.result_checked_at IS NULL THEN excluded.result_checked_at
+            WHEN sports_fixtures.status_short IS NOT excluded.status_short THEN excluded.result_checked_at
+            WHEN excluded.result_home_score IS NOT NULL AND sports_fixtures.result_home_score IS NOT excluded.result_home_score THEN excluded.result_checked_at
+            WHEN excluded.result_away_score IS NOT NULL AND sports_fixtures.result_away_score IS NOT excluded.result_away_score THEN excluded.result_checked_at
+            ELSE sports_fixtures.result_checked_at
+          END,
           is_live=excluded.is_live,updated_at=excluded.updated_at,raw_json=excluded.raw_json
         WHERE
           sports_fixtures.league_id IS NOT excluded.league_id OR
@@ -219,7 +229,12 @@ export async function ingestFlashscoreSnapshot(env: FlashscoreEnv, payload: Snap
           sports_fixtures.raw_json IS NOT excluded.raw_json OR
           (excluded.result_home_score IS NOT NULL AND sports_fixtures.result_home_score IS NOT excluded.result_home_score) OR
           (excluded.result_away_score IS NOT NULL AND sports_fixtures.result_away_score IS NOT excluded.result_away_score) OR
-          (excluded.result_checked_at IS NOT NULL AND sports_fixtures.result_checked_at IS NOT excluded.result_checked_at)
+          (excluded.result_checked_at IS NOT NULL AND (
+            sports_fixtures.result_checked_at IS NULL OR
+            sports_fixtures.status_short IS NOT excluded.status_short OR
+            (excluded.result_home_score IS NOT NULL AND sports_fixtures.result_home_score IS NOT excluded.result_home_score) OR
+            (excluded.result_away_score IS NOT NULL AND sports_fixtures.result_away_score IS NOT excluded.result_away_score)
+          ))
       `).bind(fixtureId,hashInt(String(competition.name||"Football")+"|"+String(competition.country?.name||"")),
         String(competition.name||"Football"),String(competition.country?.name||""),new Date(kickoffMs).getUTCFullYear(),
         new Date(kickoffMs).toISOString(),status,String(match.stage||match.status||"Scheduled"),null,
