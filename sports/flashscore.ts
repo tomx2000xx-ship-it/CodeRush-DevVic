@@ -197,6 +197,13 @@ export async function syncFlashscoreDay(env: FlashscoreEnv, date: string): Promi
       catch (error) { console.error("Flashscore odds snapshot failed", item.id, error instanceof Error ? error.message : "unknown"); }
     }
   }
+  await env.DB.prepare(`
+    INSERT INTO sports_source_sync_state(provider,last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded,updated_at)
+    VALUES ('flashscore',?,?,NULL,1,?,?)
+    ON CONFLICT(provider) DO UPDATE SET last_success_at=excluded.last_success_at,
+      last_attempt_at=excluded.last_attempt_at,last_error=NULL,datasets_loaded=1,
+      fixtures_loaded=excluded.fixtures_loaded,updated_at=excluded.updated_at
+  `).bind(now,now,fixtures.length,now).run();
   return {
     fixtures: fixtures.length,
     odds,
