@@ -148,7 +148,7 @@ def collect_day(base, day, odds_cache, verified_cache, stats_cache):
                     details[match_id] = {"summary": summary, "statistics": statistics}
                 except Exception as exc:
                     print("live summary retry", match_id, str(exc)[:180], flush=True)
-            elif is_final(match) and time.monotonic() - verified_cache.get(match_id, 0) > 15 * 60:
+            elif is_final(match) and (match_id not in verified_cache or time.monotonic() - verified_cache[match_id] >= 15 * 60):
                 try:
                     summary = local_api(base, "/matches/summary", {"match": match_id})
                     final_details = local_api(base, "/matches/details", {"match": match_id})
