@@ -15,7 +15,7 @@ async function loadBadge(code:string,name:string):Promise<string>{
  if(CLUB_LOGOS[code]&&CLUB_LOGOS[code]!==' Roma')return 'https://media.api-sports.io/football/teams/'+CLUB_LOGOS[code]+'.png';
  if(cache.has(key))return cache.get(key)!;
  if(pending.has(key))return pending.get(key)!;
- const team=TEAMS[code]||{name:name.trim()};
+ const team:Entry=TEAMS[code]||{name:name.trim()};
  if(!team.name)return '';
  const task=(async()=>{try{
   const endpoint=team.id?'https://www.thesportsdb.com/api/v1/json/3/lookupteam.php?id='+team.id:'https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t='+encodeURIComponent(team.name);
