@@ -1617,7 +1617,7 @@ export default {
         const oddsDate=addCalendarDays(lagosDayString(new Date()),1+rotation);
         const result=await syncFootballOdds(env,oddsDate);
         if(result.oddsWarning) console.warn("Scheduled API-Football odds sync:",result.oddsWarning);
-      } else if (controller.cron === "15 0 * * *") {
+      } else if (controller.cron === "15 6 * * *") {
         await env.DB.prepare("DELETE FROM user_sessions WHERE expires_at<datetime('now','-7 days') OR revoked_at<datetime('now','-30 days')").run();
         await env.DB.prepare("DELETE FROM admin_login_attempts WHERE created_at<datetime('now','-30 days')").run();
         const attemptedAt=isoNow();
