@@ -1,6 +1,5 @@
 import { syncOpenFootballFixtures } from "./sports/openfootball";
 import { syncFlashscoreDay, flashscoreProxy } from "./sports/flashscore";
-import { DurableObject } from "cloudflare:workers";
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   DB: D1Database;
@@ -17,8 +16,10 @@ interface Env {
   BSC_RPC_URL?: string;
 }
 
-export class FlashscoreScraper extends DurableObject<Env> {
+export class FlashscoreScraper {
   private starting: Promise<void> | undefined;
+  private ctx: DurableObjectState;
+  constructor(ctx: DurableObjectState, _env: Env) { this.ctx = ctx; }
   async fetch(request: Request): Promise<Response> {
     this.starting ??= this.startAndWaitForPort().finally(() => { this.starting = undefined; });
     await this.starting;
