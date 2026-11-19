@@ -26,8 +26,12 @@ def request_json(url, headers=None, data=None, timeout=35):
     req = Request(url, data=body, headers=headers or {}, method="GET" if body is None else "POST")
     if body is not None:
         req.add_header("Content-Type", "application/json")
-    with urlopen(req, timeout=timeout) as response:
-        return json.loads(response.read().decode("utf-8"))
+    try:
+        with urlopen(req, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:600]
+        raise RuntimeError(f"HTTP {exc.code} from {url}: {detail}") from exc
 
 
 def local_api(base, path, params=None):
@@ -52,11 +56,11 @@ def get_oidc_token():
 
 
 def clone_scraper(directory):
-    subprocess.run(["git", "init", directory], check=True, stdout=subprocess.DEVNULL)
-    subprocess.run(["git", "-C", directory, "remote", "add", "origin", SCRAPER_REPO], check=True)
-    subprocess.run(["git", "-C", directory, "fetch", "--depth", "1", "origin", SCRAPER_COMMIT], check=True)
-    subprocess.run(["git", "-C", directory, "checkout", "--detach", "FETCH_HEAD"], check=True)
-    subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "-r", os.path.join(directory, "requirements.txt")], check=True)
+    subprocess.run(["git", "init", directory], check=True, stdout=subprocess.DEVNULL, timeout=60)
+    subprocess.run(["git", "-C", directory, "remote", "add", "origin", SCRAPER_REPO], check=True, timeout=30)
+    subprocess.run(["git", "-C", directory, "fetch", "--depth", "1", "origin", SCRAPER_COMMIT], check=True, timeout=180)
+    subprocess.run(["git", "-C", directory, "checkout", "--detach", "FETCH_HEAD"], check=True, timeout=30)
+    subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "-r", os.path.join(directory, "requirements.txt")], check=True, timeout=240)
 
 
 def start_scraper(directory):
@@ -64,7 +68,7 @@ def start_scraper(directory):
     env["PORT"] = "8000"
     process = subprocess.Popen(
         [sys.executable, "run.py"], cwd=directory, env=env,
-        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+        stdout=sys.stdout, stderr=sys.stdout,
     )
     base = "http://127.0.0.1:8000"
     for _ in range(90):
@@ -174,17 +178,30 @@ def push_snapshot(payload):
 
 def main():
     start = time.monotonic()
-    try:
-        push_heartbeat("starting")
-    except Exception as exc:
-        print("startup heartbeat failed", str(exc)[:180], flush=True)
+    print("CodeRush Flashscore runner starting; requesting authenticated startup heartbeat.", flush=True)
+    startup_error = None
+    for attempt in range(1, 4):
+        try:
+            heartbeat = push_heartbeat("starting")
+            print("Startup heartbeat accepted:", json.dumps(heartbeat), flush=True)
+            startup_error = None
+            break
+        except Exception as exc:
+            startup_error = exc
+            print("Startup heartbeat attempt", attempt, "failed:", str(exc)[:500], flush=True)
+            time.sleep(attempt * 5)
+    if startup_error is not None:
+        raise RuntimeError("Cannot start the Flashscore collector because Cloudflare rejected the authenticated GitHub OIDC heartbeat.") from startup_error
+    print("Cloning and installing the pinned Flashscore scraper.", flush=True)
     odds_cache = set()
     verified_cache = {}
     stats_cache = {}
     future_refresh = {}
     with tempfile.TemporaryDirectory(prefix="coderush-flashscore-") as directory:
         clone_scraper(directory)
+        print("Pinned scraper installed; starting local API.", flush=True)
         process, base = start_scraper(directory)
+        print("Local Flashscore API is ready:", base, flush=True)
         try:
             try:
                 push_heartbeat("scraper_ready")
@@ -245,6 +262,11 @@ def main():
                             push_heartbeat("no_fixture_groups", cycle, 0, 0)
                         except Exception as heartbeat_error:
                             print("empty-cycle heartbeat failed", str(heartbeat_error)[:160], flush=True)
+                try:
+                    heartbeat = push_heartbeat("polling", cycle, len(competitions), len(odds))
+                    print("Runner heartbeat accepted:", json.dumps(heartbeat), flush=True)
+                except Exception as heartbeat_error:
+                    print("Runner heartbeat failed:", str(heartbeat_error)[:500], flush=True)
                 elapsed = time.monotonic() - cycle_start
                 time.sleep(max(5, POLL_SECONDS - elapsed))
         finally:
