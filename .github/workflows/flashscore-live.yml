@@ -15,7 +15,7 @@ permissions:
 
 # v2 avoids the abandoned pending run in the previous concurrency group.
 concurrency:
-  group: coderush-flashscore-live-v6
+  group: coderush-flashscore-live-v7
   cancel-in-progress: true
 
 jobs:
@@ -43,6 +43,19 @@ jobs:
             echo "Cancelling obsolete Flashscore feed run $RUN_ID"
             gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID/cancel" || true
           done
+
+      - name: Smoke test the deployed sports API and 1X2 ticket feed
+        env:
+          CODERUSH_WORKER_URL: https://coderush-devvic.tomx2000xx.workers.dev
+        shell: bash
+        run: |
+          USER_AGENT="CodeRush-FlashscoreRunner/1.0 (+https://github.com/tomx2000xx-ship-it/CodeRush-DevVic)"
+          STATUS=$(curl -fsS -A "$USER_AGENT" "$CODERUSH_WORKER_URL/api/sports/runner-status")
+          echo "$STATUS" | jq -e '.ok == true and .fixtures.fixtures > 0 and .odds.prices > 0'
+          curl -fsS -A "$USER_AGENT" -D /tmp/coderush-feed-headers "$CODERUSH_WORKER_URL/api/sports/fixtures" -o /tmp/coderush-feed.json
+          jq -e '.ok == true and (.fixtures | length > 0) and (.fixtures | any(.odds[0] != null and .odds[1] != null and .odds[2] != null))' /tmp/coderush-feed.json
+          grep -qi 'cache-control: public, max-age=75' /tmp/coderush-feed-headers
+          echo "Cloudflare sports API, live status, bookmaker 1X2 prices, and edge-cache headers passed."
 
       - name: Validate the feed runner
         run: python -m py_compile scripts/flashscore_live_pump.py
