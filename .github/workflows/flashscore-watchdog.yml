@@ -1,0 +1,31 @@
+name: CodeRush Flashscore Feed Watchdog
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: coderush-flashscore-watchdog
+  cancel-in-progress: true
+
+jobs:
+  ensure-feed-running:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Start the live feed if no run is active
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          ACTIVE=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/flashscore-live.yml/runs?per_page=100" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')
+          echo "Active Flashscore feed runs: $ACTIVE"
+          if [ "$ACTIVE" -eq 0 ]; then
+            gh workflow run flashscore-live.yml --ref main
+            echo "Dispatched a new Flashscore feed run."
+          fi
