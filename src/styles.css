@@ -1438,3 +1438,52 @@ html[dir="rtl"] .app :where(.nav-item,.quick-actions button,.daily-reward>button
 .sb-market-row button b,.sb-live-feature-markets button b{font-size:14px;font-weight:900;color:#43252c}
 .sb-market-row button,.sb-live-feature-markets button{background:#fff8f9;border-color:#edcbd2;color:#43252c}
 .sb-market-row button.selected,.sb-live-feature-markets button.selected{background:#fde8ed;border-color:#d94f69;color:#a92e48}
+
+
+/* Clear bookmaker-style 1X2 outcome labels and stronger tap targets. */
+.sporty-matches .sb-market-row button:not(.sb-more-market),
+.sporty-matches .sb-live-feature-markets button{
+  min-height:44px;
+  padding:4px 6px;
+  gap:8px;
+}
+.sporty-matches .sb-market-row button small,
+.sporty-matches .sb-live-feature-markets button small{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  gap:1px;
+  min-width:25px;
+  line-height:1.05;
+  text-align:start;
+}
+.sporty-matches .sb-market-row button small strong,
+.sporty-matches .sb-live-feature-markets button small strong{
+  color:#f7e7ea;
+  font-size:11px;
+  font-weight:900;
+}
+.sporty-matches .sb-market-row button small em,
+.sporty-matches .sb-live-feature-markets button small em{
+  color:#d995a0;
+  font-size:8px;
+  font-style:normal;
+  font-weight:600;
+}
+.sporty-matches .sb-market-row button b,
+.sporty-matches .sb-live-feature-markets button b{
+  font-size:13px;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:.1px;
+}
+.sporty-matches .sb-market-row button.selected small strong,
+.sporty-matches .sb-market-row button.selected small em,
+.sporty-matches .sb-live-feature-markets button.selected small strong,
+.sporty-matches .sb-live-feature-markets button.selected small em{
+  color:#ffdce2;
+}
+@media(max-width:370px){
+  .sporty-matches .sb-market-row button:not(.sb-more-market){gap:4px;padding-inline:4px}
+  .sporty-matches .sb-market-row button small em{font-size:7px}
+}
