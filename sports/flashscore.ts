@@ -89,31 +89,36 @@ function verifiedFinal(match: FlashscoreMatch, code: string, verification: any):
   return { home, away };
 }
 
-function oddsStatements(db: D1Like, fixtureId: string, matchId: string, kickoffMs: number, odds: any): any[] {
+function oddsStatements(db: D1Like, fixtureId: string, kickoffMs: number, odds: any): any[] {
   const now = Date.now();
   if (kickoffMs <= now || kickoffMs > now + 90 * 60 * 1000) return [];
-  const markets = Array.isArray(odds?.markets) ? odds.markets : [];
-  const statements: any[] = [], snapshotAt = nowIso();
-  for (const market of markets) {
-    if (String(market.bet_type || "").toUpperCase() !== "HOME_DRAW_AWAY" ||
-        String(market.bet_scope || "").toUpperCase() !== "FULL_TIME") continue;
-    const bookmaker = market.bookmaker || {};
-    const rawId = Number(bookmaker.id);
-    const bookmakerId = Number.isSafeInteger(rawId) && rawId > 0 ? rawId : hashInt(String(bookmaker.name || "Unknown bookmaker"));
-    const bookmakerName = String(bookmaker.name || "Bookmaker");
-    for (const selection of market.selections || []) {
-      const key = String(selection.selection || "").toLowerCase();
-      const outcome = key === "home" ? "home" : key === "draw" ? "draw" : key === "away" ? "away" : null;
-      const odd = Number(selection.value);
-      if (!outcome || !Number.isFinite(odd) || odd <= 1) continue;
-      statements.push(db.prepare(`
-        INSERT OR IGNORE INTO sports_odds
-          (fixture_id,bookmaker_id,bookmaker_name,market_id,market_name,outcome_key,outcome_name,odd,handicap,suspended,updated_at)
-        VALUES (?,?,?,1,'Match Winner',?,?,?,'0',?,?)
-      `).bind(fixtureId,bookmakerId,bookmakerName,outcome,
-        outcome === "home" ? "Home win" : outcome === "draw" ? "Draw" : "Away win",
-        odd,selection.is_active === false ? 1 : 0,snapshotAt));
-    }
+  const markets = (Array.isArray(odds?.markets) ? odds.markets : [])
+    .filter((market: any) => String(market.bet_type || "").toUpperCase() === "HOME_DRAW_AWAY" &&
+      String(market.bet_scope || "").toUpperCase() === "FULL_TIME")
+    .sort((a: any, b: any) => Number(a.bookmaker?.order ?? 9999) - Number(b.bookmaker?.order ?? 9999));
+  const selectedMarket = markets.find((market: any) => {
+    const keys = new Set((market.selections || []).map((selection: any) => String(selection.selection || "").toLowerCase()));
+    return keys.has("home") && keys.has("draw") && keys.has("away");
+  });
+  if (!selectedMarket) return [];
+  const bookmaker = selectedMarket.bookmaker || {};
+  const rawId = Number(bookmaker.id);
+  const bookmakerId = Number.isSafeInteger(rawId) && rawId > 0 ? rawId : hashInt(String(bookmaker.name || "Unknown bookmaker"));
+  const bookmakerName = String(bookmaker.name || "Bookmaker");
+  const snapshotAt = nowIso();
+  const statements: any[] = [];
+  for (const selection of selectedMarket.selections || []) {
+    const key = String(selection.selection || "").toLowerCase();
+    const outcome = key === "home" ? "home" : key === "draw" ? "draw" : key === "away" ? "away" : null;
+    const odd = Number(selection.value);
+    if (!outcome || !Number.isFinite(odd) || odd <= 1) continue;
+    statements.push(db.prepare(`
+      INSERT OR IGNORE INTO sports_odds
+        (fixture_id,bookmaker_id,bookmaker_name,market_id,market_name,outcome_key,outcome_name,odd,handicap,suspended,updated_at)
+      VALUES (?,?,?,1,'Match Winner',?,?,?,'0',?,?)
+    `).bind(fixtureId,bookmakerId,bookmakerName,outcome,
+      outcome === "home" ? "Home win" : outcome === "draw" ? "Draw" : "Away win",
+      odd,selection.is_active === false ? 1 : 0,snapshotAt));
   }
   return statements;
 }
@@ -168,7 +173,7 @@ export async function ingestFlashscoreSnapshot(env: FlashscoreEnv, payload: Snap
         String(home.name),String(away.name),String(home.short_name||""),String(away.short_name||""),
         homeScore,awayScore,verification?.home??null,verification?.away??null,verification?now:null,
         isLive(status)?1:0,now,JSON.stringify(raw)));
-      oddsStatementsToWrite.push(...oddsStatements(env.DB,fixtureId,match.id,kickoffMs,payload.odds?.[match.id]));
+      oddsStatementsToWrite.push(...oddsStatements(env.DB,fixtureId,kickoffMs,payload.odds?.[match.id]));
     }
   }
   await writeBatches(env.DB,statements);
