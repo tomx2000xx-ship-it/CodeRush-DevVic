@@ -781,7 +781,7 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
     env.DB.prepare("SELECT last_fixtures_sync,last_live_sync,last_odds_sync,last_error FROM sports_sync_state WHERE provider='api-football'").first<Record<string,unknown>>(),
     env.DB.prepare("SELECT last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded FROM sports_source_sync_state WHERE provider='openfootball'").first<Record<string,unknown>>()
   ]);
-  return new Response(JSON.stringify({ok:true,configured:!!openState||!!env.API_FOOTBALL_KEY,provider:env.API_FOOTBALL_KEY?"OpenFootball fixtures + API-Football odds":"OpenFootball public-domain fixtures",fixtures:Array.from(map.values()),sync:{apiFootball:state||null,openFootball:openState||null}}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
+  return new Response(JSON.stringify({ok:true,configured:true,provider:env.API_FOOTBALL_KEY?"OpenFootball fixtures + API-Football odds":"OpenFootball public-domain fixtures",fixtures:Array.from(map.values()),sync:{apiFootball:state||null,openFootball:openState||null}}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
 }
 async function handleSportsFixtureDetails(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
