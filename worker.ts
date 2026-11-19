@@ -553,20 +553,11 @@ async function persistFiveDollarFootballProbe(env:Env):Promise<void>{
   }
   await env.DB.prepare("DELETE FROM sports_provider_probe_runs WHERE provider=? AND id NOT IN (SELECT id FROM sports_provider_probe_runs WHERE provider=? ORDER BY completed_at DESC LIMIT 30)").bind("API-Football","API-Football").run();
 }
-async function handleSportsProviderProbe(request:Request,env:Env):Promise<Response>{
-  const session=await currentSession(request,env);if(!session)return json({ok:false,error:"Authentication required"},401);if(session.user.role!=="admin")return json({ok:false,error:"Administrator access required"},403);
-  try{
-    // Server-side six-hour guard makes automatic page-load activation safe across refreshes and devices.
-    await maybeRunScheduledFiveDollarFootballProbe(env);
-    const row=await env.DB.prepare("SELECT status,result_json,error,requests_used,completed_at FROM sports_provider_probe_runs WHERE provider=? ORDER BY completed_at DESC LIMIT 1").bind("API-Football").first<any>();
-    if(!row)return json({ok:false,provider:"API-Football",probeOnly:true,error:"The provider test did not produce a saved result."},502);
-    return json({ok:row.status==="success",provider:"API-Football",probeOnly:true,status:row.status,result:row.result_json?JSON.parse(row.result_json):null,error:row.error,requestsUsed:row.requests_used,completedAt:row.completed_at});
-  }catch(error){return json({ok:false,provider:"API-Football",probeOnly:true,error:error instanceof Error?error.message:"API-Football probe failed"},502);}
+async function handleSportsProviderProbe(_request:Request,_env:Env):Promise<Response>{
+  return json({ok:false,error:"Legacy football data providers have been retired."},410);
 }
-async function handleSportsProviderProbeStatus(request:Request,env:Env):Promise<Response>{
-  const session=await currentSession(request,env);if(!session)return json({ok:false,error:"Authentication required"},401);if(session.user.role!=="admin")return json({ok:false,error:"Administrator access required"},403);
-  const row=await env.DB.prepare("SELECT status,result_json,error,requests_used,started_at,completed_at FROM sports_provider_probe_runs WHERE provider=? ORDER BY completed_at DESC LIMIT 1").bind("API-Football").first<any>();
-  return json({ok:true,configured:!!env.API_FOOTBALL_KEY,latest:row?{status:row.status,result:row.result_json?JSON.parse(row.result_json):null,error:row.error,requestsUsed:row.requests_used,startedAt:row.started_at,completedAt:row.completed_at}:null,nextScheduledCheck:"Every 6 hours (UTC)."});
+async function handleSportsProviderProbeStatus(_request:Request,_env:Env):Promise<Response>{
+  return json({ok:true,configured:false,retired:true,latest:null});
 }
 async function createUserNotification(env:Env,userId:string,eventKey:string,category:"bet"|"wallet"|"referral"|"system",titleEn:string,bodyEn:string,titleAr:string,bodyAr:string,deepLink:string):Promise<void>{
  const user=await env.DB.prepare("SELECT language FROM users WHERE id=? AND status='active'").bind(userId).first<{language:string}>();if(!user)return;
@@ -1582,7 +1573,7 @@ export default {
       }
     } catch (error) {
       const message=error instanceof Error?error.message:"Scheduled sports refresh failed";
-      await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('api-football',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind(message.slice(0,500),isoNow()).run();
+      await env.DB.prepare("INSERT INTO sports_source_sync_state(provider,last_attempt_at,last_error,updated_at) VALUES ('openfootball',?,?,?) ON CONFLICT(provider) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,updated_at=excluded.updated_at").bind(message.slice(0,500),isoNow()).run();
       console.error("Scheduled OpenFootball refresh failed", message);
     }
   },
