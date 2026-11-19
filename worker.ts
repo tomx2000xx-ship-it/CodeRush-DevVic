@@ -1060,6 +1060,7 @@ async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:numb
     JOIN bet_tickets t ON t.id=s.ticket_id
     JOIN sports_fixtures f ON f.id=s.fixture_id
     WHERE s.result_status='pending' AND datetime(f.kickoff)<=datetime(?)
+      AND f.id NOT LIKE 'of-%'
       AND (f.result_checked_at IS NULL OR datetime(f.result_checked_at)<=datetime(?))
     ORDER BY CASE WHEN f.result_checked_at IS NULL THEN 0 ELSE 1 END,f.result_checked_at ASC,f.kickoff ASC
     LIMIT 20
@@ -1068,18 +1069,23 @@ async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:numb
   if(!fixtureIds.length)return {checkedFixtures:0,selectionUpdates:0,ticketsSettled:0};
   const sourceIds=fixtureIds.map(id=>id.replace(/^5d-/,""));
   const response=await apiFootball<ApiFootballFixture>(env,"fixtures?ids="+sourceIds.join("-"));
+  const verifiedIds=new Set((response.response||[]).map(item=>String(item.fixture.id)));
   await storeFootballFixtures(env,response.response||[]);
+  // Only mark IDs actually returned by API-Football as checked. An empty or
+  // partial provider response must never authorize settlement from cached data.
+  const verifiedFixtureIds=fixtureIds.filter(id=>verifiedIds.has(id.replace(/^5d-/,"")));
+  if(!verifiedFixtureIds.length)return {checkedFixtures:0,selectionUpdates:0,ticketsSettled:0};
   const checkedAt=isoNow();
-  await env.DB.batch(fixtureIds.map(id=>env.DB.prepare("UPDATE sports_fixtures SET result_checked_at=? WHERE id=?").bind(checkedAt,id)));
-  const placeholders=fixtureIds.map(()=>"?").join(",");
-  const affected=await env.DB.prepare("SELECT DISTINCT ticket_id FROM bet_ticket_selections WHERE result_status='pending' AND fixture_id IN ("+placeholders+")").bind(...fixtureIds).all<{ticket_id:string}>();
+  await env.DB.batch(verifiedFixtureIds.map(id=>env.DB.prepare("UPDATE sports_fixtures SET result_checked_at=? WHERE id=?").bind(checkedAt,id)));
+  const placeholders=verifiedFixtureIds.map(()=>"?").join(",");
+  const affected=await env.DB.prepare("SELECT DISTINCT ticket_id FROM bet_ticket_selections WHERE result_status='pending' AND fixture_id IN ("+placeholders+")").bind(...verifiedFixtureIds).all<{ticket_id:string}>();
   let selectionUpdates=0,ticketsSettled=0;
   for(const row of affected.results||[]){
     const result=await settleStoredTicket(env,row.ticket_id,checkedAt);
     selectionUpdates+=result.selectionUpdates;
     if(result.ticketStatus)ticketsSettled++;
   }
-  return {checkedFixtures:fixtureIds.length,selectionUpdates,ticketsSettled};
+  return {checkedFixtures:verifiedFixtureIds.length,selectionUpdates,ticketsSettled};
 }
 async function handleBetSettlementDiagnostics(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
