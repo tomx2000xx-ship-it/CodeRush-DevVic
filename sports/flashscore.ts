@@ -157,6 +157,7 @@ export async function ingestFlashscoreSnapshot(env: FlashscoreEnv, payload: Snap
       if (isFinal(status)) final++;
       if (verification) verified++;
       const detail = payload.details?.[match.id] || {};
+      const checked = payload.verification?.[match.id] || null;
       const raw = {
         source:"flashscore",sourceMatchId:match.id,
         teams:{home:{id:home.id,logo:home.logo},away:{id:away.id,logo:away.logo}},
@@ -164,6 +165,20 @@ export async function ingestFlashscoreSnapshot(env: FlashscoreEnv, payload: Snap
         sourceMatch:match,
         flashscoreSummary:detail.summary||null,
         flashscoreStatistics:detail.statistics||null,
+        flashscoreVerification:checked?{
+          checkedAt:payload.collected_at||now,
+          details:checked.details?{
+            status:checked.details.status||null,stage:checked.details.stage||null,
+            home_score:checked.details.home_score??null,away_score:checked.details.away_score??null
+          }:null,
+          summary:checked.summary?{
+            status:checked.summary.status||null,stage:checked.summary.stage||null,
+            home_score:checked.summary.home_score??null,away_score:checked.summary.away_score??null,
+            periods:(checked.summary.periods||[]).map((period:any)=>({
+              period:period.period||null,home_score:period.home_score??null,away_score:period.away_score??null
+            }))
+          }:null
+        }:null
       };
       const fixtureId = "fs-" + match.id;
       fixtures.push(fixtureId);
