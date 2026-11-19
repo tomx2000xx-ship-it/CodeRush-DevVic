@@ -61,6 +61,6 @@ jobs:
           if [ "$ACTIVE_COUNT" -eq 0 ]; then
             gh workflow run flashscore-live.yml --ref main
             echo "Dispatched a new Flashscore feed run."
-          fi          fi
+          fi
 
 # Keeps the no-cost feed runner alive when a long polling job ends.
