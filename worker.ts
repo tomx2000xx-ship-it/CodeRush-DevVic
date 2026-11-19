@@ -837,6 +837,12 @@ async function syncFootballLive(env: Env): Promise<{fixtures:number;odds:number}
 }
 async function handleSportsFixtures(request: Request, env: Env): Promise<Response> {
   const url=new URL(request.url);
+  // Share the public fixture snapshot at the edge so every open client does not
+  // rescan thousands of D1 rows on its own polling interval.
+  const cacheKey = new Request(url.toString(), { method: "GET" });
+  const edgeCache = caches.default;
+  const cached = await edgeCache.match(cacheKey);
+  if (cached) return cached;
   const from=url.searchParams.get("from")||dayString(new Date());
   const to=url.searchParams.get("to")||dayString(new Date(Date.now()+7*86400000));
   if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||to<from||(new Date(to).getTime()-new Date(from).getTime())>14*86400000) return json({ok:false,error:"Choose a valid date range of no more than 15 days."},400);
@@ -882,7 +888,10 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
   }
   const fixtures=Array.from(deduplicated.values());
   for(const fixture of fixtures)delete fixture._dateKey;
-  return new Response(JSON.stringify({ok:true,configured:true,provider:"Flashscore live fixtures, scores and bookmaker snapshots with OpenFootball backup",fixtures,sync:{flashscore:flashscoreState||null,openFootball:openState||null}}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
+  const response = new Response(JSON.stringify({ok:true,configured:true,provider:"Flashscore live fixtures, scores and bookmaker snapshots with OpenFootball backup",fixtures,sync:{flashscore:flashscoreState||null,openFootball:openState||null}}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=75, stale-while-revalidate=30","x-content-type-options":"nosniff"}});
+  try { await edgeCache.put(cacheKey, response.clone()); }
+  catch (error) { console.error("Sports fixture edge cache write failed", error instanceof Error ? error.message : "unknown"); }
+  return response;
 }
 async function handleSportsFixtureDetails(request:Request,env:Env):Promise<Response>{
   const id=(new URL(request.url)).searchParams.get("id")||"";
