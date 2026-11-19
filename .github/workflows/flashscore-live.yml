@@ -35,6 +35,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Validate the feed runner
+        run: python -m py_compile scripts/flashscore_live_pump.py
+
       - name: Run the Flashscore live feed
         env:
           CODERUSH_WORKER_URL: https://coderush-devvic.tomx2000xx.workers.dev
