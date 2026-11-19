@@ -35,6 +35,8 @@ jobs:
           STATUS=$(curl -fsS -A "$USER_AGENT" "$CODERUSH_WORKER_URL/api/sports/runner-status")
           echo "$STATUS" | jq -e '.ok == true and .fixtures.fixtures > 0 and .odds.prices > 0'
           curl -fsS -A "$USER_AGENT" -D /tmp/coderush-headers "$CODERUSH_WORKER_URL/api/sports/fixtures?smoke=$GITHUB_RUN_ID" -o /tmp/coderush-fixtures.json
+          jq -c '[.fixtures[] | select(.odds[0] != null and .odds[1] != null and .odds[2] != null) | {id,status,selectionOpen,kickoff,odds,bookmaker}] | .[0:8]' /tmp/coderush-fixtures.json
+          jq -c '[.fixtures[] | select(.id == "fs-0rGqQ1OE") | {id,status,selectionOpen,kickoff,odds,bookmaker}]' /tmp/coderush-fixtures.json
           jq -e '.ok == true and (.fixtures | length > 0) and (.fixtures | any(.selectionOpen == true and .odds[0] != null and .odds[1] != null and .odds[2] != null))' /tmp/coderush-fixtures.json
           jq -e '[.fixtures[] | select(.status == "CANC" or .status == "PST") | .selectionOpen] | all(. == false)' /tmp/coderush-fixtures.json
           jq -e '.fixtures | any(.live == true and (.statusLong // "") != "")' /tmp/coderush-fixtures.json
