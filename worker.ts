@@ -24,7 +24,7 @@ function decodeBase64Url(value:string):Uint8Array{
 async function verifyFlashscoreGithubOidc(token:string):Promise<string|null>{
   try{
     const parts=token.split(".");
-    if(parts.length!==3)return false;
+    if(parts.length!==3)return null;
     const header=JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[0])));
     const claims=JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1])));
     const now=Math.floor(Date.now()/1000);
