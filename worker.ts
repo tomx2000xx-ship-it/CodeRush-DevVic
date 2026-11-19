@@ -725,7 +725,7 @@ async function syncFootballOdds(env:Env, date=addCalendarDays(lagosDayString(new
     return await syncFootballOddsForDate(env,date);
   } catch(error) {
     const message=(error instanceof Error?error.message:"Football provider odds sync failed").slice(0,500);
-    await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('api-football',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind(message,isoNow()).run();
+    await env.DB.prepare("undefined").bind(message,isoNow()).run();
     return {odds:0,oddsWarning:message};
   }
 }
@@ -1563,16 +1563,6 @@ export default {
       return;
     }
     try {
-          // One bulk live-fixtures call per interval. Fixture discovery and odds have separate schedules.
-          await syncFootballLive(env);
-        } catch (error) {
-          console.error("Scheduled football live-score sync failed", error instanceof Error ? error.message : String(error));
-          await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('api-football',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind((error instanceof Error?error.message:"Scheduled live sync failed").slice(0,500),isoNow()).run();
-        }
-      }
-      return;
-    }
-    try {
       if (controller.cron === "0 */2 * * *") {
         // No bookmaker feed is currently approved; do not quote odds or auto-settle.
         return;
@@ -1593,7 +1583,7 @@ export default {
     } catch (error) {
       const message=error instanceof Error?error.message:"Scheduled sports refresh failed";
       await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('api-football',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind(message.slice(0,500),isoNow()).run();
-      console.error("Scheduled API-Football refresh failed", message);
+      console.error("Scheduled OpenFootball refresh failed", message);
     }
   },
 } satisfies ExportedHandler<Env>;
