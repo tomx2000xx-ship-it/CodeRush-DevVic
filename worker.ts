@@ -805,6 +805,9 @@ async function handleSportsSync(request: Request, env: Env): Promise<Response> {
   const session=await currentSession(request,env);
   if(!session) return json({ok:false,error:"Authentication required"},401);
   if(session.user.role!=="admin") return json({ok:false,error:"Administrator access required"},403);
+  const url=new URL(request.url);
+  const from=url.searchParams.get("from")||dayString(new Date());
+  const to=url.searchParams.get("to")||dayString(new Date(Date.now()+7*86400000));
 
   // The public-domain fixture feed can be refreshed independently of API-Football.
   // Keep provider failures separate so an odds/live-feed outage does not discard
@@ -832,9 +835,6 @@ async function handleSportsSync(request: Request, env: Env): Promise<Response> {
   let apiFootballWarning:string|undefined;
   if(env.API_FOOTBALL_KEY) {
     try {
-      const url=new URL(request.url);
-      const from=url.searchParams.get("from")||dayString(new Date());
-      const to=url.searchParams.get("to")||dayString(new Date(Date.now()+7*86400000));
       if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||to<from||(new Date(to).getTime()-new Date(from).getTime())>14*86400000) return json({ok:false,error:"Choose a valid date range of no more than 15 days."},400);
       const result=await syncFootballRange(env,from,to);
       const live=await syncFootballLive(env);
