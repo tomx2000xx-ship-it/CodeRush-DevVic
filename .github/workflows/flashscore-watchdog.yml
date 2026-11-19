@@ -52,7 +52,7 @@ jobs:
           LATEST_RUN=$(echo "$RUNS" | jq '.[0] // {} | {id,status,conclusion,event,created_at,updated_at,html_url,head_sha}')
           if [ -n "$OIDC_TOKEN" ]; then
             BODY=$(jq -n --argjson active_count "$ACTIVE_COUNT" --argjson latest_run "$LATEST_RUN" '{action:"heartbeat",active_count:$active_count,latest_run:$latest_run}')
-            curl -fsS -X POST "$CODERUSH_WORKER_URL/api/sports/ingest" \
+            curl -fsS -A "CodeRush-FlashscoreWatchdog/1.0 (+https://github.com/tomx2000xx-ship-it/CodeRush-DevVic)" -X POST "$CODERUSH_WORKER_URL/api/sports/ingest" \
               -H "Authorization: Bearer $OIDC_TOKEN" \
               -H "Content-Type: application/json" \
               -d "$BODY" || echo "Detailed watchdog heartbeat failed."
