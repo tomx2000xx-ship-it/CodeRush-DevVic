@@ -16,7 +16,7 @@ test("unsafe browser requests require an exact same-origin Origin header", () =>
 
 test("API request bodies have declared size limits and JSON content types", () => {
   assert.match(worker, /Content-Type must be application\/json/);
-  assert.match(worker, /bodyLimit=url\.pathname==="\/api\/telegram\/webhook"\?1048576:65536/);
+  assert.match(worker, /bodyLimit=url\.pathname==="\/api\/telegram\/webhook"\?1048576:url\.pathname==="\/api\/sports\/ingest"\?4194304:65536/);
   assert.match(worker, /declaredLength>bodyLimit/);
 });
 
