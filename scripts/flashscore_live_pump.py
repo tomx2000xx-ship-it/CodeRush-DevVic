@@ -167,6 +167,12 @@ def main():
                 cycle_start = time.monotonic()
                 today = datetime.now(LAGOS).date()
                 days = [today.isoformat(), (today + timedelta(days=1)).isoformat()]
+                mono_now = time.monotonic()
+                for offset in range(2, 8):
+                    future_day = (today + timedelta(days=offset)).isoformat()
+                    if mono_now - future_refresh.get(future_day, 0) >= 30 * 60:
+                        days.append(future_day)
+                        future_refresh[future_day] = mono_now
                 competitions, odds, details, verification = [], {}, {}, {}
                 for day in days:
                     try:
@@ -176,6 +182,8 @@ def main():
                         details.update(day_details)
                         verification.update(day_verification)
                     except Exception as exc:
+                        if day not in (today.isoformat(), (today + timedelta(days=1)).isoformat()):
+                            future_refresh.pop(day, None)
                         print("fixture fetch retry", day, str(exc)[:220], flush=True)
                 if competitions:
                     payload = {
