@@ -149,6 +149,19 @@ def collect_day(base, day, odds_cache, verified_cache, stats_cache):
                     print("final verification retry", match_id, str(exc)[:180], flush=True)
     return groups, odds, details, verification
 
+def push_heartbeat(status, cycle=0, fixture_groups=0, odds_count=0):
+    token = get_oidc_token()
+    return request_json(
+        WORKER_URL + "/api/sports/ingest",
+        headers={"Authorization": "Bearer " + token},
+        data={
+            "action": "heartbeat", "status": status, "cycle": cycle,
+            "fixture_groups": fixture_groups, "odds_count": odds_count,
+        },
+        timeout=20,
+    )
+
+
 def push_snapshot(payload):
     token = get_oidc_token()
     return request_json(
@@ -161,6 +174,10 @@ def push_snapshot(payload):
 
 def main():
     start = time.monotonic()
+    try:
+        push_heartbeat("starting")
+    except Exception as exc:
+        print("startup heartbeat failed", str(exc)[:180], flush=True)
     odds_cache = set()
     verified_cache = {}
     stats_cache = {}
@@ -169,8 +186,14 @@ def main():
         clone_scraper(directory)
         process, base = start_scraper(directory)
         try:
+            try:
+                push_heartbeat("scraper_ready")
+            except Exception as exc:
+                print("ready heartbeat failed", str(exc)[:180], flush=True)
             cycle = 0
+            loop_count = 0
             while time.monotonic() - start < RUN_SECONDS:
+                loop_count += 1
                 cycle_start = time.monotonic()
                 today = datetime.now(LAGOS).date()
                 days = [today.isoformat(), (today + timedelta(days=1)).isoformat()]
@@ -208,10 +231,20 @@ def main():
                             "final": result.get("final"), "verified": result.get("verified"),
                             "odds": result.get("odds"), "settlement": result.get("settlement"),
                         }), flush=True)
+                        if loop_count % 5 == 0:
+                            try:
+                                push_heartbeat("polling", cycle, len(competitions), len(odds))
+                            except Exception as heartbeat_error:
+                                print("poll heartbeat failed", str(heartbeat_error)[:160], flush=True)
                     except Exception as exc:
                         print("CodeRush ingest retry", str(exc)[:300], flush=True)
                 else:
                     print("No fixture groups returned this cycle.", flush=True)
+                    if loop_count % 5 == 0:
+                        try:
+                            push_heartbeat("no_fixture_groups", cycle, 0, 0)
+                        except Exception as heartbeat_error:
+                            print("empty-cycle heartbeat failed", str(heartbeat_error)[:160], flush=True)
                 elapsed = time.monotonic() - cycle_start
                 time.sleep(max(5, POLL_SECONDS - elapsed))
         finally:
