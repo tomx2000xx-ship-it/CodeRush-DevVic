@@ -7,16 +7,18 @@ type OpenFootballMatch = {
 };
 type Dataset = { name?: string; matches?: OpenFootballMatch[] };
 
+const seasonStartYear = new Date().getUTCMonth() >= 6 ? new Date().getUTCFullYear() : new Date().getUTCFullYear() - 1;
+const CURRENT_SEASON = seasonStartYear + "-" + String(seasonStartYear + 1).slice(-2);
 const DATASETS = [
-  { path: "2026-27/en.1.json", country: "England", league: "Premier League", code: "en1" },
-  { path: "2026-27/en.2.json", country: "England", league: "Championship", code: "en2" },
-  { path: "2026-27/de.1.json", country: "Germany", league: "Bundesliga", code: "de1" },
-  { path: "2026-27/es.1.json", country: "Spain", league: "La Liga", code: "es1" },
-  { path: "2026-27/it.1.json", country: "Italy", league: "Serie A", code: "it1" },
-  { path: "2026-27/fr.1.json", country: "France", league: "Ligue 1", code: "fr1" },
-  { path: "2026-27/nl.1.json", country: "Netherlands", league: "Eredivisie", code: "nl1" },
-  { path: "2026-27/pt.1.json", country: "Portugal", league: "Primeira Liga", code: "pt1" },
-] as const;
+  { file: "en.1.json", country: "England", league: "Premier League", code: "en1" },
+  { file: "en.2.json", country: "England", league: "Championship", code: "en2" },
+  { file: "de.1.json", country: "Germany", league: "Bundesliga", code: "de1" },
+  { file: "es.1.json", country: "Spain", league: "La Liga", code: "es1" },
+  { file: "it.1.json", country: "Italy", league: "Serie A", code: "it1" },
+  { file: "fr.1.json", country: "France", league: "Ligue 1", code: "fr1" },
+  { file: "nl.1.json", country: "Netherlands", league: "Eredivisie", code: "nl1" },
+  { file: "pt.1.json", country: "Portugal", league: "Primeira Liga", code: "pt1" },
+].map(item => ({ ...item, path: CURRENT_SEASON + "/" + item.file }));
 
 const SOURCE = "openfootball";
 const BASE = "https://raw.githubusercontent.com/openfootball/football.json/master/";
