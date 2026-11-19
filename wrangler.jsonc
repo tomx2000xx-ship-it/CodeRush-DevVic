@@ -36,33 +36,5 @@
       "enabled": true,
       "head_sampling_rate": 0.1
     }
-  },
-  "containers": [
-    {
-      "class_name": "FlashscoreScraper",
-      "scheduling_policy": "durable_object",
-      "max_instances": 1,
-      "images": {
-        "base": {
-          "dockerfile": "./sports-scraper/Dockerfile"
-        }
-      }
-    }
-  ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "FLASHSCORE_SCRAPER",
-        "class_name": "FlashscoreScraper"
-      }
-    ]
-  },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": [
-        "FlashscoreScraper"
-      ]
-    }
-  ]
+  }
 }
