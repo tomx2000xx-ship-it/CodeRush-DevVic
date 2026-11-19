@@ -97,7 +97,7 @@ function oddsStatements(db: D1Like, fixtureId: string, kickoffMs: number, odds: 
       String(market.bet_scope || "").toUpperCase() === "FULL_TIME")
     .sort((a: any, b: any) => Number(a.bookmaker?.order ?? 9999) - Number(b.bookmaker?.order ?? 9999));
   const selectedMarket = markets.find((market: any) => {
-    const keys = new Set((market.selections || []).map((selection: any) => String(selection.selection || "").toLowerCase()));
+    const keys = new Set((market.selections || []).filter((selection: any) => selection.is_active !== false && Number(selection.value) > 1).map((selection: any) => String(selection.selection || "").toLowerCase()));
     return keys.has("home") && keys.has("draw") && keys.has("away");
   });
   if (!selectedMarket) return [];
@@ -111,14 +111,14 @@ function oddsStatements(db: D1Like, fixtureId: string, kickoffMs: number, odds: 
     const key = String(selection.selection || "").toLowerCase();
     const outcome = key === "home" ? "home" : key === "draw" ? "draw" : key === "away" ? "away" : null;
     const odd = Number(selection.value);
-    if (!outcome || !Number.isFinite(odd) || odd <= 1) continue;
+    if (!outcome || !Number.isFinite(odd) || odd <= 1 || selection.is_active === false) continue;
     statements.push(db.prepare(`
       INSERT OR IGNORE INTO sports_odds
         (fixture_id,bookmaker_id,bookmaker_name,market_id,market_name,outcome_key,outcome_name,odd,handicap,suspended,updated_at)
       VALUES (?,?,?,1,'Match Winner',?,?,?,'0',?,?)
     `).bind(fixtureId,bookmakerId,bookmakerName,outcome,
       outcome === "home" ? "Home win" : outcome === "draw" ? "Draw" : "Away win",
-      odd,selection.is_active === false ? 1 : 0,snapshotAt));
+      odd,0,snapshotAt));
   }
   return statements;
 }
