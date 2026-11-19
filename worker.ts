@@ -1658,14 +1658,16 @@ export default {
   },
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     if (controller.cron === "* * * * *") {
-      await deliverTelegramNotificationOutbox(env);
-      await deliverTelegramBroadcastJobs(env);
       await updateFlashscoreRunnerMonitor(env);
+      try { await deliverTelegramNotificationOutbox(env); }
+      catch (error) { console.error("Telegram notification outbox failed", error instanceof Error ? error.message : "unknown error"); }
+      try { await deliverTelegramBroadcastJobs(env); }
+      catch (error) { console.error("Telegram broadcast delivery failed", error instanceof Error ? error.message : "unknown error"); }
       try {
         const settlement = await refreshAndSettleBetResults(env);
         if (settlement.ticketsSettled) console.log("Bet settlement", JSON.stringify(settlement));
       } catch (error) {
-        console.error("Flashscore minute sync failed", error instanceof Error ? error.message : "unknown error");
+        console.error("Flashscore settlement pass failed", error instanceof Error ? error.message : "unknown error");
       }
       return;
     }
