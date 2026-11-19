@@ -29,26 +29,38 @@ jobs:
           CODERUSH_WORKER_URL: https://coderush-devvic.tomx200xx.workers.dev
         shell: bash
         run: |
-          RUNS=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/flashscore-live.yml/runs?per_page=5" --jq '.workflow_runs')
-          ACTIVE_COUNT=$(echo "$RUNS" | jq '[.[] | select(.status == "queued" or .status == "in_progress")] | length')
-          LATEST_RUN=$(echo "$RUNS" | jq '.[0] // {} | {id,status,conclusion,event,created_at,updated_at,html_url,head_sha}')
           TOKEN_SEPARATOR="?"
           if [[ "$ACTIONS_ID_TOKEN_REQUEST_URL" == *"?"* ]]; then TOKEN_SEPARATOR="&"; fi
           TOKEN_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}${TOKEN_SEPARATOR}audience=api://coderush-flashscore-ingest"
           OIDC_TOKEN=$(curl -fsS -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$TOKEN_URL" | jq -r '.value' || true)
           if [ -n "$OIDC_TOKEN" ]; then
+            INITIAL_BODY=$(jq -n '{action:"heartbeat",active_count:-1,latest_run:null}')
+            curl -fsS -X POST "$CODERUSH_WORKER_URL/api/sports/ingest" \
+              -H "Authorization: Bearer $OIDC_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$INITIAL_BODY" || echo "Initial watchdog heartbeat failed."
+          else
+            echo "Could not obtain OIDC token."
+          fi
+
+          RUNS=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/flashscore-live.yml/runs?per_page=5" --jq '.workflow_runs' 2>/dev/null || true)
+          if [ -z "$RUNS" ]; then
+            echo "GitHub Actions run-list access is unavailable; no dispatch attempted."
+            exit 0
+          fi
+          ACTIVE_COUNT=$(echo "$RUNS" | jq '[.[] | select(.status == "queued" or .status == "in_progress")] | length')
+          LATEST_RUN=$(echo "$RUNS" | jq '.[0] // {} | {id,status,conclusion,event,created_at,updated_at,html_url,head_sha}')
+          if [ -n "$OIDC_TOKEN" ]; then
             BODY=$(jq -n --argjson active_count "$ACTIVE_COUNT" --argjson latest_run "$LATEST_RUN" '{action:"heartbeat",active_count:$active_count,latest_run:$latest_run}')
             curl -fsS -X POST "$CODERUSH_WORKER_URL/api/sports/ingest" \
               -H "Authorization: Bearer $OIDC_TOKEN" \
               -H "Content-Type: application/json" \
-              -d "$BODY" || echo "Worker heartbeat failed; retrying on the next watchdog cycle."
-          else
-            echo "Could not obtain OIDC token; retrying on the next watchdog cycle."
+              -d "$BODY" || echo "Detailed watchdog heartbeat failed."
           fi
           echo "Active Flashscore feed runs: $ACTIVE_COUNT"
           if [ "$ACTIVE_COUNT" -eq 0 ]; then
             gh workflow run flashscore-live.yml --ref main
             echo "Dispatched a new Flashscore feed run."
-          fi
+          fi          fi
 
 # Keeps the no-cost feed runner alive when a long polling job ends.
