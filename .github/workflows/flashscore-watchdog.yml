@@ -12,6 +12,7 @@ on:
 permissions:
   actions: write
   contents: read
+  id-token: write
 
 concurrency:
   group: coderush-flashscore-watchdog
@@ -22,14 +23,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Start the live feed if no run is active
+      - name: Report heartbeat and start the live feed if needed
         env:
           GH_TOKEN: ${{ github.token }}
+          CODERUSH_WORKER_URL: https://coderush-devvic.tomx200xx.workers.dev
         shell: bash
         run: |
-          ACTIVE=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/flashscore-live.yml/runs?per_page=100" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')
-          echo "Active Flashscore feed runs: $ACTIVE"
-          if [ "$ACTIVE" -eq 0 ]; then
+          RUNS=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/flashscore-live.yml/runs?per_page=5" --jq '.workflow_runs')
+          ACTIVE_COUNT=$(echo "$RUNS" | jq '[.[] | select(.status == "queued" or .status == "in_progress")] | length')
+          LATEST_RUN=$(echo "$RUNS" | jq '.[0] // {} | {id,status,conclusion,event,created_at,updated_at,html_url,head_sha}')
+          TOKEN_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=api://coderush-flashscore-ingest"
+          OIDC_TOKEN=$(curl -fsS -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$TOKEN_URL" | jq -r '.value')
+          BODY=$(jq -n --argjson active_count "$ACTIVE_COUNT" --argjson latest_run "$LATEST_RUN" '{action:"heartbeat",active_count:$active_count,latest_run:$latest_run}')
+          curl -fsS -X POST "$CODERUSH_WORKER_URL/api/sports/ingest" \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$BODY"
+          echo "Active Flashscore feed runs: $ACTIVE_COUNT"
+          if [ "$ACTIVE_COUNT" -eq 0 ]; then
             gh workflow run flashscore-live.yml --ref main
             echo "Dispatched a new Flashscore feed run."
           fi
