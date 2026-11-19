@@ -12,8 +12,9 @@ permissions:
   contents: read
   id-token: write
 
+# v2 avoids the abandoned pending run in the previous concurrency group.
 concurrency:
-  group: coderush-flashscore-live
+  group: coderush-flashscore-live-v2
   cancel-in-progress: false
 
 jobs:
