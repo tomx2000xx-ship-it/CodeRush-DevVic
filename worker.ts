@@ -1573,7 +1573,7 @@ export default {
       }
     } catch (error) {
       const message=error instanceof Error?error.message:"Scheduled sports refresh failed";
-      await env.DB.prepare("INSERT INTO sports_source_sync_state(provider,last_attempt_at,last_error,updated_at) VALUES ('openfootball',?,?,?) ON CONFLICT(provider) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,updated_at=excluded.updated_at").bind(message.slice(0,500),isoNow()).run();
+      await env.DB.prepare("INSERT INTO sports_source_sync_state(provider,last_attempt_at,last_error,updated_at) VALUES ('openfootball',?,?,?) ON CONFLICT(provider) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,updated_at=excluded.updated_at").bind(isoNow(),message.slice(0,500),isoNow()).run();
       console.error("Scheduled OpenFootball refresh failed", message);
     }
   },
