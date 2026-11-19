@@ -9,7 +9,7 @@ const CLUB_LOGOS:Record<string,string>={
 };
 const FLAGS:Record<string,string>={SEN:'sn',SUD:'sd',GHA:'gh',SOM:'so',TUR:'tr',FRA:'fr',ENG:'gb-eng',ESP:'es',GER:'de',NED:'nl',GRE:'gr',SRB:'rs',MKD:'mk',SVN:'si',SUI:'ch',SCO:'gb-sct',FRO:'fo',MDA:'md',KAZ:'kz',SVK:'sk',EST:'ee',BUL:'bg',ISL:'is',LUX:'lu',LTU:'lt',LIE:'li',GIB:'gi',MLT:'mt',DEN:'dk',NOR:'no',WAL:'gb-wls',POR:'pt',HUN:'hu',NIR:'gb-nir',UKR:'ua',GEO:'ge',ISR:'il',AUT:'at',IRL:'ie',KOS:'xk',BIH:'ba',ROU:'ro',POL:'pl',SWE:'se'};
 const cache=new Map<string,string>(),pending=new Map<string,Promise<string>>();
-const cacheKey=(code:string,name:string)=>code||("name:"+name.trim().toLowerCase().replace(/\\s+/g," "));
+const cacheKey=(code:string,name:string)=>code||("name:"+name.trim().toLowerCase().replace(/\s+/g," "));
 async function loadBadge(code:string,name:string):Promise<string>{
  const key=cacheKey(code,name);
  if(CLUB_LOGOS[code]&&CLUB_LOGOS[code]!==' Roma')return 'https://media.api-sports.io/football/teams/'+CLUB_LOGOS[code]+'.png';
