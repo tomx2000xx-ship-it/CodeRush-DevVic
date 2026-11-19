@@ -177,7 +177,7 @@ def main():
                 mono_now = time.monotonic()
                 for offset in range(2, 8):
                     future_day = (today + timedelta(days=offset)).isoformat()
-                    if mono_now - future_refresh.get(future_day, 0) >= 30 * 60:
+                    if future_day not in future_refresh or mono_now - future_refresh[future_day] >= 30 * 60:
                         days.append(future_day)
                         future_refresh[future_day] = mono_now
                 competitions, odds, details, verification = [], {}, {}, {}
