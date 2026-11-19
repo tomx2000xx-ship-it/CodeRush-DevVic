@@ -40,7 +40,8 @@ function statusCode(status: string, stage: string): string {
   const value = (stage + " " + status).toLowerCase();
   if (value.includes("walkover")) return "WO";
   if (value.includes("awarded")) return "AWD";
-  if (value.includes("after penalties") || value.includes("penalties")) return "PEN";
+  if (value.includes("after penalties")) return "PEN";
+  if (value.includes("penalties") || value.includes("penalty shootout")) return "P";
   if (value.includes("after extra time")) return "AET";
   if (value.includes("extra time")) return "ET";
   if (value.includes("half time") || value.includes("halftime")) return "HT";
