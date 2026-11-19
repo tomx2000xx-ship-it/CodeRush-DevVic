@@ -765,6 +765,7 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
   const rows=await env.DB.prepare(`
     SELECT f.id,f.league_name,f.country,f.kickoff,f.status_short,f.elapsed,f.home_team,f.away_team,f.home_code,f.away_code,
       json_extract(f.raw_json,'$.teams.home.logo') AS home_logo,json_extract(f.raw_json,'$.teams.away.logo') AS away_logo,json_extract(f.raw_json,'$.league.logo') AS league_logo,
+      COALESCE(json_extract(f.raw_json,'$.sourceMatch.date'),substr(f.kickoff,1,10)) AS source_date,
       f.home_score,f.away_score,o.bookmaker_name,o.outcome_key,o.odd,o.suspended,o.updated_at AS odds_updated_at
     FROM sports_fixtures f LEFT JOIN sports_odds o ON o.fixture_id=f.id AND o.market_id=1 AND o.bookmaker_id=(SELECT o2.bookmaker_id FROM sports_odds o2 WHERE o2.fixture_id=f.id AND o2.market_id=1 ORDER BY o2.updated_at DESC LIMIT 1)
     WHERE datetime(f.kickoff)>=datetime(?,'-1 day') AND datetime(f.kickoff)<datetime(?,'+2 day')
@@ -773,7 +774,7 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
   const map=new Map<string,Record<string,unknown>>();
   for(const row of rows.results||[]){
     let item=map.get(String(row.id));
-    if(!item){item={id:String(row.id),league:String(row.league_name),country:row.country||"",kickoff:row.kickoff,home:String(row.home_team),away:String(row.away_team),homeCode:row.home_code||"",awayCode:row.away_code||"",homeLogo:row.home_logo||null,awayLogo:row.away_logo||null,leagueLogo:row.league_logo||null,status:String(row.status_short),minute:row.elapsed,live:fixtureIsLive(String(row.status_short)),completed:["FT","AWD","WO"].includes(String(row.status_short)),score:row.home_score===null||row.away_score===null?null:String(row.home_score)+" : "+String(row.away_score),odds:[null,null,null],bookmaker:null,oddsUpdatedAt:null};map.set(String(row.id),item);}
+    if(!item){item={id:String(row.id),league:String(row.league_name),country:row.country||"",kickoff:row.kickoff,_dateKey:String(row.source_date||String(row.kickoff||"").slice(0,10)),home:String(row.home_team),away:String(row.away_team),homeCode:row.home_code||"",awayCode:row.away_code||"",homeLogo:row.home_logo||null,awayLogo:row.away_logo||null,leagueLogo:row.league_logo||null,status:String(row.status_short),minute:row.elapsed,live:fixtureIsLive(String(row.status_short)),completed:["FT","AWD","WO"].includes(String(row.status_short)),score:row.home_score===null||row.away_score===null?null:String(row.home_score)+" : "+String(row.away_score),odds:[null,null,null],bookmaker:null,oddsUpdatedAt:null};map.set(String(row.id),item);}
     const oddsUpdated=Date.parse(String(row.odds_updated_at||""));
     const oddsFresh=Number.isFinite(oddsUpdated)&&Date.now()-oddsUpdated<=45*60*1000&&oddsUpdated<=Date.now()+60*1000;
     if(row.outcome_key==="home") (item.odds as (number|null)[])[0]=row.suspended||!oddsFresh?null:Number(row.odd);
@@ -785,7 +786,24 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
     env.DB.prepare("SELECT last_fixtures_sync,last_live_sync,last_odds_sync,last_error FROM sports_sync_state WHERE provider='api-football'").first<Record<string,unknown>>(),
     env.DB.prepare("SELECT last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded FROM sports_source_sync_state WHERE provider='openfootball'").first<Record<string,unknown>>()
   ]);
-  return new Response(JSON.stringify({ok:true,configured:true,provider:env.API_FOOTBALL_KEY?"OpenFootball fixtures + API-Football odds":"OpenFootball public-domain fixtures",fixtures:Array.from(map.values()),sync:{apiFootball:state||null,openFootball:openState||null}}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
+  const normalizeTeam=(value:unknown)=>String(value||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/&/g,"and").replace(/\\b(fc|afc|cf|sc)\\b/g,"").replace(/[^a-z0-9]/g,"");
+  const deduplicated=new Map<string,Record<string,unknown>>();
+  for(const fixture of map.values()){
+    const key=[fixture._dateKey,normalizeTeam(fixture.home),normalizeTeam(fixture.away)].join("|");
+    const previous=deduplicated.get(key);
+    if(!previous){deduplicated.set(key,fixture);continue;}
+    const fixturePreferred=!String(fixture.id).startsWith("of-");
+    const primary=fixturePreferred?fixture:previous,secondary=fixturePreferred?previous:fixture;
+    for(const field of ["homeLogo","awayLogo","leagueLogo","homeCode","awayCode","oddsUpdatedAt","bookmaker"]){
+      if(!primary[field]&&secondary[field])primary[field]=secondary[field];
+    }
+    const primaryOdds=primary.odds as (number|null)[],secondaryOdds=secondary.odds as (number|null)[];
+    for(let n=0;n<3;n++)if((primaryOdds[n]===null||primaryOdds[n]===undefined)&&secondaryOdds[n]!==null&&secondaryOdds[n]!==undefined)primaryOdds[n]=secondaryOdds[n];
+    deduplicated.set(key,primary);
+  }
+  const fixtures=Array.from(deduplicated.values());
+  for(const fixture of fixtures)delete fixture._dateKey;
+  return new Response(JSON.stringify({ok:true,configured:true,provider:env.API_FOOTBALL_KEY?"OpenFootball fixtures + API-Football odds":"OpenFootball public-domain fixtures",fixtures,sync:{apiFootball:state||null,openFootball:openState||null}}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
 }
 async function handleSportsFixtureDetails(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
