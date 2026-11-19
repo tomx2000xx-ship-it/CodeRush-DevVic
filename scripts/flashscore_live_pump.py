@@ -23,7 +23,13 @@ LAGOS = ZoneInfo("Africa/Lagos")
 
 def request_json(url, headers=None, data=None, timeout=35):
     body = None if data is None else json.dumps(data, separators=(",", ":")).encode()
-    req = Request(url, data=body, headers=headers or {}, method="GET" if body is None else "POST")
+    request_headers = {
+        "User-Agent": "CodeRush-FlashscoreRunner/1.0 (+https://github.com/tomx2000xx-ship-it/CodeRush-DevVic)",
+        "Accept": "application/json",
+    }
+    if headers:
+        request_headers.update(headers)
+    req = Request(url, data=body, headers=request_headers, method="GET" if body is None else "POST")
     if body is not None:
         req.add_header("Content-Type", "application/json")
     try:
