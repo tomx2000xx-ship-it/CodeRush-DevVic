@@ -1659,8 +1659,12 @@ export default {
       await deliverTelegramNotificationOutbox(env);
       await deliverTelegramBroadcastJobs(env);
       try {
-        const result = await syncFlashscoreDay(env, dayString(new Date()));
-        console.log("Flashscore minute sync", JSON.stringify(result));
+        const today = dayString(new Date());
+        const [todayResult, tomorrowResult] = await Promise.all([
+          syncFlashscoreDay(env, today),
+          syncFlashscoreDay(env, addCalendarDays(today, 1))
+        ]);
+        console.log("Flashscore minute sync", JSON.stringify({today:todayResult,tomorrow:tomorrowResult}));
         const settlement = await refreshAndSettleBetResults(env);
         if (settlement.ticketsSettled) console.log("Bet settlement", JSON.stringify(settlement));
       } catch (error) {
