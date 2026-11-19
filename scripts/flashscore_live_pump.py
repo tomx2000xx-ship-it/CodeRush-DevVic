@@ -101,7 +101,7 @@ def kickoff_time(match):
         return None
 
 
-def collect_day(base, day, odds_cache):
+def collect_day(base, day, odds_cache, verified_cache):
     result = local_api(base, "/matches", {"sport": "football", "date": day, "timezone": "Africa/Lagos"})
     groups = result.get("competitions") or []
     odds, details, verification = {}, {}, {}
@@ -112,7 +112,7 @@ def collect_day(base, day, odds_cache):
             if not match_id:
                 continue
             kickoff = kickoff_time(match)
-            if kickoff and now < kickoff <= now + timedelta(hours=6) and match_id not in odds_cache:
+            if kickoff and now < kickoff <= now + timedelta(minutes=90) and match_id not in odds_cache:
                 try:
                     price = local_api(base, "/matches/odds", {
                         "match": match_id, "bet_type": "home-draw-away",
@@ -124,7 +124,7 @@ def collect_day(base, day, odds_cache):
                         odds_cache.add(match_id)
                 except Exception as exc:
                     print("odds fetch retry", match_id, str(exc)[:180], flush=True)
-            if is_live(match) or is_final(match):
+            if is_live(match) or (is_final(match) and time.monotonic() - verified_cache.get(match_id, 0) > 15 * 60):
                 try:
                     summary = local_api(base, "/matches/summary", {"match": match_id})
                     statistics = None
@@ -137,7 +137,7 @@ def collect_day(base, day, odds_cache):
                     if is_final(match):
                         try:
                             final_details = local_api(base, "/matches/details", {"match": match_id})
-                            verification[match_id] = {"details": final_details, "summary": summary}
+                            verification[match_id] = {"details": final_details, "summary": summary}\n                            verified_cache[match_id] = time.monotonic()
                         except Exception as exc:
                             print("final verification retry", match_id, str(exc)[:180], flush=True)
                 except Exception as exc:
@@ -157,7 +157,7 @@ def push_snapshot(payload):
 
 def main():
     start = time.monotonic()
-    odds_cache = set()
+    odds_cache = set()\n    verified_cache = {}
     with tempfile.TemporaryDirectory(prefix="coderush-flashscore-") as directory:
         clone_scraper(directory)
         process, base = start_scraper(directory)
@@ -170,7 +170,7 @@ def main():
                 competitions, odds, details, verification = [], {}, {}, {}
                 for day in days:
                     try:
-                        groups, day_odds, day_details, day_verification = collect_day(base, day, odds_cache)
+                        groups, day_odds, day_details, day_verification = collect_day(base, day, odds_cache, verified_cache)
                         competitions.extend(groups)
                         odds.update(day_odds)
                         details.update(day_details)
