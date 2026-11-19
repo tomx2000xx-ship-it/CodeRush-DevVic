@@ -63,7 +63,7 @@ test("match feed exposes provider team and league badges and status-based comple
   assert.match(worker, /json_extract\(f\.raw_json,'\$\.teams\.home\.logo'\) AS home_logo/);
   assert.match(worker, /json_extract\(f\.raw_json,'\$\.teams\.away\.logo'\) AS away_logo/);
   assert.match(worker, /json_extract\(f\.raw_json,'\$\.league\.logo'\) AS league_logo/);
-  assert.match(worker, /completed:\["FT","AWD","WO"\]/);
+  assert.match(worker, /completed:\["FT","AET","PEN","AWD","WO"\]/);
 });
 
 test("withdrawals remain manually reviewed and manually paid", () => {
