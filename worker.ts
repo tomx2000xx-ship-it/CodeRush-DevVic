@@ -21,29 +21,34 @@ function decodeBase64Url(value:string):Uint8Array{
   const padded=value.replace(/-/g,"+").replace(/_/g,"/")+"=".repeat((4-value.length%4)%4);
   return Uint8Array.from(atob(padded),character=>character.charCodeAt(0));
 }
-async function verifyFlashscoreGithubOidc(token:string):Promise<boolean>{
+async function verifyFlashscoreGithubOidc(token:string):Promise<string|null>{
   try{
     const parts=token.split(".");
     if(parts.length!==3)return false;
     const header=JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[0])));
     const claims=JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1])));
     const now=Math.floor(Date.now()/1000);
-    if(header.alg!=="RS256"||!header.kid||claims.iss!=="https://token.actions.githubusercontent.com")return false;
-    if(claims.repository!=="tomx2000xx-ship-it/CodeRush-DevVic"||claims.ref!=="refs/heads/main")return false;
-    if(claims.workflow_ref!=="tomx2000xx-ship-it/CodeRush-DevVic/.github/workflows/flashscore-live.yml@refs/heads/main")return false;
+    if(header.alg!=="RS256"||!header.kid||claims.iss!=="https://token.actions.githubusercontent.com")return null;
+    if(claims.repository!=="tomx2000xx-ship-it/CodeRush-DevVic"||claims.ref!=="refs/heads/main")return null;
+    const allowedWorkflowRefs=[
+      "tomx2000xx-ship-it/CodeRush-DevVic/.github/workflows/flashscore-live.yml@refs/heads/main",
+      "tomx2000xx-ship-it/CodeRush-DevVic/.github/workflows/flashscore-watchdog.yml@refs/heads/main"
+    ];
+    if(!allowedWorkflowRefs.includes(String(claims.workflow_ref||"")))return null;
     const audiences=Array.isArray(claims.aud)?claims.aud:[claims.aud];
-    if(!audiences.includes(FLASHCORE_OIDC_AUDIENCE)||Number(claims.exp)<=now||Number(claims.iat)>now+30)return false;
+    if(!audiences.includes(FLASHCORE_OIDC_AUDIENCE)||Number(claims.exp)<=now||Number(claims.iat)>now+30)return null;
     if(!githubOidcJwksCache||githubOidcJwksCache.expiresAt<Date.now()){
       const response=await fetch("https://token.actions.githubusercontent.com/.well-known/jwks");
-      if(!response.ok)return false;
+      if(!response.ok)return null;
       const body=await response.json() as {keys:JsonWebKey[]};
       githubOidcJwksCache={keys:body.keys,expiresAt:Date.now()+6*60*60*1000};
     }
     const jwk=githubOidcJwksCache.keys.find(key=>(key as any).kid===header.kid);
-    if(!jwk)return false;
+    if(!jwk)return null;
     const key=await crypto.subtle.importKey("jwk",jwk,{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["verify"]);
-    return await crypto.subtle.verify("RSASSA-PKCS1-v1_5",key,decodeBase64Url(parts[2]),new TextEncoder().encode(parts[0]+"."+parts[1]));
-  }catch{return false;}
+    const valid=await crypto.subtle.verify("RSASSA-PKCS1-v1_5",key,decodeBase64Url(parts[2]),new TextEncoder().encode(parts[0]+"."+parts[1]));
+    return valid?String(claims.workflow_ref):null;
+  }catch{return null;}
 }
 async function updateFlashscoreRunnerMonitor(env:Env):Promise<void>{
   try{
@@ -105,13 +110,27 @@ async function handleFlashscoreRunnerStatus(env:Env):Promise<Response>{
 async function handleFlashscoreIngest(request:Request,env:Env):Promise<Response>{
   const authorization=request.headers.get("authorization")||"";
   const token=authorization.startsWith("Bearer ")?authorization.slice(7):"";
-  if(!token||!(await verifyFlashscoreGithubOidc(token)))return json({ok:false,error:"GitHub Actions identity verification failed."},401);
+  const workflowRef=token?await verifyFlashscoreGithubOidc(token):null;
+  if(!workflowRef)return json({ok:false,error:"GitHub Actions identity verification failed."},401);
   let payload:any;
   try{
     const raw=await request.text();
     if(new TextEncoder().encode(raw).length>4194304)return json({ok:false,error:"Sports snapshot is too large."},413);
     payload=JSON.parse(raw);
   }catch{return json({ok:false,error:"Invalid sports snapshot JSON."},400);}
+  if(payload?.action==="heartbeat"){
+    const watchdogRef="tomx2000xx-ship-it/CodeRush-DevVic/.github/workflows/flashscore-watchdog.yml@refs/heads/main";
+    if(workflowRef!==watchdogRef)return json({ok:false,error:"Heartbeat is only accepted from the watchdog workflow."},403);
+    const attemptedAt=isoNow();
+    const status=JSON.stringify({active_count:Number(payload.active_count||0),latest_run:payload.latest_run||null});
+    await env.DB.prepare(`INSERT INTO sports_source_sync_state(provider,last_attempt_at,last_error,datasets_loaded,fixtures_loaded,updated_at)
+      VALUES ('flashscore_watchdog',?,?,0,0,?)
+      ON CONFLICT(provider) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,updated_at=excluded.updated_at
+    `).bind(attemptedAt,status,attemptedAt).run();
+    return json({ok:true,heartbeat:true});
+  }
+  const liveRef="tomx2000xx-ship-it/CodeRush-DevVic/.github/workflows/flashscore-live.yml@refs/heads/main";
+  if(workflowRef!==liveRef)return json({ok:false,error:"Only the live-feed workflow can submit fixture snapshots."},403);
   if(!payload||!Array.isArray(payload.competitions))return json({ok:false,error:"Missing competitions data."},400);
   try{
     const result=await ingestFlashscoreSnapshot(env,payload);
