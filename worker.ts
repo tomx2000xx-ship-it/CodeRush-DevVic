@@ -1574,9 +1574,9 @@ export default {
       }
       return;
     }
-    if (!env.API_FOOTBALL_KEY) return;
     try {
       if (controller.cron === "0 */2 * * *") {
+        if (!env.API_FOOTBALL_KEY) return;
         await refreshAndSettleBetResults(env);
         // Reuse the existing two-hour trigger: one date-specific odds request per run.
         // This keeps the account at its five-trigger Free-plan limit and stays below
@@ -1588,9 +1588,20 @@ export default {
       } else if (controller.cron === "15 0 * * *") {
         await env.DB.prepare("DELETE FROM user_sessions WHERE expires_at<datetime('now','-7 days') OR revoked_at<datetime('now','-30 days')").run();
         await env.DB.prepare("DELETE FROM admin_login_attempts WHERE created_at<datetime('now','-30 days')").run();
-        // Refresh the next seven days in Lagos local time.
-        const today=lagosDayString(new Date());
-        await syncFootballRange(env,today,addCalendarDays(today,7),{includeOdds:false});
+        const attemptedAt=isoNow();
+        try {
+          const result=await syncOpenFootballFixtures(env.DB);
+          await env.DB.prepare("INSERT INTO sports_source_sync_state(provider,last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded,updated_at) VALUES ('openfootball',?,?,?,?,?,?) ON CONFLICT(provider) DO UPDATE SET last_success_at=excluded.last_success_at,last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,datasets_loaded=excluded.datasets_loaded,fixtures_loaded=excluded.fixtures_loaded,updated_at=excluded.updated_at").bind(attemptedAt,attemptedAt,result.errors.length?result.errors.join("; ").slice(0,1000):null,result.datasets,result.stored,attemptedAt).run();
+          console.log("OpenFootball fixture sync",JSON.stringify(result));
+        } catch(error) {
+          const message=(error instanceof Error?error.message:"OpenFootball sync failed").slice(0,1000);
+          await env.DB.prepare("INSERT INTO sports_source_sync_state(provider,last_attempt_at,last_error,updated_at) VALUES ('openfootball',?,?,?) ON CONFLICT(provider) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,updated_at=excluded.updated_at").bind(attemptedAt,message,attemptedAt).run();
+          console.error("OpenFootball fixture sync failed",message);
+        }
+        if(env.API_FOOTBALL_KEY) {
+          const today=lagosDayString(new Date());
+          await syncFootballRange(env,today,addCalendarDays(today,7),{includeOdds:false});
+        }
       }
     } catch (error) {
       const message=error instanceof Error?error.message:"Scheduled sports refresh failed";
