@@ -24,3 +24,20 @@ jobs:
         run: bun install
       - name: Run tests and production build
         run: bun run build
+
+      - name: Smoke test deployed sports fixtures and selection rules
+        if: github.event_name != 'pull_request'
+        env:
+          CODERUSH_WORKER_URL: https://coderush-devvic.tomx2000xx.workers.dev
+        shell: bash
+        run: |
+          USER_AGENT="CodeRush-Production-SmokeTest/1.0 (+https://github.com/tomx2000xx-ship-it/CodeRush-DevVic)"
+          STATUS=$(curl -fsS -A "$USER_AGENT" "$CODERUSH_WORKER_URL/api/sports/runner-status")
+          echo "$STATUS" | jq -e '.ok == true and .fixtures.fixtures > 0 and .odds.prices > 0'
+          curl -fsS -A "$USER_AGENT" -D /tmp/coderush-headers "$CODERUSH_WORKER_URL/api/sports/fixtures?smoke=$GITHUB_RUN_ID" -o /tmp/coderush-fixtures.json
+          jq -e '.ok == true and (.fixtures | length > 0) and (.fixtures | any(.selectionOpen == true and .odds[0] != null and .odds[1] != null and .odds[2] != null))' /tmp/coderush-fixtures.json
+          jq -e '[.fixtures[] | select(.status == "CANC" or .status == "PST") | .selectionOpen] | all(. == false)' /tmp/coderush-fixtures.json
+          jq -e '.fixtures | any(.live == true and (.statusLong // "") != "")' /tmp/coderush-fixtures.json
+          grep -qi 'cache-control: public, max-age=75' /tmp/coderush-headers
+          echo "Production fixture feed, live phase, selection locks, bookmaker odds and edge cache passed."
+
