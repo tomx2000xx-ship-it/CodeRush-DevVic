@@ -803,23 +803,47 @@ async function handleSportsSync(request: Request, env: Env): Promise<Response> {
   const session=await currentSession(request,env);
   if(!session) return json({ok:false,error:"Authentication required"},401);
   if(session.user.role!=="admin") return json({ok:false,error:"Administrator access required"},403);
-  if(!env.API_FOOTBALL_KEY) return json({ok:false,error:"API_FOOTBALL_KEY is not configured in Cloudflare."},503);
-  const url=new URL(request.url);
-  const from=url.searchParams.get("from")||dayString(new Date());
-  const to=url.searchParams.get("to")||dayString(new Date(Date.now()+7*86400000));
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||to<from||(new Date(to).getTime()-new Date(from).getTime())>14*86400000) return json({ok:false,error:"Choose a valid date range of no more than 15 days."},400);
-  try{
-    const result=await syncFootballRange(env,from,to);
-    const live=await syncFootballLive(env);
-    return json({ok:true,provider:"API-Football",range:{from,to},...result,liveFixtures:live.fixtures,liveOdds:live.odds});
-  }catch(error){
-    const message=error instanceof Error?error.message:"Sports provider sync failed";
+
+  // The public-domain fixture feed can be refreshed independently of API-Football.
+  // Keep provider failures separate so an odds/live-feed outage does not discard
+  // successfully imported fixtures or prevent the admin from seeing partial status.
+  const attemptedAt=isoNow();
+  let openFootball:{fetched:number;stored:number;datasets:number;errors:string[]};
+  try {
+    openFootball=await syncOpenFootballFixtures(env.DB);
+    const lastSuccess=openFootball.datasets>0?attemptedAt:null;
     await env.DB.prepare(`
-      INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('api-football',?,?)
-      ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at
-    `).bind(message.slice(0,500),isoNow()).run();
-    return json({ok:false,error:message},502);
+      INSERT INTO sports_source_sync_state(provider,last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded,updated_at)
+      VALUES ('openfootball',?,?,?,?,?,?)
+      ON CONFLICT(provider) DO UPDATE SET
+        last_success_at=COALESCE(excluded.last_success_at,sports_source_sync_state.last_success_at),
+        last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,
+        datasets_loaded=excluded.datasets_loaded,fixtures_loaded=excluded.fixtures_loaded,updated_at=excluded.updated_at
+    `).bind(lastSuccess,attemptedAt,openFootball.errors.length?openFootball.errors.join("; ").slice(0,1000):null,openFootball.datasets,openFootball.stored,attemptedAt).run();
+  } catch(error) {
+    const message=(error instanceof Error?error.message:"OpenFootball sync failed").slice(0,1000);
+    await env.DB.prepare("INSERT INTO sports_source_sync_state(provider,last_attempt_at,last_error,updated_at) VALUES ('openfootball',?,?,?) ON CONFLICT(provider) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,updated_at=excluded.updated_at").bind(attemptedAt,message,attemptedAt).run();
+    return json({ok:false,error:"OpenFootball fixture refresh failed: "+message},502);
   }
+
+  let apiFootball:{fixtures:number;odds:number;liveFixtures:number;liveOdds:number}|null=null;
+  let apiFootballWarning:string|undefined;
+  if(env.API_FOOTBALL_KEY) {
+    try {
+      const url=new URL(request.url);
+      const from=url.searchParams.get("from")||dayString(new Date());
+      const to=url.searchParams.get("to")||dayString(new Date(Date.now()+7*86400000));
+      if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(from)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(to)||to<from||(new Date(to).getTime()-new Date(from).getTime())>14*86400000) return json({ok:false,error:"Choose a valid date range of no more than 15 days."},400);
+      const result=await syncFootballRange(env,from,to);
+      const live=await syncFootballLive(env);
+      apiFootball={fixtures:result.fixtures,odds:result.odds,liveFixtures:live.fixtures,liveOdds:live.odds};
+      apiFootballWarning=result.oddsWarning;
+    } catch(error) {
+      apiFootballWarning=error instanceof Error?error.message:"API-Football refresh failed";
+      await env.DB.prepare("INSERT INTO sports_sync_state(provider,last_error,updated_at) VALUES ('api-football',?,?) ON CONFLICT(provider) DO UPDATE SET last_error=excluded.last_error,updated_at=excluded.updated_at").bind(apiFootballWarning.slice(0,500),isoNow()).run();
+    }
+  }
+  return json({ok:true,provider:apiFootball?"OpenFootball fixtures + API-Football odds/live":"OpenFootball public-domain fixtures",openFootball,apiFootball,apiFootballWarning});
 }
 
 
