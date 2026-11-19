@@ -828,8 +828,29 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
   for(const fixture of fixtures)delete fixture._dateKey;
   return new Response(JSON.stringify({ok:true,configured:true,provider:"OpenFootball public-domain fixtures",fixtures,sync:{openFootball:openState||null}}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
 }
-async function handleSportsFixtureDetails(_request:Request,_env:Env):Promise<Response>{
-  return json({ok:false,error:"Match events and live statistics are not supplied by the current public-domain fixture source."},501);
+async function handleSportsFixtureDetails(request:Request,env:Env):Promise<Response>{
+  const id=(new URL(request.url)).searchParams.get("id")||"";
+  if(!/^fs-[A-Za-z0-9]{8}$/.test(id))return json({ok:false,error:"Match events are unavailable for this fixture source."},501);
+  const match=id.slice(3);
+  try{
+    const [summaryResponse,statisticsResponse]=await Promise.all([
+      flashscoreProxy(env,"/matches/summary",{match}),
+      flashscoreProxy(env,"/matches/statistics",{match}).catch(()=>null)
+    ]);
+    const summary=await summaryResponse.json() as any;
+    const statistics=statisticsResponse?await statisticsResponse.json() as any:null;
+    const events=(summary.periods||[]).flatMap((period:any)=>(period.incidents||[]).map((event:any)=>({
+      id:event.id||null,minute:event.minute||event.minute_number||null,
+      team:event.team||null,type:event.type||"event",reason:event.reason||null,
+      description:event.description||event.reason||event.type||"Match event",
+      player:event.player?.name||event.player?.short_name||null,
+      assistPlayer:event.assist_player?.name||event.assist_player?.short_name||null,
+      homeScore:event.home_score??null,awayScore:event.away_score??null
+    })));
+    return json({ok:true,statistics:statistics||{available:false},events});
+  }catch(error){
+    return json({ok:false,error:error instanceof Error?error.message:"Flashscore match details unavailable"},502);
+  }
 }
 async function handleSportsSync(request: Request, env: Env): Promise<Response> {
   const session=await currentSession(request,env);
@@ -1073,40 +1094,98 @@ async function settleStoredTicket(env:Env,ticketId:string,checkedAt:string):Prom
   }
   return {selectionUpdates,ticketStatus:finalStatus};
 }
+async function verifyFlashscoreFinalResult(env:Env,fixtureId:string):Promise<boolean>{
+  const sourceId=fixtureId.replace(/^fs-/,"");
+  if(!/^[A-Za-z0-9]{8}$/.test(sourceId))return false;
+  try{
+    const [detailsResponse,summaryResponse]=await Promise.all([
+      flashscoreProxy(env,"/matches/details",{match:sourceId}),
+      flashscoreProxy(env,"/matches/summary",{match:sourceId})
+    ]);
+    const details=await detailsResponse.json() as any;
+    const summary=await summaryResponse.json() as any;
+    const detailStatus=String(details.status||details.stage||"").toLowerCase();
+    const summaryStatus=String(summary.status||summary.stage||"").toLowerCase();
+    const combined=detailStatus+" "+summaryStatus;
+    let status="FT";
+    if(combined.includes("walkover"))status="WO";
+    else if(combined.includes("awarded"))status="AWD";
+    else if(combined.includes("after penalties"))status="PEN";
+    else if(combined.includes("after extra time"))status="AET";
+    else if(!combined.includes("finished")&&!combined.includes("ended")&&!combined.includes("full time"))return false;
+    const dh=Number(details.home_score), da=Number(details.away_score);
+    const sh=Number(summary.home_score), sa=Number(summary.away_score);
+    if(!Number.isInteger(dh)||!Number.isInteger(da)||!Number.isInteger(sh)||!Number.isInteger(sa)||dh<0||da<0||dh!==sh||da!==sa)return false;
+    const checkedAt=isoNow();
+    await env.DB.prepare(`UPDATE sports_fixtures SET status_short=?,status_long=?,home_score=?,away_score=?,
+      result_home_score=?,result_away_score=?,result_checked_at=?,is_live=0,updated_at=? WHERE id=?`)
+      .bind(status,String(details.stage||details.status||"Finished"),dh,da,dh,da,checkedAt,checkedAt,fixtureId).run();
+    return true;
+  }catch(error){
+    console.error("Flashscore final-result verification failed",fixtureId,error instanceof Error?error.message:"unknown");
+    return false;
+  }
+}
 async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:number;selectionUpdates:number;ticketsSettled:number}>{
   const now=isoNow(),cutoff=new Date(Date.now()-110*60*1000).toISOString();
+  const flashscoreCutoff=new Date(Date.now()-5*60*1000).toISOString();
+  const flashscoreDue=await env.DB.prepare(`
+    SELECT DISTINCT f.id
+    FROM bet_ticket_selections s
+    JOIN bet_tickets t ON t.id=s.ticket_id
+    JOIN sports_fixtures f ON f.id=s.fixture_id
+    WHERE s.result_status='pending' AND f.id LIKE 'fs-%'
+      AND datetime(f.kickoff)<=datetime(?)
+      AND f.status_short IN ('FT','AET','PEN','AWD','WO')
+      AND (f.result_checked_at IS NULL OR datetime(f.result_checked_at)<=datetime(?))
+    ORDER BY f.kickoff ASC LIMIT 20
+  `).bind(now,flashscoreCutoff).all<{id:string}>();
+  const verifiedFlashscoreIds:string[]=[];
+  for(const row of flashscoreDue.results||[]){
+    if(await verifyFlashscoreFinalResult(env,row.id))verifiedFlashscoreIds.push(row.id);
+  }
+  let selectionUpdates=0,ticketsSettled=0;
+  if(verifiedFlashscoreIds.length){
+    const placeholders=verifiedFlashscoreIds.map(()=>"?").join(",");
+    const affected=await env.DB.prepare("SELECT DISTINCT ticket_id FROM bet_ticket_selections WHERE result_status='pending' AND fixture_id IN ("+placeholders+")").bind(...verifiedFlashscoreIds).all<{ticket_id:string}>();
+    for(const row of affected.results||[]){
+      const result=await settleStoredTicket(env,row.ticket_id,isoNow());
+      selectionUpdates+=result.selectionUpdates;
+      if(result.ticketStatus)ticketsSettled++;
+    }
+  }
   const due=await env.DB.prepare(`
     SELECT DISTINCT f.id
     FROM bet_ticket_selections s
     JOIN bet_tickets t ON t.id=s.ticket_id
     JOIN sports_fixtures f ON f.id=s.fixture_id
     WHERE s.result_status='pending' AND datetime(f.kickoff)<=datetime(?)
-      AND f.id NOT LIKE 'of-%'
+      AND f.id NOT LIKE 'of-%' AND f.id NOT LIKE 'fs-%'
       AND (f.result_checked_at IS NULL OR datetime(f.result_checked_at)<=datetime(?))
     ORDER BY CASE WHEN f.result_checked_at IS NULL THEN 0 ELSE 1 END,f.result_checked_at ASC,f.kickoff ASC
     LIMIT 20
   `).bind(now,cutoff).all<{id:string}>();
   const fixtureIds=(due.results||[]).map(row=>row.id);
-  if(!fixtureIds.length)return {checkedFixtures:0,selectionUpdates:0,ticketsSettled:0};
-  const sourceIds=fixtureIds.map(id=>id.replace(/^5d-/,""));
-  const response=await apiFootball<ApiFootballFixture>(env,"fixtures?ids="+sourceIds.join("-"));
-  const verifiedIds=new Set((response.response||[]).map(item=>String(item.fixture.id)));
-  await storeFootballFixtures(env,response.response||[]);
-  // Only mark IDs actually returned by API-Football as checked. An empty or
-  // partial provider response must never authorize settlement from cached data.
-  const verifiedFixtureIds=fixtureIds.filter(id=>verifiedIds.has(id.replace(/^5d-/,"")));
-  if(!verifiedFixtureIds.length)return {checkedFixtures:0,selectionUpdates:0,ticketsSettled:0};
-  const checkedAt=isoNow();
-  await env.DB.batch(verifiedFixtureIds.map(id=>env.DB.prepare("UPDATE sports_fixtures SET result_checked_at=? WHERE id=?").bind(checkedAt,id)));
-  const placeholders=verifiedFixtureIds.map(()=>"?").join(",");
-  const affected=await env.DB.prepare("SELECT DISTINCT ticket_id FROM bet_ticket_selections WHERE result_status='pending' AND fixture_id IN ("+placeholders+")").bind(...verifiedFixtureIds).all<{ticket_id:string}>();
-  let selectionUpdates=0,ticketsSettled=0;
-  for(const row of affected.results||[]){
-    const result=await settleStoredTicket(env,row.ticket_id,checkedAt);
-    selectionUpdates+=result.selectionUpdates;
-    if(result.ticketStatus)ticketsSettled++;
+  if(fixtureIds.length){
+    const sourceIds=fixtureIds.map(id=>id.replace(/^5d-/,""));
+    const response=await apiFootball<ApiFootballFixture>(env,"fixtures?ids="+sourceIds.join("-"));
+    const verifiedIds=new Set((response.response||[]).map(item=>String(item.fixture.id)));
+    await storeFootballFixtures(env,response.response||[]);
+    const verifiedFixtureIds=fixtureIds.filter(id=>verifiedIds.has(id.replace(/^5d-/,"")));
+    if(verifiedFixtureIds.length){
+      const checkedAt=isoNow();
+      await env.DB.batch(verifiedFixtureIds.map(id=>env.DB.prepare("UPDATE sports_fixtures SET result_checked_at=? WHERE id=?").bind(checkedAt,id)));
+      const placeholders=verifiedFixtureIds.map(()=>"?").join(",");
+      const affected=await env.DB.prepare("SELECT DISTINCT ticket_id FROM bet_ticket_selections WHERE result_status='pending' AND fixture_id IN ("+placeholders+")").bind(...verifiedFixtureIds).all<{ticket_id:string}>();
+      for(const row of affected.results||[]){
+        const result=await settleStoredTicket(env,row.ticket_id,checkedAt);
+        selectionUpdates+=result.selectionUpdates;
+        if(result.ticketStatus)ticketsSettled++;
+      }
+    }
+    return {checkedFixtures:verifiedFlashscoreIds.length+verifiedIds.size,selectionUpdates,ticketsSettled};
   }
-  return {checkedFixtures:verifiedFixtureIds.length,selectionUpdates,ticketsSettled};
+  return {checkedFixtures:verifiedFlashscoreIds.length,selectionUpdates,ticketsSettled};
 }
 async function handleBetSettlementDiagnostics(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
@@ -1581,6 +1660,8 @@ export default {
       try {
         const result = await syncFlashscoreDay(env, dayString(new Date()));
         console.log("Flashscore minute sync", JSON.stringify(result));
+        const settlement = await refreshAndSettleBetResults(env);
+        if (settlement.ticketsSettled) console.log("Bet settlement", JSON.stringify(settlement));
       } catch (error) {
         console.error("Flashscore minute sync failed", error instanceof Error ? error.message : "unknown error");
       }
