@@ -3,7 +3,7 @@ import { syncFlashscoreDay, flashscoreProxy } from "./sports/flashscore";
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   DB: D1Database;
-  FLASHSCORE_SCRAPER: DurableObjectNamespace<FlashscoreScraper>;
+  FLASHSCORE_SCRAPER: { getByName(name: string): { fetch(request: Request): Promise<Response> } };
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_BROADCAST_SECRET?: string;
   TELEGRAM_CHANNEL_URL?: string;
@@ -18,8 +18,8 @@ interface Env {
 
 export class FlashscoreScraper {
   private starting: Promise<void> | undefined;
-  private ctx: DurableObjectState;
-  constructor(ctx: DurableObjectState, _env: Env) { this.ctx = ctx; }
+  private ctx: any;
+  constructor(ctx: any, _env: Env) { this.ctx = ctx; }
   async fetch(request: Request): Promise<Response> {
     this.starting ??= this.startAndWaitForPort().finally(() => { this.starting = undefined; });
     await this.starting;
