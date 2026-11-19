@@ -1,3 +1,4 @@
+import { syncOpenFootballFixtures } from "./sports/openfootball";
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   DB: D1Database;
@@ -755,7 +756,6 @@ async function syncFootballLive(env: Env): Promise<{fixtures:number;odds:number}
   return {fixtures,odds:0};
 }
 async function handleSportsFixtures(request: Request, env: Env): Promise<Response> {
-  if (!env.API_FOOTBALL_KEY) return json({ok:true,configured:false,provider:"API-Football",fixtures:[],message:"API-Football is not configured yet."});
   const url=new URL(request.url);
   const from=url.searchParams.get("from")||dayString(new Date());
   const to=url.searchParams.get("to")||dayString(new Date(Date.now()+7*86400000));
@@ -777,8 +777,11 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
     if(row.outcome_key==="away") (item.odds as (number|null)[])[2]=row.suspended?null:Number(row.odd);
     if(row.bookmaker_name){item.bookmaker=row.bookmaker_name;item.oddsUpdatedAt=row.odds_updated_at;}
   }
-  const state=await env.DB.prepare("SELECT last_fixtures_sync,last_live_sync,last_odds_sync,last_error FROM sports_sync_state WHERE provider='api-football'").first<Record<string,unknown>>();
-  return new Response(JSON.stringify({ok:true,configured:true,provider:"API-Football",fixtures:Array.from(map.values()),sync:state}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
+  const [state,openState]=await Promise.all([
+    env.DB.prepare("SELECT last_fixtures_sync,last_live_sync,last_odds_sync,last_error FROM sports_sync_state WHERE provider='api-football'").first<Record<string,unknown>>(),
+    env.DB.prepare("SELECT last_success_at,last_attempt_at,last_error,datasets_loaded,fixtures_loaded FROM sports_source_sync_state WHERE provider='openfootball'").first<Record<string,unknown>>()
+  ]);
+  return new Response(JSON.stringify({ok:true,configured:!!openState||!!env.API_FOOTBALL_KEY,provider:env.API_FOOTBALL_KEY?"OpenFootball fixtures + API-Football odds":"OpenFootball public-domain fixtures",fixtures:Array.from(map.values()),sync:{apiFootball:state||null,openFootball:openState||null}}),{headers:{"content-type":"application/json; charset=utf-8","cache-control":"public, max-age=10, stale-while-revalidate=20","x-content-type-options":"nosniff"}});
 }
 async function handleSportsFixtureDetails(request:Request,env:Env):Promise<Response>{
   const session=await currentSession(request,env);
