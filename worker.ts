@@ -1165,7 +1165,7 @@ async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:numb
       AND f.status_short IN ('FT','AET','PEN','AWD','WO','CANC','ABD','PST','SUSP','INT')
       AND f.result_checked_at IS NOT NULL
       AND (f.status_short='CANC' OR datetime(f.result_checked_at)<=datetime(?))
-      AND (f.status_short='CANC' OR datetime(f.kickoff)<=datetime(?))
+      AND (f.status_short IN ('CANC','AWD','WO') OR datetime(f.kickoff)<=datetime(?))
     ORDER BY f.kickoff ASC LIMIT 20
   `).bind(flashscoreCutoff,now).all<{id:string}>();
   const fixtureIds=(due.results||[]).map(row=>row.id);
