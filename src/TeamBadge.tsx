@@ -9,5 +9,31 @@ const CLUB_LOGOS:Record<string,string>={
 };
 const FLAGS:Record<string,string>={SEN:'sn',SUD:'sd',GHA:'gh',SOM:'so',TUR:'tr',FRA:'fr',ENG:'gb-eng',ESP:'es',GER:'de',NED:'nl',GRE:'gr',SRB:'rs',MKD:'mk',SVN:'si',SUI:'ch',SCO:'gb-sct',FRO:'fo',MDA:'md',KAZ:'kz',SVK:'sk',EST:'ee',BUL:'bg',ISL:'is',LUX:'lu',LTU:'lt',LIE:'li',GIB:'gi',MLT:'mt',DEN:'dk',NOR:'no',WAL:'gb-wls',POR:'pt',HUN:'hu',NIR:'gb-nir',UKR:'ua',GEO:'ge',ISR:'il',AUT:'at',IRL:'ie',KOS:'xk',BIH:'ba',ROU:'ro',POL:'pl',SWE:'se'};
 const cache=new Map<string,string>(),pending=new Map<string,Promise<string>>();
-async function loadBadge(code:string):Promise<string>{if(CLUB_LOGOS[code]&&CLUB_LOGOS[code]!==' Roma')return 'https://media.api-sports.io/football/teams/'+CLUB_LOGOS[code]+'.png';if(cache.has(code))return cache.get(code)!;if(pending.has(code))return pending.get(code)!;const team=TEAMS[code];if(!team)return '';const task=(async()=>{try{const endpoint=team.id?'https://www.thesportsdb.com/api/v1/json/3/lookupteam.php?id='+team.id:'https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t='+encodeURIComponent(team.name);const response=await fetch(endpoint);if(!response.ok)return FLAGS[code]?'https://flagcdn.com/w160/'+FLAGS[code]+'.png':'';const data=await response.json();const rows=Array.isArray(data?.teams)?data.teams:[];const exact=rows.find((r:any)=>String(r.strTeam||'').toLowerCase()===team.name.toLowerCase()&&r.strBadge);const alias=rows.find((r:any)=>[team.name,...(team.aliases||[])].some(n=>String(r.strTeam||'').toLowerCase()===n.toLowerCase())&&r.strBadge);const found=exact||alias||rows.find((r:any)=>r.strBadge&&/national|world cup|uefa|fifa/i.test(String(r.strLeague||'')));const url=found?.strBadge||(FLAGS[code]?'https://flagcdn.com/w160/'+FLAGS[code]+'.png':'');if(url)cache.set(code,url);return url}catch{return FLAGS[code]?'https://flagcdn.com/w160/'+FLAGS[code]+'.png':''}})();pending.set(code,task);const result=await task;pending.delete(code);return result}
-export function TeamBadge({name,code,logoUrl}:{name:string;code:string;logoUrl?:string|null}){const [src,setSrc]=useState(()=>logoUrl||cache.get(code)||'');useEffect(()=>{let active=true;if(logoUrl){setSrc(logoUrl);return()=>{active=false}}setSrc(cache.get(code)||'');loadBadge(code).then(url=>{if(active&&url)setSrc(url)});return()=>{active=false}},[code,logoUrl]);return <div className="crest club-crest team-crest">{src?<img src={src} alt={name+' team crest or flag'} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setSrc('')}/>:<span>{code||name.slice(0,3).toUpperCase()}</span>}</div>}
+const cacheKey=(code:string,name:string)=>code||("name:"+name.trim().toLowerCase().replace(/\\s+/g," "));
+async function loadBadge(code:string,name:string):Promise<string>{
+ const key=cacheKey(code,name);
+ if(CLUB_LOGOS[code]&&CLUB_LOGOS[code]!==' Roma')return 'https://media.api-sports.io/football/teams/'+CLUB_LOGOS[code]+'.png';
+ if(cache.has(key))return cache.get(key)!;
+ if(pending.has(key))return pending.get(key)!;
+ const team=TEAMS[code]||{name:name.trim()};
+ if(!team.name)return '';
+ const task=(async()=>{try{
+  const endpoint=team.id?'https://www.thesportsdb.com/api/v1/json/3/lookupteam.php?id='+team.id:'https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t='+encodeURIComponent(team.name);
+  const response=await fetch(endpoint,{signal:AbortSignal.timeout(5000)});
+  if(!response.ok)return FLAGS[code]?'https://flagcdn.com/w160/'+FLAGS[code]+'.png':'';
+  const data=await response.json(),rows=Array.isArray(data?.teams)?data.teams:[];
+  const names=[team.name,...(team.aliases||[])].map(value=>value.toLowerCase());
+  const found=rows.find((row:any)=>row.strBadge&&names.includes(String(row.strTeam||'').trim().toLowerCase()));
+  const url=found?.strBadge||(FLAGS[code]?'https://flagcdn.com/w160/'+FLAGS[code]+'.png':'');
+  if(url)cache.set(key,url);
+  return url;
+ }catch{return FLAGS[code]?'https://flagcdn.com/w160/'+FLAGS[code]+'.png':''}})();
+ pending.set(key,task);
+ const result=await task;pending.delete(key);return result;
+}
+export function TeamBadge({name,code,logoUrl}:{name:string;code:string;logoUrl?:string|null}){
+ const key=cacheKey(code,name);
+ const [src,setSrc]=useState(()=>logoUrl||cache.get(key)||'');
+ useEffect(()=>{let active=true;if(logoUrl){setSrc(logoUrl);return()=>{active=false}}setSrc(cache.get(key)||'');loadBadge(code,name).then(url=>{if(active&&url)setSrc(url)});return()=>{active=false}},[code,name,logoUrl,key]);
+ return <div className="crest club-crest team-crest">{src?<img src={src} alt={name+' team crest or flag'} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setSrc('')}/>:<span>{code||name.slice(0,3).toUpperCase()}</span>}</div>
+}
