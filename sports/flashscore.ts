@@ -65,11 +65,12 @@ function verifiedFinal(match: FlashscoreMatch, code: string, verification: any):
   const home = scoreValue(match.home_score), away = scoreValue(match.away_score);
   const dh = scoreValue(details.home_score), da = scoreValue(details.away_score);
   const sh = scoreValue(summary.home_score), sa = scoreValue(summary.away_score);
-  if (home === null || away === null || dh === null || da === null || sh === null || sa === null) return null;
-  if (home !== dh || away !== da || home !== sh || away !== sa) return null;
+  if (dh === null || da === null || sh === null || sa === null) return null;
+  if (dh !== sh || da !== sa) return null;
 
-  // The 1X2 "full-time" market is settled at 90 minutes, not after extra time
-  // or a penalty shootout. Flashscore summary period scores are goals in each period.
+  // The listing score for AET/PEN fixtures may include extra time or the shootout.
+  // The 1X2 full-time market is the regulation-time result, so validate details
+  // and summary against each other and derive the score from the first two halves.
   const hasExtraPeriods = (match.periods || []).some((period: any) => /extra|penalt|period\\s*[3-9]/i.test(String(period.name || "")));
   if (code === "AET" || code === "PEN" || hasExtraPeriods) {
     const periodRows = [
@@ -102,6 +103,7 @@ function verifiedFinal(match: FlashscoreMatch, code: string, verification: any):
     if (firstHome === null || firstAway === null || secondHome === null || secondAway === null) return null;
     return { home: firstHome + secondHome, away: firstAway + secondAway };
   }
+  if (home === null || away === null || home !== dh || away !== da || home !== sh || away !== sa) return null;
   return { home, away };
 }
 
