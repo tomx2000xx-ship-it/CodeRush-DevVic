@@ -4,6 +4,7 @@ export type FlashscoreEnv = { DB: D1Like };
 type FlashscoreMatch = {
   id?: string; start_time?: string; date?: string; status?: string; stage?: string;
   home_score?: number | null; away_score?: number | null;
+  periods?: Array<{ name?: string; home?: number | null; away?: number | null }>;
   home?: { id?: string; name?: string; short_name?: string; logo?: string };
   away?: { id?: string; name?: string; short_name?: string; logo?: string };
 };
@@ -70,21 +71,35 @@ function verifiedFinal(match: FlashscoreMatch, code: string, verification: any):
   // The 1X2 "full-time" market is settled at 90 minutes, not after extra time
   // or a penalty shootout. Flashscore summary period scores are goals in each period.
   if (code === "AET" || code === "PEN") {
-    const regularPeriods = (summary.periods || []).filter((period: any) => {
-      const label = String(period.period || "").toLowerCase();
-      return !label.includes("extra") &&
-        (label.includes("1st half") || label.includes("first half") ||
-         label.includes("2nd half") || label.includes("second half"));
+    const periodRows = [
+      ...(summary.periods || []).map((period: any) => ({
+        label: String(period.period || ""),
+        home: period.home_score,
+        away: period.away_score,
+      })),
+      ...(match.periods || []).map((period: any) => ({
+        label: String(period.name || ""),
+        home: period.home,
+        away: period.away,
+      })),
+    ];
+    const regularPeriods = periodRows.filter((period: any) => {
+      const label = period.label.toLowerCase().replace(/[\\s_-]/g, "");
+      return label === "1sthalf" || label === "firsthalf" || label === "2ndhalf" || label === "secondhalf";
     });
-    if (regularPeriods.length < 2) return null;
-    let regularHome = 0, regularAway = 0;
-    for (const period of regularPeriods) {
-      const periodHome = scoreValue(period.home_score), periodAway = scoreValue(period.away_score);
-      if (periodHome === null || periodAway === null) return null;
-      regularHome += periodHome;
-      regularAway += periodAway;
-    }
-    return { home: regularHome, away: regularAway };
+    const firstHalf = regularPeriods.find((period: any) => {
+      const label = period.label.toLowerCase().replace(/[\\s_-]/g, "");
+      return label === "1sthalf" || label === "firsthalf";
+    });
+    const secondHalf = regularPeriods.find((period: any) => {
+      const label = period.label.toLowerCase().replace(/[\\s_-]/g, "");
+      return label === "2ndhalf" || label === "secondhalf";
+    });
+    if (!firstHalf || !secondHalf) return null;
+    const firstHome = scoreValue(firstHalf.home), firstAway = scoreValue(firstHalf.away);
+    const secondHome = scoreValue(secondHalf.home), secondAway = scoreValue(secondHalf.away);
+    if (firstHome === null || firstAway === null || secondHome === null || secondAway === null) return null;
+    return { home: firstHome + secondHome, away: firstAway + secondAway };
   }
   return { home, away };
 }
