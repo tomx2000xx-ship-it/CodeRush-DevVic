@@ -119,7 +119,7 @@ def collect_day(base, day, odds_cache, verified_cache):
                         "bet_scope": "full-time", "geo": "NG",
                     })
                     markets = price.get("markets") or []
-                    if any(str(m.get("bet_type", "")).upper() == "HOME_DRAW_AWAY" and str(m.get("bet_scope", "")).upper() == "FULL_TIME" and m.get("selections") for m in markets):
+                    if any(str(m.get("bet_type", "")).upper() == "HOME_DRAW_AWAY" and str(m.get("bet_scope", "")).upper() == "FULL_TIME" and {"home", "draw", "away"}.issubset({str(x.get("selection", "")).lower() for x in (m.get("selections") or [])}) for m in markets):
                         odds[match_id] = price
                         odds_cache.add(match_id)
                 except Exception as exc:
