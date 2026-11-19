@@ -64,7 +64,7 @@ function verifiedFinal(match: FlashscoreMatch, code: string, verification: any):
 
 function oddsStatements(db: D1Like, fixtureId: string, matchId: string, kickoffMs: number, odds: any): any[] {
   const now = Date.now();
-  if (kickoffMs <= now || kickoffMs > now + 6 * 60 * 60 * 1000) return [];
+  if (kickoffMs <= now || kickoffMs > now + 90 * 60 * 1000) return [];
   const markets = Array.isArray(odds?.markets) ? odds.markets : [];
   const statements: any[] = [], snapshotAt = nowIso();
   for (const market of markets) {
