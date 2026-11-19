@@ -53,13 +53,40 @@ async function writeBatches(db: D1Like, statements: any[]): Promise<void> {
   for (let offset = 0; offset < statements.length; offset += 50) await db.batch(statements.slice(offset, offset + 50));
 }
 
-function verifiedFinal(match: FlashscoreMatch, code: string, verification: any): { home: number; away: number } | null {
+function verifiedFinal(match: FlashscoreMatch, code: string, verification: any): { home: number | null; away: number | null } | null {
   if (!isFinal(code) || !verification?.details || !verification?.summary) return null;
+  const details = verification.details, summary = verification.summary;
+  const detailText = (String(details.status || "") + " " + String(details.stage || "")).toLowerCase();
+  const summaryText = (String(summary.status || "") + " " + String(summary.stage || "")).toLowerCase();
+  if (code === "AWD" && detailText.includes("awarded") && summaryText.includes("awarded")) return { home: null, away: null };
+  if (code === "WO" && detailText.includes("walkover") && summaryText.includes("walkover")) return { home: null, away: null };
+
   const home = scoreValue(match.home_score), away = scoreValue(match.away_score);
-  const dh = scoreValue(verification.details.home_score), da = scoreValue(verification.details.away_score);
-  const sh = scoreValue(verification.summary.home_score), sa = scoreValue(verification.summary.away_score);
+  const dh = scoreValue(details.home_score), da = scoreValue(details.away_score);
+  const sh = scoreValue(summary.home_score), sa = scoreValue(summary.away_score);
   if (home === null || away === null || dh === null || da === null || sh === null || sa === null) return null;
-  return home === dh && away === da && home === sh && away === sa ? { home, away } : null;
+  if (home !== dh || away !== da || home !== sh || away !== sa) return null;
+
+  // The 1X2 "full-time" market is settled at 90 minutes, not after extra time
+  // or a penalty shootout. Flashscore summary period scores are goals in each period.
+  if (code === "AET" || code === "PEN") {
+    const regularPeriods = (summary.periods || []).filter((period: any) => {
+      const label = String(period.period || "").toLowerCase();
+      return !label.includes("extra") &&
+        (label.includes("1st half") || label.includes("first half") ||
+         label.includes("2nd half") || label.includes("second half"));
+    });
+    if (regularPeriods.length < 2) return null;
+    let regularHome = 0, regularAway = 0;
+    for (const period of regularPeriods) {
+      const periodHome = scoreValue(period.home_score), periodAway = scoreValue(period.away_score);
+      if (periodHome === null || periodAway === null) return null;
+      regularHome += periodHome;
+      regularAway += periodAway;
+    }
+    return { home: regularHome, away: regularAway };
+  }
+  return { home, away };
 }
 
 function oddsStatements(db: D1Like, fixtureId: string, matchId: string, kickoffMs: number, odds: any): any[] {
