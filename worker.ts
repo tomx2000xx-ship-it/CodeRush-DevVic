@@ -759,7 +759,7 @@ async function handleSportsFixtures(request: Request, env: Env): Promise<Respons
   const url=new URL(request.url);
   const from=url.searchParams.get("from")||dayString(new Date());
   const to=url.searchParams.get("to")||dayString(new Date(Date.now()+7*86400000));
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||to<from||(new Date(to).getTime()-new Date(from).getTime())>14*86400000) return json({ok:false,error:"Choose a valid date range of no more than 15 days."},400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||to<from) return json({ok:false,error:"Invalid date range"},400);
   const rows=await env.DB.prepare(`
     SELECT f.id,f.league_name,f.country,f.kickoff,f.status_short,f.elapsed,f.home_team,f.away_team,f.home_code,f.away_code,
       json_extract(f.raw_json,'$.teams.home.logo') AS home_logo,json_extract(f.raw_json,'$.teams.away.logo') AS away_logo,json_extract(f.raw_json,'$.league.logo') AS league_logo,
@@ -833,7 +833,7 @@ async function handleSportsSync(request: Request, env: Env): Promise<Response> {
       const url=new URL(request.url);
       const from=url.searchParams.get("from")||dayString(new Date());
       const to=url.searchParams.get("to")||dayString(new Date(Date.now()+7*86400000));
-      if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(from)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(to)||to<from||(new Date(to).getTime()-new Date(from).getTime())>14*86400000) return json({ok:false,error:"Choose a valid date range of no more than 15 days."},400);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||to<from||(new Date(to).getTime()-new Date(from).getTime())>14*86400000) return json({ok:false,error:"Choose a valid date range of no more than 15 days."},400);
       const result=await syncFootballRange(env,from,to);
       const live=await syncFootballLive(env);
       apiFootball={fixtures:result.fixtures,odds:result.odds,liveFixtures:live.fixtures,liveOdds:live.odds};
