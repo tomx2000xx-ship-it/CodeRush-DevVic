@@ -1162,11 +1162,12 @@ async function refreshAndSettleBetResults(env:Env):Promise<{checkedFixtures:numb
     JOIN sports_fixtures f ON f.id=s.fixture_id
     WHERE s.result_status='pending' AND f.id LIKE 'fs-%'
       AND datetime(f.kickoff)<=datetime(?)
-      AND f.status_short IN ('FT','AET','PEN','AWD','WO')
+      AND f.status_short IN ('FT','AET','PEN','AWD','WO','CANC','ABD','PST','SUSP','INT')
       AND f.result_checked_at IS NOT NULL
-      AND datetime(f.result_checked_at)<=datetime(?)
+      AND (f.status_short='CANC' OR datetime(f.result_checked_at)<=datetime(?))
+      AND (f.status_short='CANC' OR datetime(f.kickoff)<=datetime(?))
     ORDER BY f.kickoff ASC LIMIT 20
-  `).bind(now,flashscoreCutoff).all<{id:string}>();
+  `).bind(flashscoreCutoff,now).all<{id:string}>();
   const fixtureIds=(due.results||[]).map(row=>row.id);
   let selectionUpdates=0,ticketsSettled=0;
   if(fixtureIds.length){
