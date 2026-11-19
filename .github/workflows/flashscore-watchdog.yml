@@ -7,6 +7,9 @@ on:
       - ".github/workflows/flashscore-watchdog.yml"
   schedule:
     - cron: "*/5 * * * *"
+  workflow_run:
+    workflows: ["CodeRush Flashscore Live Feed"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
